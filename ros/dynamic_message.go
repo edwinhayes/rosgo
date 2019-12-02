@@ -9,12 +9,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/buger/jsonparser"
+	"github.com/edwinhayes/rosgo/libgengo"
+	"github.com/pkg/errors"
 	"os"
 	"reflect"
 	"strings"
-
-	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/pkg/errors"
 )
 
 // DEFINE PUBLIC STRUCTURES.
@@ -162,20 +162,19 @@ func (t DynamicMessageType) NewMessage() Message {
 	if t.spec == nil {
 		return nil
 	}
-
 	// But otherwise, make a new one.
 	d := new(DynamicMessage)
 	d.dynamicType = &t
 	var err error
-	d.data, err = buildMap(t.Name())
+	d.data, err = zeroValueData(t.Name())
 	if err != nil {
 		return nil
 	}
 	return d
 }
 
-//buildMap creates the zeroValue (default) data map for a new dynamic message
-func buildMap(s string) (map[string]interface{}, error) {
+//zeroValueData creates the zeroValue (default) data map for a new dynamic message
+func zeroValueData(s string) (map[string]interface{}, error) {
 	//Create map
 	d := make(map[string]interface{})
 
@@ -497,11 +496,230 @@ func (m DynamicMessage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.data)
 }
 
-//func (m DynamicMessage) UnmarshalJSON(buf []byte) error {
-// TODO - This is not as easy, because a DynamicMessage already needs to be pointing at the correct type in order for
-//	the unmarshalled m.data to make any sense - how are you supposed to do this in the case of any nested messages,
-//	given that the JSON object won't contain any information about the schema.
-//}
+//UnmarshalJSON provides a custom implementation of JSON unmarshalling. Using the dynamicMessage provided, Msgspec is used to
+//determine the individual parsing of each JSON encoded payload item into the correct Go type. It is important each type is
+//correct so that the message serializes correctly and is understood by the ROS system
+func (m DynamicMessage) UnmarshalJSON(buf []byte) error {
+
+	var err error
+	var tmpArray []interface{}
+	//We range the message spec fields as this is more predictable than using JSON structure to loop
+	for _, field := range m.dynamicType.spec.Fields {
+		//If the field is an array
+		if field.IsArray {
+			//Here we grab the msgBytes and json decoded msgType for the field Name lookup
+			msgBytes, msgType, _, _ := jsonparser.Get(buf, field.GoName)
+			jsonType := fmt.Sprintf("%v", msgType)
+			//For scenario where a []uint8 array is provided, ros byte array encoded as json string
+			if jsonType == "string" {
+				bytes, err := jsonparser.GetString(buf, field.GoName)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				m.data[field.GoName] = []byte(bytes)
+			} else if jsonType == "array" {
+				//Continue if the payload provides an array
+				//TODO: Utilize the array callback feature in the jsonparser package, structure will change significantly
+				//Using a builtin json unmarshal is cheating and uses too many resources
+				err := json.Unmarshal(msgBytes, &tmpArray)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				//here we are checking the size of the array provided in json
+				//If the array is in field spec is fixed length and it does not match, an error will occur
+				size := len(tmpArray)
+				if field.ArrayLen != -1 && field.ArrayLen != size {
+					return errors.New("Fixed array length incorrect : " + field.GoName)
+				}
+				//Loop through array items
+				for i := 0; i < size; i++ {
+					//Get the json bytes of the array Item
+					arrayBytes, err := json.Marshal(tmpArray[i])
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					//If it is a builtin goType
+					if field.IsBuiltin {
+						//Here we grab the msgBytes and json decoded msgType for the field Name lookup in array
+						msgBytes, msgType, _, _ := jsonparser.Get(arrayBytes, field.GoName)
+						jsonType := fmt.Sprintf("%v", msgType)
+						if jsonType == "bool" {
+							//Lookup bool field inside array
+							data, err := jsonparser.GetBoolean(msgBytes, field.GoName)
+							if err != nil {
+								return errors.Wrap(err, "Field: "+field.Name)
+							}
+							m.data[field.GoName] = append(m.data[field.GoName].([]bool), bool(data))
+						} else if jsonType == "number" {
+							//Lookup number inside array
+							data, err := jsonparser.GetFloat(msgBytes, field.GoName)
+							if err != nil {
+								return errors.Wrap(err, "Field: "+field.Name)
+							}
+							switch field.GoType {
+							case "int8":
+								m.data[field.GoName] = append(m.data[field.GoName].([]int8), int8(data))
+							case "int16":
+								m.data[field.GoName] = append(m.data[field.GoName].([]int16), int16(data))
+							case "int32":
+								m.data[field.GoName] = append(m.data[field.GoName].([]int32), int32(data))
+							case "int64":
+								m.data[field.GoName] = append(m.data[field.GoName].([]int64), int64(data))
+							case "uint8":
+								m.data[field.GoName] = append(m.data[field.GoName].([]uint8), uint8(data))
+							case "uint16":
+								m.data[field.GoName] = append(m.data[field.GoName].([]uint16), uint16(data))
+							case "uint32":
+								m.data[field.GoName] = append(m.data[field.GoName].([]uint32), uint32(data))
+							case "uint64":
+								m.data[field.GoName] = append(m.data[field.GoName].([]uint64), uint64(data))
+							case "float32":
+								m.data[field.GoName] = append(m.data[field.GoName].([]float32), float32(data))
+							case "float64":
+								m.data[field.GoName] = append(m.data[field.GoName].([]float64), float64(data))
+							}
+						} else if jsonType == "string" {
+							//Lookup string inside array
+							data, err := jsonparser.GetString(msgBytes, field.GoName)
+							if err != nil {
+								return errors.Wrap(err, "Field: "+field.Name)
+							}
+							if field.GoType == "string" {
+								m.data[field.GoName] = append(m.data[field.GoName].([]string), string(data))
+							} else {
+								return errors.New("Expected type []string, found : " + field.GoType)
+							}
+						} else if jsonType == "object" {
+							//Time and Duration are provided as JSON objects
+							switch field.GoType {
+							case "ros.Time":
+								sec, err := jsonparser.GetFloat(msgBytes, "Sec")
+								nSec, err := jsonparser.GetFloat(msgBytes, "NSec")
+								if err != nil {
+									return errors.Wrap(err, "Field: "+field.Name)
+								}
+								tmpTime := Time{}
+								tmpTime.Sec = uint32(sec)
+								tmpTime.NSec = uint32(nSec)
+								m.data[field.GoName] = append(m.data[field.GoName].([]Time), tmpTime)
+							case "ros.Duration":
+								sec, err := jsonparser.GetFloat(msgBytes, "Sec")
+								nSec, err := jsonparser.GetFloat(msgBytes, "NSec")
+								if err != nil {
+									return errors.Wrap(err, "Field: "+field.Name)
+								}
+								tmpDuration := Duration{}
+								tmpDuration.Sec = uint32(sec)
+								tmpDuration.NSec = uint32(nSec)
+								m.data[field.GoName] = append(m.data[field.GoName].([]Duration), tmpDuration)
+							}
+						}
+					} else {
+						//We have a nested message array
+						t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
+						if err != nil {
+							return errors.Wrap(err, "Field: "+field.Name)
+						}
+						nestedMsg := t2.NewMessage().(*DynamicMessage)
+						if err = nestedMsg.UnmarshalJSON(arrayBytes); err != nil {
+							return errors.Wrap(err, "Field: "+field.Name)
+						}
+						m.data[field.GoName] = append(m.data[field.GoName].([]Message), nestedMsg)
+					}
+				}
+			}
+		} else {
+			//Here we grab the msgBytes and json decoded msgType for the field Name lookup
+			msgBytes, msgType, _, _ := jsonparser.Get(buf, field.GoName)
+			jsonType := fmt.Sprintf("%v", msgType)
+			if jsonType == "bool" {
+				//Lookup bool field inside json message
+				data, err := jsonparser.GetBoolean(msgBytes, field.GoName)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				m.data[field.GoName] = bool(data)
+			} else if jsonType == "number" {
+				//Lookup number field inside json message
+				data, err := jsonparser.GetFloat(buf, field.GoName)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				switch field.GoType {
+				case "int8":
+					m.data[field.GoName] = int8(data)
+				case "int16":
+					m.data[field.GoName] = int16(data)
+				case "int32":
+					m.data[field.GoName] = int32(data)
+				case "int64":
+					m.data[field.GoName] = int64(data)
+				case "uint8":
+					m.data[field.GoName] = uint8(data)
+				case "uint16":
+					m.data[field.GoName] = uint16(data)
+				case "uint32":
+					m.data[field.GoName] = uint32(data)
+				case "uint64":
+					m.data[field.GoName] = uint64(data)
+				case "float32":
+					m.data[field.GoName] = float32(data)
+				case "float64":
+					m.data[field.GoName] = float64(data)
+				default:
+					return errors.New("Built-in type not found : " + field.GoType)
+				}
+			} else if jsonType == "string" {
+				//Lookup string field inside json message
+				data, err := jsonparser.GetString(buf, field.GoName)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				if field.GoType == "string" {
+					m.data[field.GoName] = data
+				} else {
+					return errors.New("Expected type []string, found : " + field.GoType)
+				}
+			} else if jsonType == "object" {
+				//Time and Duration are provided as JSON objects
+				switch field.GoType {
+				case "ros.Time":
+					sec, err := jsonparser.GetFloat(msgBytes, "Sec")
+					nSec, err := jsonparser.GetFloat(msgBytes, "NSec")
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpTime := Time{}
+					tmpTime.Sec = uint32(sec)
+					tmpTime.NSec = uint32(nSec)
+					m.data[field.GoName] = tmpTime
+				case "ros.Duration":
+					sec, err := jsonparser.GetFloat(msgBytes, "Sec")
+					nSec, err := jsonparser.GetFloat(msgBytes, "NSec")
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpDuration := Duration{}
+					tmpDuration.Sec = uint32(sec)
+					tmpDuration.NSec = uint32(nSec)
+					m.data[field.GoName] = tmpDuration
+				default:
+					//We've got a nested ros message
+					t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					nestedMsg := t2.NewMessage().(*DynamicMessage)
+					if err = nestedMsg.UnmarshalJSON(msgBytes); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					m.data[field.GoName] = nestedMsg
+				}
+			}
+		}
+	}
+	return err
+}
 
 // Serialize converts a DynamicMessage into a TCPROS bytestream allowing it to be published to other nodes; required for
 // ros.Message.
