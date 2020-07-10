@@ -141,38 +141,38 @@ func (sm *clientStateMachine) getTransitions(goalStatus *ros.DynamicMessage) (st
 	switch sm.state {
 	case WaitingForGoalAck:
 		switch status {
-		case 0:
+		case uint8(0):
 			stateList.PushBack(Pending)
 			break
-		case 1:
+		case uint8(1):
 			stateList.PushBack(Active)
 			break
-		case 5:
+		case uint8(5):
 			stateList.PushBack(Pending)
 			stateList.PushBack(WaitingForCancelAck)
 			break
-		case 7:
+		case uint8(7):
 			stateList.PushBack(Pending)
 			stateList.PushBack(Recalling)
 			break
-		case 8:
+		case uint8(8):
 			stateList.PushBack(Pending)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			break
@@ -181,35 +181,35 @@ func (sm *clientStateMachine) getTransitions(goalStatus *ros.DynamicMessage) (st
 
 	case Pending:
 		switch status {
-		case 0:
+		case uint8(0):
 			break
-		case 1:
+		case uint8(1):
 			stateList.PushBack(Active)
 			break
-		case 5:
+		case uint8(5):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 7:
+		case uint8(7):
 			stateList.PushBack(Recalling)
 			break
-		case 8:
+		case uint8(8):
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			break
@@ -217,178 +217,178 @@ func (sm *clientStateMachine) getTransitions(goalStatus *ros.DynamicMessage) (st
 		break
 	case Active:
 		switch status {
-		case 0:
+		case uint8(0):
 			err = fmt.Errorf("invalid transition from Active to Pending")
 			break
-		case 1:
+		case uint8(1):
 			break
-		case 5:
+		case uint8(5):
 			err = fmt.Errorf("invalid transition from Active to Rejected")
 			break
-		case 7:
+		case uint8(7):
 			err = fmt.Errorf("invalid transition from Active to Recalling")
 			break
-		case 8:
+		case uint8(8):
 			err = fmt.Errorf("invalid transition from Active to Recalled")
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case WaitingForResult:
 		switch status {
-		case 0:
+		case uint8(0):
 			err = fmt.Errorf("invalid transition from WaitingForResult to Pending")
 			break
-		case 1:
+		case uint8(1):
 			break
-		case 5:
+		case uint8(5):
 			break
-		case 7:
+		case uint8(7):
 			err = fmt.Errorf("invalid transition from WaitingForResult to Recalling")
 			break
-		case 8:
+		case uint8(8):
 			break
-		case 2:
+		case uint8(2):
 			break
-		case 3:
+		case uint8(3):
 			break
-		case 4:
+		case uint8(4):
 			break
-		case 6:
+		case uint8(6):
 			err = fmt.Errorf("invalid transition from WaitingForResult to Preempting")
 			break
 		}
 		break
 	case WaitingForCancelAck:
 		switch status {
-		case 0:
+		case uint8(0):
 			break
-		case 1:
+		case uint8(1):
 			break
-		case 5:
+		case uint8(5):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 7:
+		case uint8(7):
 			stateList.PushBack(Recalling)
 			break
-		case 8:
+		case uint8(8):
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case Recalling:
 		switch status {
-		case 0:
+		case uint8(0):
 			err = fmt.Errorf("invalid transition from Recalling to Pending")
 			break
-		case 1:
+		case uint8(1):
 			err = fmt.Errorf("invalid transition from Recalling to Active")
 			break
-		case 5:
+		case uint8(5):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 7:
+		case uint8(7):
 			break
-		case 8:
+		case uint8(8):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case Preempting:
 		switch status {
-		case 0:
+		case uint8(0):
 			err = fmt.Errorf("invalid transition from Preempting to Pending")
 			break
-		case 1:
+		case uint8(1):
 			err = fmt.Errorf("invalid transition from Preempting to Active")
 			break
-		case 5:
+		case uint8(5):
 			err = fmt.Errorf("invalid transition from Preempting to Rejected")
 			break
-		case 7:
+		case uint8(7):
 			err = fmt.Errorf("invalid transition from Preempting to Recalling")
 			break
-		case 8:
+		case uint8(8):
 			err = fmt.Errorf("invalid transition from Preempting to Recalled")
 			break
-		case 2:
+		case uint8(2):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 3:
+		case uint8(3):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 4:
+		case uint8(4):
 			stateList.PushBack(WaitingForResult)
 			break
-		case 6:
+		case uint8(6):
 			break
 		}
 		break
 	case Done:
 		switch status {
-		case 0:
+		case uint8(0):
 			err = fmt.Errorf("invalid transition from Done to Pending")
 			break
-		case 1:
+		case uint8(1):
 			err = fmt.Errorf("invalid transition from Done to Active")
 			break
-		case 5:
+		case uint8(5):
 			break
-		case 7:
+		case uint8(7):
 			err = fmt.Errorf("invalid transition from Done to Recalling")
 			break
-		case 8:
+		case uint8(8):
 			break
-		case 2:
+		case uint8(2):
 			break
-		case 3:
+		case uint8(3):
 			break
-		case 4:
+		case uint8(4):
 			break
-		case 6:
+		case uint8(6):
 			err = fmt.Errorf("invalid transition from Done to Preempting")
 			break
 		}
