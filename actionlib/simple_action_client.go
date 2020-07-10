@@ -1,7 +1,6 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"fmt"
 	"reflect"
 	"time"
@@ -102,18 +101,18 @@ func (sc *simpleActionClient) GetResult() (ros.Message, error) {
 
 func (sc *simpleActionClient) GetState() (uint8, error) {
 	if sc.gh == nil {
-		return actionlib_msgs.LOST, fmt.Errorf("called get state when no goal running")
+		return uint8(9), fmt.Errorf("called get state when no goal running")
 	}
 
 	status, err := sc.gh.GetGoalStatus()
 	if err != nil {
-		return actionlib_msgs.LOST, err
+		return uint8(9), err
 	}
 
-	if status == actionlib_msgs.RECALLING {
-		status = actionlib_msgs.PENDING
-	} else if status == actionlib_msgs.PREEMPTING {
-		status = actionlib_msgs.ACTIVE
+	if status == uint8(7) {
+		status = uint8(0)
+	} else if status == uint8(6) {
+		status = uint8(1)
 	}
 
 	return status, nil

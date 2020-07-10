@@ -1,7 +1,6 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"fmt"
 	"hash/fnv"
 	"sync"
@@ -25,10 +24,10 @@ func newServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) *serverGoalH
 	}
 }
 
-func newServerGoalHandlerWithGoalId(as ActionServer, goalID *actionlib_msgs.GoalID) *serverGoalHandler {
+func newServerGoalHandlerWithGoalId(as ActionServer, goalID *ros.DynamicMessage) *serverGoalHandler {
 	return &serverGoalHandler{
 		as: as,
-		sm: newServerStateMachine(*goalID),
+		sm: newServerStateMachine(goalID),
 	}
 }
 
@@ -53,7 +52,7 @@ func (gh *serverGoalHandler) SetAccepted(text string) error {
 
 	if status, err := gh.sm.transition(Accept, text); err != nil {
 		return fmt.Errorf("to transition to an active state, the goal must be in a pending"+
-			"or recalling state, it is currently in state: %d", status.Status)
+			"or recalling state, it is currently in state: %d", status.Data()["status"].(uint8))
 	}
 
 	gh.as.PublishStatus()
@@ -69,7 +68,7 @@ func (gh *serverGoalHandler) SetCancelled(result ros.Message, text string) error
 	status, err := gh.sm.transition(Cancel, text)
 	if err != nil {
 		return fmt.Errorf("to transition to an Canceled state, the goal must be in a pending"+
-			" or recalling state, it is currently in state: %d", status.Status)
+			" or recalling state, it is currently in state: %d", status.Data()["status"].(uint8))
 	}
 
 	gh.SetHandlerDestructionTime(ros.Now())
@@ -86,7 +85,7 @@ func (gh *serverGoalHandler) SetRejected(result ros.Message, text string) error 
 	status, err := gh.sm.transition(Reject, text)
 	if err != nil {
 		return fmt.Errorf("to transition to an Rejected state, the goal must be in a pending"+
-			"or recalling state, it is currently in state: %d", status.Status)
+			"or recalling state, it is currently in state: %d", status.Data()["status"].(uint8))
 	}
 
 	gh.SetHandlerDestructionTime(ros.Now())
@@ -103,7 +102,7 @@ func (gh *serverGoalHandler) SetAborted(result ros.Message, text string) error {
 	status, err := gh.sm.transition(Abort, text)
 	if err != nil {
 		return fmt.Errorf("to transition to an Aborted state, the goal must be in a pending"+
-			"or recalling state, it is currently in state: %d", status.Status)
+			"or recalling state, it is currently in state: %d", status.Data()["status"].(uint8))
 	}
 
 	gh.SetHandlerDestructionTime(ros.Now())
@@ -120,7 +119,7 @@ func (gh *serverGoalHandler) SetSucceeded(result ros.Message, text string) error
 	status, err := gh.sm.transition(Succeed, text)
 	if err != nil {
 		return fmt.Errorf("to transition to an Succeeded state, the goal must be in a pending"+
-			"or recalling state, it is currently in state: %d", status.Status)
+			"or recalling state, it is currently in state: %d", status.Data()["status"].(uint8))
 	}
 
 	gh.SetHandlerDestructionTime(ros.Now())
@@ -154,21 +153,26 @@ func (gh *serverGoalHandler) GetGoal() ros.Message {
 	return gh.goal.GetGoal()
 }
 
-func (gh *serverGoalHandler) GetGoalId() actionlib_msgs.GoalID {
+func (gh *serverGoalHandler) GetGoalId() *ros.DynamicMessage {
 	if gh.goal == nil {
-		return actionlib_msgs.GoalID{}
+		// Create a new Goal id message
+		goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+		goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
+		return goalMsg
 	}
 
 	return gh.goal.GetGoalId()
 }
 
-func (gh *serverGoalHandler) GetGoalStatus() actionlib_msgs.GoalStatus {
+func (gh *serverGoalHandler) GetGoalStatus() *ros.DynamicMessage {
 	status := gh.sm.getStatus()
-	if status.Status != 0 && gh.goal != nil && gh.goal.GetGoalId().Data()["id"].(string) != "" {
+	if status.Data()["status"].(uint8) != 0 && gh.goal != nil && gh.goal.GetGoalId().Data()["id"].(string) != "" {
 		return status
 	}
-
-	return actionlib_msgs.GoalStatus{}
+	// Creae a new goal status message
+	statusMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
+	statusMsg := statusMsgType.NewMessage().(*ros.DynamicMessage)
+	return statusMsg
 }
 
 func (gh *serverGoalHandler) Equal(other ServerGoalHandler) bool {
@@ -176,7 +180,7 @@ func (gh *serverGoalHandler) Equal(other ServerGoalHandler) bool {
 		return false
 	}
 
-	return gh.goal.GetGoalId().Data()["id"].(string) == other.GetGoalId().Id
+	return gh.goal.GetGoalId().Data()["id"].(string) == other.GetGoalId().Data()["id"].(string)
 }
 
 func (gh *serverGoalHandler) NotEqual(other ServerGoalHandler) bool {

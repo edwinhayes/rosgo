@@ -1,7 +1,6 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"fmt"
 	"sync"
 
@@ -45,11 +44,18 @@ func newDefaultActionClient(node ros.Node, action string, actType ActionType) *d
 		goalIDGen:      newGoalIDGenerator(node.Name()),
 	}
 
+	// Create goal publisher
 	ac.goalPub, _ = node.NewPublisher(fmt.Sprintf("%s/goal", action), actType.GoalType())
-	ac.cancelPub, _ = node.NewPublisher(fmt.Sprintf("%s/cancel", action), actionlib_msgs.MsgGoalID)
+	// Create cancel publisher
+	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	ac.cancelPub, _ = node.NewPublisher(fmt.Sprintf("%s/cancel", action), goalMsgType)
+	// Create result subscriber
 	ac.resultSub, _ = node.NewSubscriber(fmt.Sprintf("%s/result", action), actType.ResultType(), ac.internalResultCallback)
+	// Create feedback subscriber
 	ac.feedbackSub, _ = node.NewSubscriber(fmt.Sprintf("%s/feedback", action), actType.FeedbackType(), ac.internalFeedbackCallback)
-	ac.statusSub, _ = node.NewSubscriber(fmt.Sprintf("%s/status", action), actionlib_msgs.MsgGoalStatusArray, ac.internalStatusCallback)
+	// Create status subscriber
+	statusMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatusArray")
+	ac.statusSub, _ = node.NewSubscriber(fmt.Sprintf("%s/status", action), statusMsgType, ac.internalStatusCallback)
 
 	return ac
 }
@@ -93,8 +99,10 @@ func (ac *defaultActionClient) CancelAllGoals() {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
 	}
-
-	ac.cancelPub.Publish(&actionlib_msgs.GoalID{})
+	// Create a goal id message
+	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	goalMsg := goalMsgType.NewMessage()
+	ac.cancelPub.Publish(goalMsg)
 }
 
 func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp ros.Time) {
@@ -103,8 +111,11 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp ros.Time) {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
 	}
-
-	cancelMsg := &actionlib_msgs.GoalID{Stamp: stamp}
+	// Create a goal id message using timestamp
+	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
+	goalMsg.Data()["stamp"] = stamp
+	cancelMsg := goalMsg
 	ac.cancelPub.Publish(cancelMsg)
 }
 
@@ -127,7 +138,7 @@ func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) {
 	}
 }
 
-func (ac *defaultActionClient) PublishCancel(cancel *actionlib_msgs.GoalID) {
+func (ac *defaultActionClient) PublishCancel(cancel *ros.DynamicMessage) {
 	if ac.started {
 		ac.cancelPub.Publish(cancel)
 	}
@@ -199,7 +210,7 @@ func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback,
 	}
 }
 
-func (ac *defaultActionClient) internalStatusCallback(statusArr *actionlib_msgs.GoalStatusArray, event ros.MessageEvent) {
+func (ac *defaultActionClient) internalStatusCallback(statusArr *ros.DynamicMessage, event ros.MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()

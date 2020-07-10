@@ -1,8 +1,6 @@
 package actionlib
 
 import (
-	"github.com/edwinhayes/rosgo/libtest/msgs/std_msgs"
-
 	"github.com/edwinhayes/rosgo/ros"
 )
 
@@ -26,7 +24,7 @@ type ActionGoal interface {
 	GetHeader() *ros.DynamicMessage
 	GetGoalId() *ros.DynamicMessage
 	GetGoal() ros.Message
-	SetHeader(std_msgs.Header)
+	SetHeader(*ros.DynamicMessage)
 	SetGoalId(*ros.DynamicMessage)
 	SetGoal(ros.Message)
 }
@@ -36,7 +34,7 @@ type ActionFeedback interface {
 	GetHeader() *ros.DynamicMessage
 	GetStatus() *ros.DynamicMessage
 	GetFeedback() ros.Message
-	SetHeader(std_msgs.Header)
+	SetHeader(*ros.DynamicMessage)
 	SetStatus(*ros.DynamicMessage)
 	SetFeedback(ros.Message)
 }
@@ -46,7 +44,7 @@ type ActionResult interface {
 	GetHeader() *ros.DynamicMessage
 	GetStatus() *ros.DynamicMessage
 	GetResult() ros.Message
-	SetHeader(std_msgs.Header)
+	SetHeader(*ros.DynamicMessage)
 	SetStatus(*ros.DynamicMessage)
 	SetResult(ros.Message)
 }

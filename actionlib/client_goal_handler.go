@@ -1,7 +1,6 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"fmt"
 	"reflect"
 
@@ -57,7 +56,7 @@ func (gh *clientGoalHandler) GetCommState() (CommState, error) {
 
 func (gh *clientGoalHandler) GetGoalStatus() (uint8, error) {
 	if gh.stateMachine == nil {
-		return actionlib_msgs.LOST, fmt.Errorf("trying to get goal status on an inactive ClientGoalHandler")
+		return uint8(9), fmt.Errorf("trying to get goal status on an inactive ClientGoalHandler")
 	}
 
 	return gh.stateMachine.getGoalStatus().Data()["status"].(uint8), nil
@@ -83,18 +82,18 @@ func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
 
 	// implement get status
 	goalStatus := gh.stateMachine.getGoalStatus().Data()["status"].(uint8)
-	if goalStatus == actionlib_msgs.PREEMPTED ||
-		goalStatus == actionlib_msgs.SUCCEEDED ||
-		goalStatus == actionlib_msgs.ABORTED ||
-		goalStatus == actionlib_msgs.REJECTED ||
-		goalStatus == actionlib_msgs.RECALLED ||
-		goalStatus == actionlib_msgs.LOST {
+	if goalStatus == uint8(2) ||
+		goalStatus == uint8(3) ||
+		goalStatus == uint8(4) ||
+		goalStatus == uint8(5) ||
+		goalStatus == uint8(7) ||
+		goalStatus == uint8(9) {
 
 		return goalStatus, nil
 	}
 
 	logger.Warnf("Asking for terminal state when latest goal is in %v", goalStatus)
-	return actionlib_msgs.LOST, nil
+	return uint8(9), nil
 }
 
 func (gh *clientGoalHandler) GetResult() (ros.Message, error) {
@@ -128,11 +127,12 @@ func (gh *clientGoalHandler) Cancel() error {
 	if gh.stateMachine == nil {
 		return fmt.Errorf("trying to call cancel on inactive client goal hanlder")
 	}
-
-	cancelMsg := &actionlib_msgs.GoalID{
-		Stamp: ros.Now(),
-		Id:    gh.actionGoalID}
-
+	// Create a goal id message with timestamp and goal id
+	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
+	goalMsg.Data()["stamp"] = ros.Now()
+	goalMsg.Data()["id"] = gh.actionGoalID
+	cancelMsg := goalMsg
 	gh.actionClient.cancelPub.Publish(cancelMsg)
 	gh.stateMachine.transitionTo(WaitingForCancelAck, gh, gh.transitionCb)
 	return nil
@@ -180,9 +180,13 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 		state == Recalling ||
 		state == Preempting {
 
-		statusArr := new(actionlib_msgs.GoalStatusArray)
-		statusArr.StatusList = append(statusArr.StatusList, result.GetStatus())
-		if err := gh.updateStatus(statusArr); err != nil {
+		// Create a status array message
+		statusArrayType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatusArray")
+		statusArrayMsg := statusArrayType.NewMessage().(*ros.DynamicMessage)
+		statusArray := statusArrayMsg.Data()["status_list"].([]*ros.DynamicMessage)
+		statusArray = append(statusArray, result.GetStatus())
+		// Update the goal handler status
+		if err := gh.updateStatus(statusArrayMsg); err != nil {
 			return err
 		}
 
@@ -195,7 +199,7 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 	}
 }
 
-func (gh *clientGoalHandler) updateStatus(statusArr *actionlib_msgs.GoalStatusArray) error {
+func (gh *clientGoalHandler) updateStatus(statusArr *ros.DynamicMessage) error {
 	logger := *gh.logger
 	state := gh.stateMachine.getState()
 	if state == Done {

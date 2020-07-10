@@ -1,9 +1,10 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"fmt"
 	"sync"
+
+	"github.com/edwinhayes/rosgo/ros"
 )
 
 type Event uint8
@@ -37,112 +38,114 @@ func (e Event) String() string {
 }
 
 type serverStateMachine struct {
-	goalStatus actionlib_msgs.GoalStatus
+	goalStatus *ros.DynamicMessage
 	mutex      sync.RWMutex
 }
 
-func newServerStateMachine(goalID actionlib_msgs.GoalID) *serverStateMachine {
+func newServerStateMachine(goalID *ros.DynamicMessage) *serverStateMachine {
+	// Create a goal status message with pending status
+	statusMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
+	statusMsg := statusMsgType.NewMessage().(*ros.DynamicMessage)
+	statusMsg.Data()["status"] = 0
 	return &serverStateMachine{
-		goalStatus: actionlib_msgs.GoalStatus{
-			GoalId: goalID,
-			Status: actionlib_msgs.PENDING,
-		},
+
+		goalStatus: statusMsg,
 	}
 }
 
-func (sm *serverStateMachine) transition(event Event, text string) (actionlib_msgs.GoalStatus, error) {
+func (sm *serverStateMachine) transition(event Event, text string) (*ros.DynamicMessage, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	nextState := sm.goalStatus.Status
+	nextState := sm.goalStatus.Data()["status"].(uint8)
 
-	switch sm.goalStatus.Status {
-	case actionlib_msgs.PENDING:
+	switch sm.goalStatus.Data()["status"].(uint8) {
+	case 0:
 		switch event {
 		case Reject:
-			nextState = actionlib_msgs.REJECTED
+			nextState = uint8(5)
 			break
 		case CancelRequest:
-			nextState = actionlib_msgs.RECALLING
+			nextState = uint8(7)
 			break
 		case Cancel:
-			nextState = actionlib_msgs.RECALLED
+			nextState = uint8(8)
 			break
 		case Accept:
-			nextState = actionlib_msgs.ACTIVE
+			nextState = uint8(1)
 			break
 		default:
 			return sm.goalStatus, fmt.Errorf("invalid transition Event")
 		}
 
-	case actionlib_msgs.RECALLING:
+	case uint8(7):
 		switch event {
 		case Reject:
-			nextState = actionlib_msgs.REJECTED
+			nextState = uint8(5)
 			break
 		case Cancel:
-			nextState = actionlib_msgs.RECALLED
+			nextState = uint8(8)
 			break
 		case Accept:
-			nextState = actionlib_msgs.PREEMPTING
+			nextState = uint8(6)
 			break
 		default:
 			return sm.goalStatus, fmt.Errorf("invalid transition Event")
 		}
 
-	case actionlib_msgs.ACTIVE:
+	case uint8(1):
 		switch event {
 		case Succeed:
-			nextState = actionlib_msgs.SUCCEEDED
+			nextState = uint8(3)
 			break
 		case CancelRequest:
-			nextState = actionlib_msgs.PREEMPTING
+			nextState = uint8(6)
 			break
 		case Cancel:
-			nextState = actionlib_msgs.PREEMPTED
+			nextState = uint8(2)
 			break
 		case Abort:
-			nextState = actionlib_msgs.ABORTED
+			nextState = uint8(4)
 			break
 		default:
 			return sm.goalStatus, fmt.Errorf("invalid transition Event")
 		}
 
-	case actionlib_msgs.PREEMPTING:
+	case uint8(6):
 		switch event {
 		case Succeed:
-			nextState = actionlib_msgs.SUCCEEDED
+			nextState = uint8(3)
 			break
 		case Cancel:
-			nextState = actionlib_msgs.PREEMPTED
+			nextState = uint8(2)
 			break
 		case Abort:
-			nextState = actionlib_msgs.ABORTED
+			nextState = uint8(4)
 			break
 		default:
 			return sm.goalStatus, fmt.Errorf("invalid transition Event")
 		}
-	case actionlib_msgs.REJECTED:
+	case uint8(5):
 		break
-	case actionlib_msgs.RECALLED:
+	case uint8(8):
 		break
-	case actionlib_msgs.SUCCEEDED:
+	case uint8(3):
 		break
-	case actionlib_msgs.PREEMPTED:
+	case uint8(2):
 		break
-	case actionlib_msgs.ABORTED:
+	case uint8(4):
 		break
 	default:
 		return sm.goalStatus, fmt.Errorf("invalid state")
 	}
 
-	sm.goalStatus.Status = nextState
-	sm.goalStatus.Text = text
+	sm.goalStatus.Data()["status"] = nextState
+	sm.goalStatus.Data()["text"] = text
 
 	return sm.goalStatus, nil
 }
 
-func (sm *serverStateMachine) getStatus() actionlib_msgs.GoalStatus {
+func (sm *serverStateMachine) getStatus() *ros.DynamicMessage {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
