@@ -399,7 +399,7 @@ LOOP:
 	}
 }
 
-func GenerateMessage(context *MsgContext, spec *MsgSpec, isAction bool) (string, error) {
+func GenerateMessage(context *PkgContext, spec *MsgSpec, isAction bool) (string, error) {
 	var gen MsgGen
 	gen.IsAction = isAction
 	gen.Fields = spec.Fields
@@ -426,7 +426,7 @@ func GenerateMessage(context *MsgContext, spec *MsgSpec, isAction bool) (string,
 	return buffer.String(), err
 }
 
-func GenerateService(context *MsgContext, spec *SrvSpec) (string, string, string, error) {
+func GenerateService(context *PkgContext, spec *SrvSpec) (string, string, string, error) {
 	reqCode, err := GenerateMessage(context, spec.Request, false)
 	if err != nil {
 		return "", "", "", err
@@ -454,7 +454,7 @@ type ActionCode struct {
 	goalCode string
 }
 
-func GenerateAction(context *MsgContext, spec *ActionSpec) (actionCode string, codeMap map[string]string, err error) {
+func GenerateAction(context *PkgContext, spec *ActionSpec) (actionCode string, codeMap map[string]string, err error) {
 	codeMap = make(map[string]string)
 	codeMap[spec.Goal.FullName], err = GenerateMessage(context, spec.Goal, false)
 	if err != nil {

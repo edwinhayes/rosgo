@@ -57,7 +57,7 @@ func newDynamicServiceTypeNested(typeName string, packageName string) (*DynamicS
 	// Create a message context if for some reason it does not exist yet, as it also contains service definitions
 	if context == nil {
 		// Create context for our ROS install.
-		c, err := libgengo.NewMsgContext(strings.Split(GetRuntimePackagePath(), ":"))
+		c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func newDynamicServiceTypeNested(typeName string, packageName string) (*DynamicS
 	// We need to try to look up the full name, in case we've just been given a short name.
 	fullname := typeName
 
-	_, ok := context.GetMsgs()[fullname]
+	_, ok := context.GetSrvs()[fullname]
 	if !ok {
 		// Seems like the package_name we were give wasn't the full name.
 

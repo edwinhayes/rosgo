@@ -53,7 +53,7 @@ func main() {
 
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
 
-	context, err := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	context, err := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)

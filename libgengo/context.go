@@ -52,7 +52,7 @@ func findPackages(pkgType string, rosPkgPaths []string) (map[string]string, erro
 			}
 			for _, p := range pkgPaths {
 				basename := filepath.Base(p)
-				rootname := basename[:len(basename)-4] // This is chopping off the file extension.  Horribly.
+				rootname := basename[:len(basename)-(len(pkgType)+1)] // This is chopping off the file extension.  Horribly.
 				fullname := pkgName + "/" + rootname
 				pkgs[fullname] = p
 			}
@@ -73,6 +73,7 @@ func findPackages(pkgType string, rosPkgPaths []string) (map[string]string, erro
 			continue
 		}
 	}
+
 	return pkgs, nil
 }
 
@@ -88,16 +89,22 @@ func FindAllActions(rosPkgPaths []string) (map[string]string, error) {
 	return findPackages("action", rosPkgPaths)
 }
 
-type MsgContext struct {
+type PkgContext struct {
 	msgPathMap      map[string]string
-	srvPathMap      map[string]string
-	actionPathMap   map[string]string
 	msgRegistry     map[string]*MsgSpec
 	msgRegistryLock sync.RWMutex
+
+	srvPathMap      map[string]string
+	srvRegistry     map[string]*SrvSpec
+	srvRegistryLock sync.RWMutex
+
+	actionPathMap   map[string]string
+	actRegistry     map[string]*ActionSpec
+	actRegistryLock sync.RWMutex
 }
 
-func NewMsgContext(rosPkgPaths []string) (*MsgContext, error) {
-	ctx := new(MsgContext)
+func NewPkgContext(rosPkgPaths []string) (*PkgContext, error) {
+	ctx := new(PkgContext)
 	msgs, err := FindAllMessages(rosPkgPaths)
 	if err != nil {
 		return nil, err
@@ -117,16 +124,30 @@ func NewMsgContext(rosPkgPaths []string) (*MsgContext, error) {
 	ctx.actionPathMap = acts
 
 	ctx.msgRegistry = make(map[string]*MsgSpec)
+	ctx.srvRegistry = make(map[string]*SrvSpec)
+	ctx.actRegistry = make(map[string]*ActionSpec)
 	return ctx, nil
 }
 
-func (ctx *MsgContext) Register(fullname string, spec *MsgSpec) {
+func (ctx *PkgContext) RegisterMsg(fullname string, spec *MsgSpec) {
 	ctx.msgRegistryLock.Lock()
 	ctx.msgRegistry[fullname] = spec
 	ctx.msgRegistryLock.Unlock()
 }
 
-func (ctx *MsgContext) LoadMsgFromString(text string, fullname string) (*MsgSpec, error) {
+func (ctx *PkgContext) RegisterSrv(fullname string, spec *SrvSpec) {
+	ctx.srvRegistryLock.Lock()
+	ctx.srvRegistry[fullname] = spec
+	ctx.srvRegistryLock.Unlock()
+}
+
+func (ctx *PkgContext) RegisterAction(fullname string, spec *ActionSpec) {
+	ctx.actRegistryLock.Lock()
+	ctx.actRegistry[fullname] = spec
+	ctx.actRegistryLock.Unlock()
+}
+
+func (ctx *PkgContext) LoadMsgFromString(text string, fullname string) (*MsgSpec, error) {
 	packageName, shortName, e := packageResourceName(fullname)
 	if e != nil {
 		return nil, e
@@ -160,11 +181,11 @@ func (ctx *MsgContext) LoadMsgFromString(text string, fullname string) (*MsgSpec
 		return nil, err
 	}
 	spec.MD5Sum = md5sum
-	ctx.Register(fullname, spec)
+	ctx.RegisterMsg(fullname, spec)
 	return spec, nil
 }
 
-func (ctx *MsgContext) LoadMsgFromFile(filePath string, fullname string) (*MsgSpec, error) {
+func (ctx *PkgContext) LoadMsgFromFile(filePath string, fullname string) (*MsgSpec, error) {
 	bytes, e := ioutil.ReadFile(filePath)
 	if e != nil {
 		return nil, e
@@ -173,7 +194,7 @@ func (ctx *MsgContext) LoadMsgFromFile(filePath string, fullname string) (*MsgSp
 	return ctx.LoadMsgFromString(text, fullname)
 }
 
-func (ctx *MsgContext) LoadMsg(fullname string) (*MsgSpec, error) {
+func (ctx *PkgContext) LoadMsg(fullname string) (*MsgSpec, error) {
 	ctx.msgRegistryLock.RLock()
 	if spec, ok := ctx.msgRegistry[fullname]; ok {
 		ctx.msgRegistryLock.RUnlock()
@@ -196,7 +217,7 @@ func (ctx *MsgContext) LoadMsg(fullname string) (*MsgSpec, error) {
 	}
 }
 
-func (ctx *MsgContext) LoadSrvFromString(text string, fullname string) (*SrvSpec, error) {
+func (ctx *PkgContext) LoadSrvFromString(text string, fullname string) (*SrvSpec, error) {
 	packageName, shortName, err := packageResourceName(fullname)
 	if err != nil {
 		return nil, err
@@ -227,11 +248,11 @@ func (ctx *MsgContext) LoadSrvFromString(text string, fullname string) (*SrvSpec
 		return nil, err
 	}
 	spec.MD5Sum = md5sum
-
+	ctx.RegisterSrv(fullname, spec)
 	return spec, nil
 }
 
-func (ctx *MsgContext) LoadSrvFromFile(filePath string, fullname string) (*SrvSpec, error) {
+func (ctx *PkgContext) LoadSrvFromFile(filePath string, fullname string) (*SrvSpec, error) {
 	bytes, e := ioutil.ReadFile(filePath)
 	if e != nil {
 		return nil, e
@@ -240,7 +261,7 @@ func (ctx *MsgContext) LoadSrvFromFile(filePath string, fullname string) (*SrvSp
 	return ctx.LoadSrvFromString(text, fullname)
 }
 
-func (ctx *MsgContext) LoadSrv(fullname string) (*SrvSpec, error) {
+func (ctx *PkgContext) LoadSrv(fullname string) (*SrvSpec, error) {
 	if path, ok := ctx.srvPathMap[fullname]; ok {
 		spec, err := ctx.LoadSrvFromFile(path, fullname)
 		if err != nil {
@@ -253,7 +274,7 @@ func (ctx *MsgContext) LoadSrv(fullname string) (*SrvSpec, error) {
 	}
 }
 
-func (ctx *MsgContext) LoadActionFromString(text string, fullname string) (*ActionSpec, error) {
+func (ctx *PkgContext) LoadActionFromString(text string, fullname string) (*ActionSpec, error) {
 	packageName, shortName, err := packageResourceName(fullname)
 	if err != nil {
 		return nil, err
@@ -313,10 +334,11 @@ func (ctx *MsgContext) LoadActionFromString(text string, fullname string) (*Acti
 		return nil, err
 	}
 	spec.MD5Sum = md5sum
+	ctx.RegisterAction(fullname, spec)
 	return spec, nil
 }
 
-func (ctx *MsgContext) LoadActionFromFile(filePath string, fullname string) (*ActionSpec, error) {
+func (ctx *PkgContext) LoadActionFromFile(filePath string, fullname string) (*ActionSpec, error) {
 	bytes, e := ioutil.ReadFile(filePath)
 	if e != nil {
 		return nil, e
@@ -325,20 +347,30 @@ func (ctx *MsgContext) LoadActionFromFile(filePath string, fullname string) (*Ac
 	return ctx.LoadActionFromString(text, fullname)
 }
 
-func (ctx *MsgContext) LoadAction(fullname string) (*ActionSpec, error) {
-	if path, ok := ctx.actionPathMap[fullname]; ok {
-		spec, err := ctx.LoadActionFromFile(path, fullname)
-		if err != nil {
-			return nil, err
-		} else {
-			return spec, nil
-		}
+func (ctx *PkgContext) LoadAction(fullname string) (*ActionSpec, error) {
+	ctx.actRegistryLock.RLock()
+	if spec, ok := ctx.actRegistry[fullname]; ok {
+		ctx.actRegistryLock.RUnlock()
+		return spec, nil
 	} else {
-		return nil, fmt.Errorf("Action definition of `%s` is not found", fullname)
+		ctx.actRegistryLock.RUnlock()
+		if path, ok := ctx.actionPathMap[fullname]; ok {
+			spec, err := ctx.LoadActionFromFile(path, fullname)
+			if err != nil {
+				return nil, err
+			} else {
+				ctx.actRegistryLock.Lock()
+				ctx.actRegistry[fullname] = spec
+				ctx.actRegistryLock.Unlock()
+				return spec, nil
+			}
+		} else {
+			return nil, fmt.Errorf("Action definition of `%s` is not found", fullname)
+		}
 	}
 }
 
-func (ctx *MsgContext) ComputeMD5Text(spec *MsgSpec) (string, error) {
+func (ctx *PkgContext) ComputeMD5Text(spec *MsgSpec) (string, error) {
 	var buf bytes.Buffer
 	for _, c := range spec.Constants {
 		buf.WriteString(fmt.Sprintf("%s %s=%s\n", c.Type, c.Name, c.ValueText))
@@ -361,7 +393,7 @@ func (ctx *MsgContext) ComputeMD5Text(spec *MsgSpec) (string, error) {
 	return strings.Trim(buf.String(), "\n"), nil
 }
 
-func (ctx *MsgContext) ComputeMsgMD5(spec *MsgSpec) (string, error) {
+func (ctx *PkgContext) ComputeMsgMD5(spec *MsgSpec) (string, error) {
 	md5text, err := ctx.ComputeMD5Text(spec)
 	if err != nil {
 		return "", err
@@ -373,7 +405,7 @@ func (ctx *MsgContext) ComputeMsgMD5(spec *MsgSpec) (string, error) {
 	return md5sum, nil
 }
 
-func (ctx *MsgContext) ComputeActionMD5(spec *ActionSpec) (string, error) {
+func (ctx *PkgContext) ComputeActionMD5(spec *ActionSpec) (string, error) {
 	goalText, err := ctx.ComputeMD5Text(spec.ActionGoal)
 	if err != nil {
 		return "", err
@@ -395,7 +427,7 @@ func (ctx *MsgContext) ComputeActionMD5(spec *ActionSpec) (string, error) {
 	return md5sum, nil
 }
 
-func (ctx *MsgContext) ComputeSrvMD5(spec *SrvSpec) (string, error) {
+func (ctx *PkgContext) ComputeSrvMD5(spec *SrvSpec) (string, error) {
 	reqText, err := ctx.ComputeMD5Text(spec.Request)
 	if err != nil {
 		return "", err
@@ -412,9 +444,23 @@ func (ctx *MsgContext) ComputeSrvMD5(spec *SrvSpec) (string, error) {
 	return md5sum, nil
 }
 
-func (ctx *MsgContext) GetMsgs() map[string]*MsgSpec {
+func (ctx *PkgContext) GetMsgs() map[string]*MsgSpec {
 	ctx.msgRegistryLock.RLock()
 	msgs := ctx.msgRegistry
 	ctx.msgRegistryLock.RUnlock()
 	return msgs
+}
+
+func (ctx *PkgContext) GetSrvs() map[string]*SrvSpec {
+	ctx.srvRegistryLock.RLock()
+	srvs := ctx.srvRegistry
+	ctx.srvRegistryLock.RUnlock()
+	return srvs
+}
+
+func (ctx *PkgContext) GetActions() map[string]*ActionSpec {
+	ctx.actRegistryLock.RLock()
+	actions := ctx.actRegistry
+	ctx.actRegistryLock.RUnlock()
+	return actions
 }

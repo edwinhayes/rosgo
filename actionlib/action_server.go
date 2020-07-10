@@ -66,8 +66,8 @@ func (as *defaultActionServer) init() {
 	as.handlers = map[string]*serverGoalHandler{}
 
 	// setup action result type so that we can create default result messages
-	res := as.actionResult.NewMessage().(ActionResult).GetResult()
-	as.actionResultType = res.Type()
+	//res := .NewMessage().(ActionResult).GetResult()
+	as.actionResultType = as.actionResult
 
 	// get frequency from ros params
 	as.statusFrequency = ros.NewRate(5.0)

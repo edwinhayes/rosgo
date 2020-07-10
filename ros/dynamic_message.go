@@ -8,13 +8,14 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/pkg/errors"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/buger/jsonparser"
+	"github.com/edwinhayes/rosgo/libgengo"
+	"github.com/pkg/errors"
 )
 
 // DEFINE PUBLIC STRUCTURES.
@@ -42,7 +43,7 @@ type DynamicMessage struct {
 
 var rosPkgPath string // Colon separated list of paths to search for message definitions on.
 
-var context *libgengo.MsgContext // We'll try to preserve a single message context to avoid reloading each time.
+var context *libgengo.PkgContext // We'll try to preserve a single message context to avoid reloading each time.
 
 // DEFINE PUBLIC STATIC FUNCTIONS.
 
@@ -90,7 +91,7 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (*DynamicM
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
-		c, err := libgengo.NewMsgContext(strings.Split(GetRuntimePackagePath(), ":"))
+		c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
 		if err != nil {
 			return nil, err
 		}

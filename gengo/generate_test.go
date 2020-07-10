@@ -42,7 +42,7 @@ string[] sva
 string[42] sfa
 `
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	}
@@ -94,7 +94,7 @@ Bar[] xva
 Bar[42] xfa
 `
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	}
@@ -150,7 +150,7 @@ Bar[] xva
 Bar[42] xfa
 `
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	}
