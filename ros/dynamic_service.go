@@ -12,7 +12,7 @@ import (
 // DEFINE PUBLIC STRUCTURES.
 
 // DynamicServiceType abstracts the schema of a ROS Service whose schema is only known at runtime.
-// DynamicServiceType implements the rosgo ServiceType interface, allowing it to be used throughout rosgo in the same manner as message schemas generated
+// DynamicServiceType implements the rosgo ServiceType interface, allowing it to be used throughout rosgo in the same manner as service schemas generated
 // at compiletime by gengo.
 type DynamicServiceType struct {
 	name    string
@@ -25,7 +25,6 @@ type DynamicServiceType struct {
 // DynamicService abstracts an instance of a ROS Service whose type is only known at runtime.  The schema of the message is denoted by the referenced DynamicServiceType, while the
 // Request and Response references the rosgo Messages it implements.  DynamicService implements the rosgo Service interface, allowing
 // it to be used throughout rosgo in the same manner as service types generated at compiletime by gengo.
-
 type DynamicService struct {
 	dynamicType *DynamicServiceType
 	Request     Message
@@ -41,9 +40,8 @@ type DynamicService struct {
 // DEFINE PUBLIC STATIC FUNCTIONS.
 
 // NewDynamicServiceType generates a DynamicServiceType corresponding to the specified typeName from the available ROS service definitions; typeName should be a fully-qualified
-// ROS service type name.  The first time the function is run, a message/service 'context' is created by searching through the available ROS definitions, then the ROS service to
+// ROS service type name.  The first time the function is run, a message/service/action 'context' is created by searching through the available ROS definitions, then the ROS service to
 // be used for the definition is looked up by name.  On subsequent calls, the ROS service type is looked up directly from the existing context.
-
 func NewDynamicServiceType(typeName string) (*DynamicServiceType, error) {
 	return newDynamicServiceTypeNested(typeName, "")
 }
@@ -53,7 +51,7 @@ func NewDynamicServiceType(typeName string) (*DynamicServiceType, error) {
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS services; this is used internally for handling complex ROS services.
 func newDynamicServiceTypeNested(typeName string, packageName string) (*DynamicServiceType, error) {
-	// Create an empty message type.
+	// Create an empty action type.
 	m := new(DynamicServiceType)
 
 	// Create a message context if for some reason it does not exist yet, as it also contains service definitions
@@ -104,7 +102,7 @@ func newDynamicServiceTypeNested(typeName string, packageName string) (*DynamicS
 
 // DEFINE PUBLIC RECEIVER FUNCTIONS.
 
-//	DynamicMessageType
+//	DynamicServiceType
 
 // MD5Sum returns the ROS compatible MD5 sum of the service type; required for ros.ServiceType.
 func (t *DynamicServiceType) MD5Sum() string {
@@ -114,6 +112,11 @@ func (t *DynamicServiceType) MD5Sum() string {
 // Name returns the full ROS name of the service type; required for ros.ServiceType.
 func (t *DynamicServiceType) Name() string {
 	return t.name
+}
+
+// Name returns the full ROS text of the service type; required for ros.ServiceType.
+func (t *DynamicServiceType) Text() string {
+	return t.text
 }
 
 // NewService creates a new DynamicService instantiating the service type; required for ros.ServiceType.
