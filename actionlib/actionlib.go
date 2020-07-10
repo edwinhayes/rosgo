@@ -1,8 +1,6 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
-
 	"github.com/edwinhayes/rosgo/ros"
 )
 
@@ -26,7 +24,7 @@ func NewServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) ServerGoalHa
 	return newServerGoalHandlerWithGoal(as, goal)
 }
 
-func NewServerGoalHandlerWithGoalId(as ActionServer, goalID *actionlib_msgs.GoalID) ServerGoalHandler {
+func NewServerGoalHandlerWithGoalId(as ActionServer, goalID *ros.DynamicMessage) ServerGoalHandler {
 	return newServerGoalHandlerWithGoalId(as, goalID)
 }
 
@@ -40,8 +38,8 @@ type ActionClient interface {
 type ActionServer interface {
 	Start()
 	Shutdown()
-	PublishResult(status actionlib_msgs.GoalStatus, result ros.Message)
-	PublishFeedback(status actionlib_msgs.GoalStatus, feedback ros.Message)
+	PublishResult(status *ros.DynamicMessage, result ros.Message)
+	PublishFeedback(status *ros.DynamicMessage, feedback ros.Message)
 	PublishStatus()
 	RegisterGoalCallback(interface{})
 	RegisterCancelCallback(interface{})
@@ -96,8 +94,8 @@ type ServerGoalHandler interface {
 	SetCancelRequested() bool
 	PublishFeedback(ros.Message)
 	GetGoal() ros.Message
-	GetGoalId() actionlib_msgs.GoalID
-	GetGoalStatus() actionlib_msgs.GoalStatus
+	GetGoalId() *ros.DynamicMessage
+	GetGoalStatus() *ros.DynamicMessage
 	Equal(ServerGoalHandler) bool
 	NotEqual(ServerGoalHandler) bool
 	Hash() uint32
