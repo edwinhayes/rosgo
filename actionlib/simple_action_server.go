@@ -164,7 +164,7 @@ func (s *simpleActionServer) RegisterPreemptCallback(cb interface{}) {
 
 func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	logger := *s.logger
-	goalHandler := s.actionServer.getHandler(ag.GetGoalId().Id)
+	goalHandler := s.actionServer.getHandler(ag.GetGoalId().Data()["id"].(string))
 	logger.Infof("[SimpleActionServer] Server received new goal with id %s", goalHandler.GetGoalId().Id)
 
 	var goalStamp, nextGoalStamp ros.Time

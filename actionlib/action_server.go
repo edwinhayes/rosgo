@@ -220,9 +220,9 @@ func (as *defaultActionServer) internalGoalCallback(goal ActionGoal, event ros.M
 	goalID := goal.GetGoalId()
 
 	for id, gh := range as.handlers {
-		if goalID.Id == id {
+		if goalID.Data()["id"].(string) == id {
 			st := gh.GetGoalStatus()
-			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.Id, st.Status)
+			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.Data()["id"].(string), st.Status)
 			if st.Status == actionlib_msgs.RECALLING {
 				st.Status = actionlib_msgs.RECALLED
 				result := as.actionResultType.NewMessage()
@@ -234,18 +234,18 @@ func (as *defaultActionServer) internalGoalCallback(goal ActionGoal, event ros.M
 		}
 	}
 
-	id := goalID.Id
+	id := goalID.Data()["id"].(string)
 	if len(id) == 0 {
 		id = as.goalIDGen.generateID()
 		goal.SetGoalId(actionlib_msgs.GoalID{
 			Id:    id,
-			Stamp: goalID.Stamp,
+			Stamp: goalID.Data()["stamp"].(string),
 		})
 	}
 
 	gh := newServerGoalHandlerWithGoal(as, goal)
 	as.handlers[id] = gh
-	if !goalID.Stamp.IsZero() && goalID.Stamp.Cmp(as.lastCancel) <= 0 {
+	if !goalID.Data()["stamp"].(*ros.Time).IsZero() && goalID.Data()["stamp"].(*ros.Time).Cmp(as.lastCancel) <= 0 {
 		gh.SetCancelled(nil, "timestamp older than last goal cancel")
 		return
 	}

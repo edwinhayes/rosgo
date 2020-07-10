@@ -1,11 +1,12 @@
 package actionlib
 
 import (
-	"actionlib_msgs"
 	"container/list"
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/edwinhayes/rosgo/ros"
 )
 
 type CommState uint8
@@ -49,15 +50,21 @@ func (cs CommState) String() string {
 
 type clientStateMachine struct {
 	state      CommState
-	goalStatus actionlib_msgs.GoalStatus
+	goalStatus *ros.DynamicMessage
 	goalResult ActionResult
 	mutex      sync.RWMutex
 }
 
 func newClientStateMachine() *clientStateMachine {
+	// Create a goal status message for the state machine
+	msgtype, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
+	msg := msgtype.NewMessage().(*ros.DynamicMessage)
+	// Set the status to pending
+	msg.Data()["status"] = uint8(0)
+	// Return new state machine with message and state
 	return &clientStateMachine{
 		state:      WaitingForGoalAck,
-		goalStatus: actionlib_msgs.GoalStatus{Status: actionlib_msgs.PENDING},
+		goalStatus: msg,
 	}
 }
 
@@ -68,7 +75,7 @@ func (sm *clientStateMachine) getState() CommState {
 	return sm.state
 }
 
-func (sm *clientStateMachine) getGoalStatus() actionlib_msgs.GoalStatus {
+func (sm *clientStateMachine) getGoalStatus() *ros.DynamicMessage {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -89,13 +96,13 @@ func (sm *clientStateMachine) setState(state CommState) {
 	sm.state = state
 }
 
-func (sm *clientStateMachine) setGoalStatus(id actionlib_msgs.GoalID, status uint8, text string) {
+func (sm *clientStateMachine) setGoalStatus(id *ros.DynamicMessage, status uint8, text string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	sm.goalStatus.GoalId = id
-	sm.goalStatus.Status = status
-	sm.goalStatus.Text = text
+	sm.goalStatus.Data()["goalid"] = id
+	sm.goalStatus.Data()["status"] = status
+	sm.goalStatus.Data()["text"] = text
 }
 
 func (sm *clientStateMachine) setGoalResult(result ActionResult) {
@@ -109,7 +116,7 @@ func (sm *clientStateMachine) setAsLost() {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	sm.goalStatus.Status = uint8(Lost)
+	sm.goalStatus.Data()["status"] = uint8(Lost)
 }
 
 func (sm *clientStateMachine) transitionTo(state CommState, gh ClientGoalHandler, callback interface{}) {
@@ -125,47 +132,47 @@ func (sm *clientStateMachine) transitionTo(state CommState, gh ClientGoalHandler
 	}
 }
 
-func (sm *clientStateMachine) getTransitions(goalStatus actionlib_msgs.GoalStatus) (stateList list.List, err error) {
+func (sm *clientStateMachine) getTransitions(goalStatus *ros.DynamicMessage) (stateList list.List, err error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	status := goalStatus.Status
+	status := goalStatus.Data()["status"].(uint8)
 
 	switch sm.state {
 	case WaitingForGoalAck:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			stateList.PushBack(Pending)
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			stateList.PushBack(Active)
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			stateList.PushBack(Pending)
 			stateList.PushBack(WaitingForCancelAck)
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			stateList.PushBack(Pending)
 			stateList.PushBack(Recalling)
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			stateList.PushBack(Pending)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			break
@@ -174,35 +181,35 @@ func (sm *clientStateMachine) getTransitions(goalStatus actionlib_msgs.GoalStatu
 
 	case Pending:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			stateList.PushBack(Active)
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			stateList.PushBack(Recalling)
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(Active)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			stateList.PushBack(Active)
 			stateList.PushBack(Preempting)
 			break
@@ -210,178 +217,178 @@ func (sm *clientStateMachine) getTransitions(goalStatus actionlib_msgs.GoalStatu
 		break
 	case Active:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			err = fmt.Errorf("invalid transition from Active to Pending")
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			err = fmt.Errorf("invalid transition from Active to Rejected")
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			err = fmt.Errorf("invalid transition from Active to Recalling")
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			err = fmt.Errorf("invalid transition from Active to Recalled")
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case WaitingForResult:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			err = fmt.Errorf("invalid transition from WaitingForResult to Pending")
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			err = fmt.Errorf("invalid transition from WaitingForResult to Recalling")
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			err = fmt.Errorf("invalid transition from WaitingForResult to Preempting")
 			break
 		}
 		break
 	case WaitingForCancelAck:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			stateList.PushBack(Recalling)
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(Recalling)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case Recalling:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			err = fmt.Errorf("invalid transition from Recalling to Pending")
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			err = fmt.Errorf("invalid transition from Recalling to Active")
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(Preempting)
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			stateList.PushBack(Preempting)
 			break
 		}
 		break
 	case Preempting:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			err = fmt.Errorf("invalid transition from Preempting to Pending")
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			err = fmt.Errorf("invalid transition from Preempting to Active")
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			err = fmt.Errorf("invalid transition from Preempting to Rejected")
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			err = fmt.Errorf("invalid transition from Preempting to Recalling")
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			err = fmt.Errorf("invalid transition from Preempting to Recalled")
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			stateList.PushBack(WaitingForResult)
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			break
 		}
 		break
 	case Done:
 		switch status {
-		case actionlib_msgs.PENDING:
+		case 0:
 			err = fmt.Errorf("invalid transition from Done to Pending")
 			break
-		case actionlib_msgs.ACTIVE:
+		case 1:
 			err = fmt.Errorf("invalid transition from Done to Active")
 			break
-		case actionlib_msgs.REJECTED:
+		case 5:
 			break
-		case actionlib_msgs.RECALLING:
+		case 7:
 			err = fmt.Errorf("invalid transition from Done to Recalling")
 			break
-		case actionlib_msgs.RECALLED:
+		case 8:
 			break
-		case actionlib_msgs.PREEMPTED:
+		case 2:
 			break
-		case actionlib_msgs.SUCCEEDED:
+		case 3:
 			break
-		case actionlib_msgs.ABORTED:
+		case 4:
 			break
-		case actionlib_msgs.PREEMPTING:
+		case 6:
 			err = fmt.Errorf("invalid transition from Done to Preempting")
 			break
 		}

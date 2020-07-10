@@ -24,23 +24,27 @@ func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, 
 		actionClient: ac,
 		stateMachine: newClientStateMachine(),
 		actionGoal:   ag,
-		actionGoalID: ag.GetGoalId().Id,
+		actionGoalID: ag.GetGoalId().Data()["id"].(string),
 		transitionCb: transitionCb,
 		feedbackCb:   feedbackCb,
 		logger:       ac.logger,
 	}
 }
 
-func findGoalStatus(statusArr *actionlib_msgs.GoalStatusArray, id string) *actionlib_msgs.GoalStatus {
-	var status actionlib_msgs.GoalStatus
-	for _, st := range statusArr.StatusList {
-		if st.GoalId.Id == id {
+func findGoalStatus(statusArr *ros.DynamicMessage, id string) *ros.DynamicMessage {
+	// Create a dynamic message for status message
+	var status *ros.DynamicMessage
+	// Get array of goal statuses from status array
+	statusArray := statusArr.Data()["status_list"].([]*ros.DynamicMessage)
+	// loop through goal status array for matching status message
+	for _, st := range statusArray {
+		if st.Data()["goalid"].(string) == id {
 			status = st
 			break
 		}
 	}
 
-	return &status
+	return status
 }
 
 func (gh *clientGoalHandler) GetCommState() (CommState, error) {
@@ -56,7 +60,7 @@ func (gh *clientGoalHandler) GetGoalStatus() (uint8, error) {
 		return actionlib_msgs.LOST, fmt.Errorf("trying to get goal status on an inactive ClientGoalHandler")
 	}
 
-	return gh.stateMachine.getGoalStatus().Status, nil
+	return gh.stateMachine.getGoalStatus().Data()["status"].(uint8), nil
 }
 
 func (gh *clientGoalHandler) GetGoalStatusText() (string, error) {
@@ -64,7 +68,7 @@ func (gh *clientGoalHandler) GetGoalStatusText() (string, error) {
 		return "", fmt.Errorf("trying to get goal status text on an inactive ClientGoalHandler")
 	}
 
-	return gh.stateMachine.getGoalStatus().Text, nil
+	return gh.stateMachine.getGoalStatus().Data()["text"].(string), nil
 }
 
 func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
@@ -78,7 +82,7 @@ func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
 	}
 
 	// implement get status
-	goalStatus := gh.stateMachine.getGoalStatus().Status
+	goalStatus := gh.stateMachine.getGoalStatus().Data()["status"].(uint8)
 	if goalStatus == actionlib_msgs.PREEMPTED ||
 		goalStatus == actionlib_msgs.SUCCEEDED ||
 		goalStatus == actionlib_msgs.ABORTED ||
@@ -142,7 +146,7 @@ func (gh *clientGoalHandler) Shutdown(deleteFromManager bool) {
 }
 
 func (gh *clientGoalHandler) updateFeedback(af ActionFeedback) {
-	if gh.actionGoalID != af.GetStatus().GoalId.Id {
+	if gh.actionGoalID != af.GetStatus().Data()["goalid"].(*ros.DynamicMessage).Data()["id"].(string) {
 		return
 	}
 
@@ -158,14 +162,14 @@ func (gh *clientGoalHandler) updateFeedback(af ActionFeedback) {
 }
 
 func (gh *clientGoalHandler) updateResult(result ActionResult) error {
-	if gh.actionGoalID != result.GetStatus().GoalId.Id {
+	if gh.actionGoalID != result.GetStatus().Data()["goalid"].(*ros.DynamicMessage).Data()["id"].(string) {
 		return nil
 	}
 
 	status := result.GetStatus()
 	state := gh.stateMachine.getState()
 
-	gh.stateMachine.setGoalStatus(status.GoalId, status.Status, status.Text)
+	gh.stateMachine.setGoalStatus(status.Data()["goalid"].(*ros.DynamicMessage), status.Data()["status"].(uint8), status.Data()["text"].(string))
 	gh.stateMachine.setGoalResult(result)
 
 	if state == WaitingForGoalAck ||
@@ -211,8 +215,8 @@ func (gh *clientGoalHandler) updateStatus(statusArr *actionlib_msgs.GoalStatusAr
 		return nil
 	}
 
-	gh.stateMachine.setGoalStatus(status.GoalId, status.Status, status.Text)
-	nextStates, err := gh.stateMachine.getTransitions(*status)
+	gh.stateMachine.setGoalStatus(status.Data()["goalid"].(*ros.DynamicMessage), status.Data()["status"].(uint8), status.Data()["text"].(string))
+	nextStates, err := gh.stateMachine.getTransitions(status)
 	if err != nil {
 		return fmt.Errorf("error getting transitions: %v", err)
 	}

@@ -164,7 +164,7 @@ func (gh *serverGoalHandler) GetGoalId() actionlib_msgs.GoalID {
 
 func (gh *serverGoalHandler) GetGoalStatus() actionlib_msgs.GoalStatus {
 	status := gh.sm.getStatus()
-	if status.Status != 0 && gh.goal != nil && gh.goal.GetGoalId().Id != "" {
+	if status.Status != 0 && gh.goal != nil && gh.goal.GetGoalId().Data()["id"].(string) != "" {
 		return status
 	}
 
@@ -176,7 +176,7 @@ func (gh *serverGoalHandler) Equal(other ServerGoalHandler) bool {
 		return false
 	}
 
-	return gh.goal.GetGoalId().Id == other.GetGoalId().Id
+	return gh.goal.GetGoalId().Data()["id"].(string) == other.GetGoalId().Id
 }
 
 func (gh *serverGoalHandler) NotEqual(other ServerGoalHandler) bool {
@@ -184,7 +184,7 @@ func (gh *serverGoalHandler) NotEqual(other ServerGoalHandler) bool {
 }
 
 func (gh *serverGoalHandler) Hash() uint32 {
-	id := gh.goal.GetGoalId().Id
+	id := gh.goal.GetGoalId().Data()["id"].(string)
 	hs := fnv.New32a()
 	hs.Write([]byte(id))
 

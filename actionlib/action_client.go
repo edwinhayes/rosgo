@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	modular "github.com/edwinhayes/logrus-modular"
-	"github.com/edwinhayes/rosgo/libtest/msgs/std_msgs"
 
 	"github.com/edwinhayes/rosgo/ros"
 )
@@ -62,8 +61,17 @@ func (ac *defaultActionClient) SendGoal(goal ros.Message, transitionCb, feedback
 	}
 
 	ag := ac.actionType.GoalType().NewMessage().(ActionGoal)
-	goalID := actionlib_msgs.GoalID{Id: ac.goalIDGen.generateID(), Stamp: ros.Now()}
-	header := std_msgs.Header{Stamp: ros.Now()}
+	// make a goalId message with timestamp
+	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
+	goalMsg.Data()["id"] = ac.goalIDGen.generateID()
+	goalMsg.Data()["stamp"] = ros.Now()
+	goalID := goalMsg
+	// make a header with timestamp
+	headerMsgType, _ := ros.NewDynamicMessageType("std_msgs/Header")
+	headerMsg := headerMsgType.NewMessage().(*ros.DynamicMessage)
+	headerMsg.Data()["stamp"] = ros.Now()
+	header := headerMsg
 
 	ag.SetGoal(goal)
 	ag.SetGoalId(goalID)
