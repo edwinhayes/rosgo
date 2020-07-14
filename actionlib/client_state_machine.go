@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type CommState uint8
@@ -57,8 +55,8 @@ type clientStateMachine struct {
 
 func newClientStateMachine() *clientStateMachine {
 	// Create a goal status message for the state machine
-	statusType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
-	status := statusType.NewMessage().(*DynamicActionStatus)
+	statusType, _ := NewDynamicStatusType()
+	status := statusType.NewStatusMessage().(*DynamicActionStatus)
 	// Set the status to pending
 	status.SetStatus(uint8(0))
 	// Return new state machine with message and state

@@ -77,6 +77,11 @@ func ResetContext() {
 // ROS message type name.  The first time the function is run, a message 'context' is created by searching through the available ROS message definitions, then the ROS message to
 // be used for the definition is looked up by name.  On subsequent calls, the ROS message type is looked up directly from the existing context.
 func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
+	t, err := newDynamicMessageTypeNested(typeName, "")
+	return &t, err
+}
+
+func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 	return newDynamicMessageTypeNested(typeName, "")
 }
 
@@ -84,7 +89,7 @@ func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
 // searching through the available ROS message definitions, then the ROS message type to use for the defintion is looked up by name.  On subsequent calls, the ROS message type
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
-func newDynamicMessageTypeNested(typeName string, packageName string) (*DynamicMessageType, error) {
+func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
 	// Create an empty message type.
 	m := new(DynamicMessageType)
 
@@ -151,16 +156,17 @@ func (t *DynamicMessageType) MD5Sum() string {
 // NewMessage creates a new DynamicMessage instantiating the message type; required for ros.MessageType.
 func (t *DynamicMessageType) NewMessage() Message {
 	// Don't instantiate messages for incomplete types.
-	if t.spec == nil {
-		return nil
-	}
+	return t.NewDynamicMessage()
+}
+
+func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
-	d := new(DynamicMessage)
+	d := &DynamicMessage{}
 	d.dynamicType = t
 	var err error
 	d.data, err = zeroValueData(t.Name())
 	if err != nil {
-		return nil
+		return d
 	}
 	return d
 }

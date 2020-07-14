@@ -7,9 +7,9 @@ import (
 type ActionType interface {
 	MD5Sum() string
 	Name() string
-	GoalType() ros.MessageType
-	FeedbackType() ros.MessageType
-	ResultType() ros.MessageType
+	GoalType() ActionGoalType
+	FeedbackType() ActionFeedbackType
+	ResultType() ActionResultType
 	NewAction() Action
 }
 
@@ -17,6 +17,41 @@ type Action interface {
 	GetActionGoal() ActionGoal
 	GetActionFeedback() ActionFeedback
 	GetActionResult() ActionResult
+}
+
+type ActionGoalType interface {
+	ros.MessageType
+	NewGoalMessage() ActionGoal
+}
+
+type ActionGoalIDType interface {
+	ros.MessageType
+	NewGoalIDMessage() ActionGoalID
+}
+
+type ActionHeaderType interface {
+	ros.MessageType
+	NewHeaderMessage() ActionHeader
+}
+
+type ActionStatusType interface {
+	ros.MessageType
+	NewStatusMessage() ActionStatus
+}
+
+type ActionStatusArrayType interface {
+	ros.MessageType
+	NewStatusArrayMessage() ActionStatusArray
+}
+
+type ActionFeedbackType interface {
+	ros.MessageType
+	NewFeedbackMessage() ActionFeedback
+}
+
+type ActionResultType interface {
+	ros.MessageType
+	NewResultMessage() ActionResult
 }
 
 type ActionGoal interface {

@@ -15,9 +15,9 @@ type defaultActionClient struct {
 	action           string
 	actionType       ActionType
 	actionResult     ros.MessageType
-	actionResultType ros.MessageType
-	actionFeedback   ros.MessageType
-	actionGoal       ros.MessageType
+	actionResultType ActionResultType
+	actionFeedback   ActionFeedbackType
+	actionGoal       ActionGoalType
 	goalPub          ros.Publisher
 	cancelPub        ros.Publisher
 	resultSub        ros.Subscriber
@@ -66,15 +66,15 @@ func (ac *defaultActionClient) SendGoal(goal ros.Message, transitionCb, feedback
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
 	}
 
-	ag := ac.actionType.GoalType().NewMessage().(*DynamicActionGoal)
+	ag := ac.actionType.GoalType().NewGoalMessage()
 	// make a goalId message with timestamp and generated id
-	goalidType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
-	goalid := goalidType.NewMessage().(*DynamicActionGoalID)
+	goalidType, _ := NewDynamicGoalIDType()
+	goalid := goalidType.NewGoalIDMessage().(*DynamicActionGoalID)
 	goalid.SetStamp(ros.Now())
 	goalid.SetID(ac.goalIDGen.generateID())
 	// make a header with timestamp
-	headerType, _ := ros.NewDynamicMessageType("std_msgs/Header")
-	header := headerType.NewMessage().(*DynamicActionHeader)
+	headerType, _ := NewDynamicHeaderType()
+	header := headerType.NewHeaderMessage().(*DynamicActionHeader)
 	header.SetStamp(ros.Now())
 
 	ag.SetGoal(goal)
