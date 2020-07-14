@@ -50,21 +50,21 @@ func (cs CommState) String() string {
 
 type clientStateMachine struct {
 	state      CommState
-	goalStatus *ros.DynamicMessage
+	goalStatus ActionStatus
 	goalResult ActionResult
 	mutex      sync.RWMutex
 }
 
 func newClientStateMachine() *clientStateMachine {
 	// Create a goal status message for the state machine
-	msgtype, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
-	msg := msgtype.NewMessage().(*ros.DynamicMessage)
+	statusType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
+	status := statusType.NewMessage().(*DynamicActionStatus)
 	// Set the status to pending
-	msg.Data()["status"] = uint8(0)
+	status.SetStatus(uint8(0))
 	// Return new state machine with message and state
 	return &clientStateMachine{
 		state:      WaitingForGoalAck,
-		goalStatus: msg,
+		goalStatus: status,
 	}
 }
 
@@ -75,7 +75,7 @@ func (sm *clientStateMachine) getState() CommState {
 	return sm.state
 }
 
-func (sm *clientStateMachine) getGoalStatus() *ros.DynamicMessage {
+func (sm *clientStateMachine) getGoalStatus() ActionStatus {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -96,13 +96,13 @@ func (sm *clientStateMachine) setState(state CommState) {
 	sm.state = state
 }
 
-func (sm *clientStateMachine) setGoalStatus(id *ros.DynamicMessage, status uint8, text string) {
+func (sm *clientStateMachine) setGoalStatus(id ActionGoalID, status uint8, text string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	sm.goalStatus.Data()["goalid"] = id
-	sm.goalStatus.Data()["status"] = status
-	sm.goalStatus.Data()["text"] = text
+	sm.goalStatus.SetGoalID(id)
+	sm.goalStatus.SetStatus(status)
+	sm.goalStatus.SetStatusText(text)
 }
 
 func (sm *clientStateMachine) setGoalResult(result ActionResult) {
@@ -116,7 +116,7 @@ func (sm *clientStateMachine) setAsLost() {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	sm.goalStatus.Data()["status"] = uint8(Lost)
+	sm.goalStatus.SetStatus(uint8(Lost))
 }
 
 func (sm *clientStateMachine) transitionTo(state CommState, gh ClientGoalHandler, callback interface{}) {
@@ -132,11 +132,11 @@ func (sm *clientStateMachine) transitionTo(state CommState, gh ClientGoalHandler
 	}
 }
 
-func (sm *clientStateMachine) getTransitions(goalStatus *ros.DynamicMessage) (stateList list.List, err error) {
+func (sm *clientStateMachine) getTransitions(goalStatus ActionStatus) (stateList list.List, err error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	status := goalStatus.Data()["status"].(uint8)
+	status := goalStatus.GetStatus()
 
 	switch sm.state {
 	case WaitingForGoalAck:

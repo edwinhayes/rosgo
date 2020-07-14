@@ -24,7 +24,7 @@ func NewServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) ServerGoalHa
 	return newServerGoalHandlerWithGoal(as, goal)
 }
 
-func NewServerGoalHandlerWithGoalId(as ActionServer, goalID *ros.DynamicMessage) ServerGoalHandler {
+func NewServerGoalHandlerWithGoalId(as ActionServer, goalID ActionGoalID) ServerGoalHandler {
 	return newServerGoalHandlerWithGoalId(as, goalID)
 }
 
@@ -38,8 +38,8 @@ type ActionClient interface {
 type ActionServer interface {
 	Start()
 	Shutdown()
-	PublishResult(status *ros.DynamicMessage, result ros.Message)
-	PublishFeedback(status *ros.DynamicMessage, feedback ros.Message)
+	PublishResult(status ActionStatus, result ros.Message)
+	PublishFeedback(status ActionStatus, feedback ros.Message)
 	PublishStatus()
 	RegisterGoalCallback(interface{})
 	RegisterCancelCallback(interface{})
@@ -94,8 +94,8 @@ type ServerGoalHandler interface {
 	SetCancelRequested() bool
 	PublishFeedback(ros.Message)
 	GetGoal() ros.Message
-	GetGoalId() *ros.DynamicMessage
-	GetGoalStatus() *ros.DynamicMessage
+	GetGoalId() ActionGoalID
+	GetGoalStatus() ActionStatus
 	Equal(ServerGoalHandler) bool
 	NotEqual(ServerGoalHandler) bool
 	Hash() uint32

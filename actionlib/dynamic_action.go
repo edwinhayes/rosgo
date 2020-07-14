@@ -35,6 +35,17 @@ type DynamicAction struct {
 	Result      ActionResult
 }
 
+// DynamicAction* interfaces.
+type DynamicActionGoal struct{ ros.DynamicMessage }
+type DynamicActionFeedback struct{ ros.DynamicMessage }
+type DynamicActionResult struct{ ros.DynamicMessage }
+
+// DynamicAction** shared type interfaces.
+type DynamicActionGoalID struct{ ros.DynamicMessage }
+type DynamicActionHeader struct{ ros.DynamicMessage }
+type DynamicActionStatus struct{ ros.DynamicMessage }
+type DynamicActionStatusArray struct{ ros.DynamicMessage }
+
 // DEFINE PRIVATE STRUCTURES.
 
 // DEFINE PUBLIC GLOBALS.
@@ -180,4 +191,75 @@ func (a *DynamicAction) GetActionFeedback() ActionFeedback {
 // GetActionResult returns the actionlib.ActionResult of the DynamicAction; required for actionlib.Action.
 func (a *DynamicAction) GetActionResult() ActionResult {
 	return a.Result
+}
+
+// Dynamic Action Goal Interface
+// Get and set functions of DynamicActionGoal interface
+func (m *DynamicActionGoal) SetGoal(goal ros.Message)      { m.Data()["goal"] = goal }
+func (m *DynamicActionGoal) GetGoal() ros.Message          { return m.Data()["goal"].(*ros.DynamicMessage) }
+func (m *DynamicActionGoal) GetGoalId() ActionGoalID       { return m.Data()["goalid"].(*DynamicActionGoalID) }
+func (m *DynamicActionGoal) SetGoalId(goalid ActionGoalID) { m.Data()["goalid"] = goalid }
+func (m *DynamicActionGoal) GetHeader() ActionHeader {
+	return m.Data()["header"].(*DynamicActionHeader)
+}
+func (m *DynamicActionGoal) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+
+// Get and Set Functions of DynamicActionGoalID
+func (m *DynamicActionGoalID) GetID() string           { return m.Data()["id"].(string) }
+func (m *DynamicActionGoalID) SetID(id string)         { m.Data()["id"] = id }
+func (m *DynamicActionGoalID) GetStamp() ros.Time      { return m.Data()["stamp"].(ros.Time) }
+func (m *DynamicActionGoalID) SetStamp(stamp ros.Time) { m.Data()["stamp"] = stamp }
+
+//
+
+// Dynamic Action Feedback Interface
+// Get and set functions of DynamicActionFeedback interface
+func (m *DynamicActionFeedback) SetFeedback(goal ros.Message) { m.Data()["feedback"] = goal }
+func (m *DynamicActionFeedback) GetFeedback() ros.Message {
+	return m.Data()["goal"].(*ros.DynamicMessage)
+}
+func (m *DynamicActionFeedback) GetStatus() ActionStatus {
+	return m.Data()["goalid"].(*DynamicActionStatus)
+}
+func (m *DynamicActionFeedback) SetStatus(status ActionStatus) { m.Data()["status"] = status }
+func (m *DynamicActionFeedback) GetHeader() ActionHeader {
+	return m.Data()["header"].(*DynamicActionHeader)
+}
+func (m *DynamicActionFeedback) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+
+//
+
+// Dynamic Action Feedback Interface
+// Get and set functions of DynamicActionFeedback interface
+func (m *DynamicActionResult) SetResult(result ros.Message) { m.Data()["result"] = result }
+func (m *DynamicActionResult) GetResult() ros.Message {
+	return m.Data()["goal"].(*ros.DynamicMessage)
+}
+func (m *DynamicActionResult) GetStatus() ActionStatus {
+	return m.Data()["goalid"].(*DynamicActionStatus)
+}
+func (m *DynamicActionResult) SetStatus(status ActionStatus) { m.Data()["status"] = status }
+func (m *DynamicActionResult) GetHeader() ActionHeader {
+	return m.Data()["header"].(*DynamicActionHeader)
+}
+func (m *DynamicActionResult) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+
+// Get and Set Functions of shared type DynamicActionStatus
+func (m *DynamicActionStatus) GetGoalID() ActionGoalID   { return m.Data()["id"].(*DynamicActionGoalID) }
+func (m *DynamicActionStatus) SetGoalID(id ActionGoalID) { m.Data()["id"] = id }
+func (m *DynamicActionStatus) GetStatus() uint8          { return m.Data()["status"].(uint8) }
+func (m *DynamicActionStatus) SetStatus(status uint8)    { m.Data()["status"] = status }
+func (m *DynamicActionStatus) GetStatusText() string     { return m.Data()["text"].(string) }
+func (m *DynamicActionStatus) SetStatusText(text string) { m.Data()["text"] = text }
+
+// Get and set functions of shared type DynamicActionHeader
+func (m *DynamicActionHeader) GetStamp() ros.Time      { return m.Data()["stamp"].(ros.Time) }
+func (m *DynamicActionHeader) SetStamp(stamp ros.Time) { m.Data()["stamp"] = stamp }
+
+// Get and set functions of the shared type DynamicActionStatusArray
+func (m *DynamicActionStatusArray) GetStatusArray() []ActionStatus {
+	return m.Data()["status_list"].([]ActionStatus)
+}
+func (m *DynamicActionStatusArray) SetStatusArray(statusArray []ActionStatus) {
+	m.Data()["status_list"] = statusArray
 }

@@ -123,26 +123,25 @@ func (as *defaultActionServer) Start() {
 }
 
 // PublishResult publishes action result message
-func (as *defaultActionServer) PublishResult(status *ros.DynamicMessage, result ros.Message) {
+func (as *defaultActionServer) PublishResult(status ActionStatus, result ros.Message) {
 	msg := as.actionResult.NewMessage().(ActionResult)
 	// Create a header message with time stamp
-	headerMsgType, _ := ros.NewDynamicMessageType("std_msgs/Header")
-	headerMsg := headerMsgType.NewMessage().(*ros.DynamicMessage)
-	headerMsg.Data()["stamp"] = ros.Now()
-	msg.SetHeader(headerMsg)
+	headerType, _ := ros.NewDynamicMessageType("std_msgs/Header")
+	header := headerType.NewMessage().(ActionHeader)
+	header.SetStamp(ros.Now())
+	msg.SetHeader(header)
 	msg.SetStatus(status)
 	msg.SetResult(result)
 	as.resultPub.Publish(msg)
 }
 
 // PublishFeedback publishes action feedback messages
-func (as *defaultActionServer) PublishFeedback(status *ros.DynamicMessage, feedback ros.Message) {
+func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback ros.Message) {
 	msg := as.actionFeedback.NewMessage().(ActionFeedback)
 	// Create a header message with time stamp
-	headerMsgType, _ := ros.NewDynamicMessageType("std_msgs/Header")
-	headerMsg := headerMsgType.NewMessage().(*ros.DynamicMessage)
-	headerMsg.Data()["stamp"] = ros.Now()
-	msg.SetHeader(headerMsg)
+	headerType, _ := ros.NewDynamicMessageType("std_msgs/Header")
+	header := headerType.NewMessage().(ActionHeader)
+	header.SetStamp(ros.Now())
 	msg.SetStatus(status)
 	msg.SetFeedback(feedback)
 	as.feedbackPub.Publish(msg)
@@ -151,7 +150,7 @@ func (as *defaultActionServer) PublishFeedback(status *ros.DynamicMessage, feedb
 func (as *defaultActionServer) getStatus() *ros.DynamicMessage {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
-	var statusList []*ros.DynamicMessage
+	var statusList []ActionStatus
 
 	if as.node.OK() {
 		for id, gh := range as.handlers {
@@ -171,10 +170,10 @@ func (as *defaultActionServer) getStatus() *ros.DynamicMessage {
 	statusArrayMsg := statusArrayType.NewMessage().(*ros.DynamicMessage)
 
 	// Create a header message with time stamp
-	headerMsgType, _ := ros.NewDynamicMessageType("std_msgs/Header")
-	headerMsg := headerMsgType.NewMessage().(*ros.DynamicMessage)
-	headerMsg.Data()["stamp"] = ros.Now()
-	statusArrayMsg.Data()["header"] = headerMsg
+	headerType, _ := ros.NewDynamicMessageType("std_msgs/Header")
+	header := headerType.NewMessage().(ActionHeader)
+	header.SetStamp(ros.Now())
+	statusArrayMsg.Data()["header"] = header
 
 	// Add status list
 	statusArrayMsg.Data()["status_list"] = statusList
@@ -186,7 +185,7 @@ func (as *defaultActionServer) PublishStatus() {
 }
 
 // internalCancelCallback recieves cancel message from client
-func (as *defaultActionServer) internalCancelCallback(goalID *ros.DynamicMessage, event ros.MessageEvent) {
+func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event ros.MessageEvent) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
@@ -195,14 +194,16 @@ func (as *defaultActionServer) internalCancelCallback(goalID *ros.DynamicMessage
 	logger.Debug("Action server has received a new cancel request")
 
 	for id, gh := range as.handlers {
-		cancelAll := (goalID.Data()["id"].(string) == "" && goalID.Data()["stamp"].(*ros.Time).IsZero())
-		cancelCurrent := (goalID.Data()["id"].(string) == id)
+		idStamp := goalID.GetStamp()
+		cancelAll := (goalID.GetID() == "" && idStamp.IsZero())
+		cancelCurrent := (goalID.GetID() == id)
 
 		st := gh.GetGoalStatus()
-		cancelBeforeStamp := (!goalID.Data()["stamp"].(*ros.Time).IsZero() && st.Data()["goal_id"].(*ros.DynamicMessage).Data()["stamp"].(*ros.Time).Cmp(goalID.Data()["stamp"].(ros.Time)) <= 0)
+		statusStamp := st.GetGoalID().GetStamp()
+		cancelBeforeStamp := (!idStamp.IsZero() && statusStamp.Cmp(idStamp) <= 0)
 
 		if cancelAll || cancelCurrent || cancelBeforeStamp {
-			if goalID.Data()["id"].(string) == st.Data()["goal_id"].(*ros.DynamicMessage).Data()["id"].(string) {
+			if goalID.GetID() == st.GetGoalID().GetID() {
 				goalFound = true
 			}
 
@@ -218,14 +219,14 @@ func (as *defaultActionServer) internalCancelCallback(goalID *ros.DynamicMessage
 		}
 	}
 
-	if goalID.Data()["id"].(string) != "" && !goalFound {
+	if goalID.GetID() != "" && !goalFound {
 		gh := newServerGoalHandlerWithGoalId(as, goalID)
-		as.handlers[goalID.Data()["id"].(string)] = gh
+		as.handlers[goalID.GetID()] = gh
 		gh.SetHandlerDestructionTime(ros.Now())
 	}
-
-	if goalID.Data()["stamp"].(*ros.Time).Cmp(as.lastCancel) > 0 {
-		as.lastCancel = goalID.Data()["stamp"].(ros.Time)
+	stamp := goalID.GetStamp()
+	if stamp.Cmp(as.lastCancel) > 0 {
+		as.lastCancel = stamp
 	}
 }
 
@@ -240,11 +241,11 @@ func (as *defaultActionServer) internalGoalCallback(goal ActionGoal, event ros.M
 	goalID := goal.GetGoalId()
 
 	for id, gh := range as.handlers {
-		if goalID.Data()["id"].(string) == id {
+		if goalID.GetID() == id {
 			st := gh.GetGoalStatus()
-			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.Data()["id"].(string), st.Data()["status"].(uint8))
-			if st.Data()["status"].(uint8) == uint8(7) {
-				st.Data()["status"] = uint8(8)
+			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.GetID(), st.GetStatus())
+			if st.GetStatus() == uint8(7) {
+				st.SetStatus(uint8(8))
 				result := as.actionResultType.NewMessage()
 				as.PublishResult(st, result)
 			}
@@ -254,21 +255,22 @@ func (as *defaultActionServer) internalGoalCallback(goal ActionGoal, event ros.M
 		}
 	}
 
-	id := goalID.Data()["id"].(string)
+	id := goalID.GetID()
 	if len(id) == 0 {
 		id = as.goalIDGen.generateID()
 		// Create goal id message with id and time stamp
-		goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
-		goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
-		goalMsg.Data()["id"] = id
-		goalMsg.Data()["stamp"] = goalID.Data()["stamp"].(string)
+		goalIDType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+		newGoalID := goalIDType.NewMessage().(*DynamicActionGoalID)
+		newGoalID.SetID(id)
+		newGoalID.SetStamp(goalID.GetStamp())
 		// Set goal id
-		goal.SetGoalId(goalMsg)
+		goal.SetGoalId(newGoalID)
 	}
 
 	gh := newServerGoalHandlerWithGoal(as, goal)
 	as.handlers[id] = gh
-	if !goalID.Data()["stamp"].(*ros.Time).IsZero() && goalID.Data()["stamp"].(*ros.Time).Cmp(as.lastCancel) <= 0 {
+	stamp := goalID.GetStamp()
+	if !stamp.IsZero() && stamp.Cmp(as.lastCancel) <= 0 {
 		gh.SetCancelled(nil, "timestamp older than last goal cancel")
 		return
 	}

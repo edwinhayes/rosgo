@@ -23,21 +23,20 @@ func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, 
 		actionClient: ac,
 		stateMachine: newClientStateMachine(),
 		actionGoal:   ag,
-		actionGoalID: ag.GetGoalId().Data()["id"].(string),
+		actionGoalID: ag.GetGoalId().GetID(),
+		//actionGoalID: ag.GetGoalId().(*ros.DynamicMessage).Data()["id"].(string),
 		transitionCb: transitionCb,
 		feedbackCb:   feedbackCb,
 		logger:       ac.logger,
 	}
 }
 
-func findGoalStatus(statusArr *ros.DynamicMessage, id string) *ros.DynamicMessage {
+func findGoalStatus(statusArr ActionStatusArray, id string) ActionStatus {
 	// Create a dynamic message for status message
-	var status *ros.DynamicMessage
-	// Get array of goal statuses from status array
-	statusArray := statusArr.Data()["status_list"].([]*ros.DynamicMessage)
+	var status ActionStatus
 	// loop through goal status array for matching status message
-	for _, st := range statusArray {
-		if st.Data()["goalid"].(string) == id {
+	for _, st := range statusArr.GetStatusArray() {
+		if st.GetGoalID().GetID() == id {
 			status = st
 			break
 		}
@@ -59,7 +58,7 @@ func (gh *clientGoalHandler) GetGoalStatus() (uint8, error) {
 		return uint8(9), fmt.Errorf("trying to get goal status on an inactive ClientGoalHandler")
 	}
 
-	return gh.stateMachine.getGoalStatus().Data()["status"].(uint8), nil
+	return gh.stateMachine.getGoalStatus().GetStatus(), nil
 }
 
 func (gh *clientGoalHandler) GetGoalStatusText() (string, error) {
@@ -67,7 +66,7 @@ func (gh *clientGoalHandler) GetGoalStatusText() (string, error) {
 		return "", fmt.Errorf("trying to get goal status text on an inactive ClientGoalHandler")
 	}
 
-	return gh.stateMachine.getGoalStatus().Data()["text"].(string), nil
+	return gh.stateMachine.getGoalStatus().GetStatusText(), nil
 }
 
 func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
@@ -81,7 +80,7 @@ func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
 	}
 
 	// implement get status
-	goalStatus := gh.stateMachine.getGoalStatus().Data()["status"].(uint8)
+	goalStatus := gh.stateMachine.getGoalStatus().GetStatus()
 	if goalStatus == uint8(2) ||
 		goalStatus == uint8(3) ||
 		goalStatus == uint8(4) ||
@@ -146,7 +145,7 @@ func (gh *clientGoalHandler) Shutdown(deleteFromManager bool) {
 }
 
 func (gh *clientGoalHandler) updateFeedback(af ActionFeedback) {
-	if gh.actionGoalID != af.GetStatus().Data()["goalid"].(*ros.DynamicMessage).Data()["id"].(string) {
+	if gh.actionGoalID != af.GetStatus().GetGoalID().GetID() {
 		return
 	}
 
@@ -162,14 +161,14 @@ func (gh *clientGoalHandler) updateFeedback(af ActionFeedback) {
 }
 
 func (gh *clientGoalHandler) updateResult(result ActionResult) error {
-	if gh.actionGoalID != result.GetStatus().Data()["goalid"].(*ros.DynamicMessage).Data()["id"].(string) {
+	if gh.actionGoalID != result.GetStatus().GetGoalID().GetID() {
 		return nil
 	}
 
 	status := result.GetStatus()
 	state := gh.stateMachine.getState()
 
-	gh.stateMachine.setGoalStatus(status.Data()["goalid"].(*ros.DynamicMessage), status.Data()["status"].(uint8), status.Data()["text"].(string))
+	gh.stateMachine.setGoalStatus(status.GetGoalID(), status.GetStatus(), status.GetStatusText())
 	gh.stateMachine.setGoalResult(result)
 
 	if state == WaitingForGoalAck ||
@@ -182,8 +181,8 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 
 		// Create a status array message
 		statusArrayType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatusArray")
-		statusArrayMsg := statusArrayType.NewMessage().(*ros.DynamicMessage)
-		statusArray := statusArrayMsg.Data()["status_list"].([]*ros.DynamicMessage)
+		statusArrayMsg := statusArrayType.NewMessage().(*DynamicActionStatusArray)
+		statusArray := statusArrayMsg.GetStatusArray()
 		statusArray = append(statusArray, result.GetStatus())
 		// Update the goal handler status
 		if err := gh.updateStatus(statusArrayMsg); err != nil {
@@ -199,7 +198,7 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 	}
 }
 
-func (gh *clientGoalHandler) updateStatus(statusArr *ros.DynamicMessage) error {
+func (gh *clientGoalHandler) updateStatus(statusArr ActionStatusArray) error {
 	logger := *gh.logger
 	state := gh.stateMachine.getState()
 	if state == Done {
@@ -219,7 +218,7 @@ func (gh *clientGoalHandler) updateStatus(statusArr *ros.DynamicMessage) error {
 		return nil
 	}
 
-	gh.stateMachine.setGoalStatus(status.Data()["goalid"].(*ros.DynamicMessage), status.Data()["status"].(uint8), status.Data()["text"].(string))
+	gh.stateMachine.setGoalStatus(status.GetGoalID(), status.GetStatus(), status.GetStatusText())
 	nextStates, err := gh.stateMachine.getTransitions(status)
 	if err != nil {
 		return fmt.Errorf("error getting transitions: %v", err)

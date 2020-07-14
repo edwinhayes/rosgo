@@ -38,28 +38,27 @@ func (e Event) String() string {
 }
 
 type serverStateMachine struct {
-	goalStatus *ros.DynamicMessage
+	goalStatus ActionStatus
 	mutex      sync.RWMutex
 }
 
-func newServerStateMachine(goalID *ros.DynamicMessage) *serverStateMachine {
+func newServerStateMachine(goalID ActionGoalID) *serverStateMachine {
 	// Create a goal status message with pending status
-	statusMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
-	statusMsg := statusMsgType.NewMessage().(*ros.DynamicMessage)
-	statusMsg.Data()["status"] = 0
+	statusType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
+	status := statusType.NewMessage().(*DynamicActionStatus)
+	status.SetStatus(0)
 	return &serverStateMachine{
-
-		goalStatus: statusMsg,
+		goalStatus: status,
 	}
 }
 
-func (sm *serverStateMachine) transition(event Event, text string) (*ros.DynamicMessage, error) {
+func (sm *serverStateMachine) transition(event Event, text string) (ActionStatus, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	nextState := sm.goalStatus.Data()["status"].(uint8)
+	nextState := sm.goalStatus.GetStatus()
 
-	switch sm.goalStatus.Data()["status"].(uint8) {
+	switch sm.goalStatus.GetStatus() {
 	case 0:
 		switch event {
 		case Reject:
@@ -139,13 +138,13 @@ func (sm *serverStateMachine) transition(event Event, text string) (*ros.Dynamic
 		return sm.goalStatus, fmt.Errorf("invalid state")
 	}
 
-	sm.goalStatus.Data()["status"] = nextState
-	sm.goalStatus.Data()["text"] = text
+	sm.goalStatus.SetStatus(nextState)
+	sm.goalStatus.SetStatusText(text)
 
 	return sm.goalStatus, nil
 }
 
-func (sm *serverStateMachine) getStatus() *ros.DynamicMessage {
+func (sm *serverStateMachine) getStatus() ActionStatus {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 

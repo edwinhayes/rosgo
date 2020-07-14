@@ -91,11 +91,11 @@ func (s *simpleActionServer) AcceptNewGoal() (ros.Message, error) {
 }
 
 func (s *simpleActionServer) IsActive() bool {
-	if s.currentGoal == nil || s.currentGoal.GetGoalId().Data()["id"].(string) == "" {
+	if s.currentGoal == nil || s.currentGoal.GetGoalId().GetID() == "" {
 		return false
 	}
 
-	status := s.currentGoal.GetGoalStatus().Data()["status"].(uint8)
+	status := s.currentGoal.GetGoalStatus().GetStatus()
 	if status == uint8(1) || status == uint8(6) {
 		return true
 	}
@@ -163,20 +163,20 @@ func (s *simpleActionServer) RegisterPreemptCallback(cb interface{}) {
 
 func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	logger := *s.logger
-	goalHandler := s.actionServer.getHandler(ag.GetGoalId().Data()["id"].(string))
-	logger.Infof("[SimpleActionServer] Server received new goal with id %s", goalHandler.GetGoalId().Data()["id"].(string))
+	goalHandler := s.actionServer.getHandler(ag.GetGoalId().GetID())
+	logger.Infof("[SimpleActionServer] Server received new goal with id %s", goalHandler.GetGoalId().GetID())
 
 	var goalStamp, nextGoalStamp ros.Time
-	goalStamp = goalHandler.GetGoalId().Data()["stamp"].(ros.Time)
+	goalStamp = goalHandler.GetGoalId().GetStamp()
 	if s.nextGoal != nil {
-		nextGoalStamp = s.nextGoal.GetGoalId().Data()["stamp"].(ros.Time)
+		nextGoalStamp = s.nextGoal.GetGoalId().GetStamp()
 	}
 
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
-	if (s.currentGoal == nil || goalStamp.Cmp(s.currentGoal.GetGoalId().Data()["stamp"].(ros.Time)) >= 0) &&
-		(s.nextGoal == nil || nextGoalStamp.Cmp(s.currentGoal.GetGoalId().Data()["stamp"].(ros.Time)) >= 0) {
+	if (s.currentGoal == nil || goalStamp.Cmp(s.currentGoal.GetGoalId().GetStamp()) >= 0) &&
+		(s.nextGoal == nil || nextGoalStamp.Cmp(s.currentGoal.GetGoalId().GetStamp()) >= 0) {
 
 		if (s.nextGoal != nil) &&
 			(s.currentGoal == nil || s.nextGoal.NotEqual(s.currentGoal)) {
@@ -213,16 +213,16 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	}
 }
 
-func (s *simpleActionServer) internalPreemptCallback(gID *ros.DynamicMessage) {
+func (s *simpleActionServer) internalPreemptCallback(gID ActionGoalID) {
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 	logger := *s.logger
 
-	goalHandler := s.actionServer.getHandler(gID.Data()["id"].(string))
+	goalHandler := s.actionServer.getHandler(gID.GetID())
 	logger.Infof("[SimpleActionServer] Server received preempt call for goal with id %s",
-		goalHandler.GetGoalId().Data()["id"].(string))
+		goalHandler.GetGoalId().GetID())
 
-	if goalHandler.GetGoalId().Data()["id"].(string) == s.currentGoal.GetGoalId().Data()["id"].(string) {
+	if goalHandler.GetGoalId().GetID() == s.currentGoal.GetGoalId().GetID() {
 		s.preemptRequest = true
 		goal := goalHandler.GetGoal()
 		args := []reflect.Value{reflect.ValueOf(goal)}

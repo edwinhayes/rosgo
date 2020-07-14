@@ -66,21 +66,19 @@ func (ac *defaultActionClient) SendGoal(goal ros.Message, transitionCb, feedback
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
 	}
 
-	ag := ac.actionType.GoalType().NewMessage().(ActionGoal)
-	// make a goalId message with timestamp
-	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
-	goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
-	goalMsg.Data()["id"] = ac.goalIDGen.generateID()
-	goalMsg.Data()["stamp"] = ros.Now()
-	goalID := goalMsg
+	ag := ac.actionType.GoalType().NewMessage().(*DynamicActionGoal)
+	// make a goalId message with timestamp and generated id
+	goalidType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
+	goalid := goalidType.NewMessage().(*DynamicActionGoalID)
+	goalid.SetStamp(ros.Now())
+	goalid.SetID(ac.goalIDGen.generateID())
 	// make a header with timestamp
-	headerMsgType, _ := ros.NewDynamicMessageType("std_msgs/Header")
-	headerMsg := headerMsgType.NewMessage().(*ros.DynamicMessage)
-	headerMsg.Data()["stamp"] = ros.Now()
-	header := headerMsg
+	headerType, _ := ros.NewDynamicMessageType("std_msgs/Header")
+	header := headerType.NewMessage().(*DynamicActionHeader)
+	header.SetStamp(ros.Now())
 
 	ag.SetGoal(goal)
-	ag.SetGoalId(goalID)
+	ag.SetGoalId(goalid)
 	ag.SetHeader(header)
 	ac.PublishActionGoal(ag)
 
@@ -210,7 +208,7 @@ func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback,
 	}
 }
 
-func (ac *defaultActionClient) internalStatusCallback(statusArr *ros.DynamicMessage, event ros.MessageEvent) {
+func (ac *defaultActionClient) internalStatusCallback(statusArr ActionStatusArray, event ros.MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()

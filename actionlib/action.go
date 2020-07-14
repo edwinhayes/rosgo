@@ -21,30 +21,65 @@ type Action interface {
 
 type ActionGoal interface {
 	ros.Message
-	GetHeader() *ros.DynamicMessage
-	GetGoalId() *ros.DynamicMessage
+	GetHeader() ActionHeader
+	GetGoalId() ActionGoalID
 	GetGoal() ros.Message
-	SetHeader(*ros.DynamicMessage)
-	SetGoalId(*ros.DynamicMessage)
+	SetHeader(ActionHeader)
+	SetGoalId(ActionGoalID)
 	SetGoal(ros.Message)
 }
 
+type ActionGoalID interface {
+	ros.Message
+	GetID() string
+	SetID(string)
+	GetStamp() ros.Time
+	SetStamp(ros.Time)
+}
+
+// * ActionFeedback interface
 type ActionFeedback interface {
 	ros.Message
-	GetHeader() *ros.DynamicMessage
-	GetStatus() *ros.DynamicMessage
+	GetHeader() ActionHeader
+	GetStatus() ActionStatus
 	GetFeedback() ros.Message
-	SetHeader(*ros.DynamicMessage)
-	SetStatus(*ros.DynamicMessage)
+	SetHeader(ActionHeader)
+	SetStatus(ActionStatus)
 	SetFeedback(ros.Message)
 }
 
+// * ActionResult interface
 type ActionResult interface {
 	ros.Message
-	GetHeader() *ros.DynamicMessage
-	GetStatus() *ros.DynamicMessage
+	GetHeader() ActionHeader
+	GetStatus() ActionStatus
 	GetResult() ros.Message
-	SetHeader(*ros.DynamicMessage)
-	SetStatus(*ros.DynamicMessage)
+	SetHeader(ActionHeader)
+	SetStatus(ActionStatus)
 	SetResult(ros.Message)
+}
+
+// *** Shared ActionHeader interface
+type ActionHeader interface {
+	ros.Message
+	GetStamp() ros.Time
+	SetStamp(ros.Time)
+}
+
+// *** Shared ActionStatus interface
+type ActionStatus interface {
+	ros.Message
+	GetGoalID() ActionGoalID
+	SetGoalID(ActionGoalID)
+	GetStatus() uint8
+	SetStatus(uint8)
+	GetStatusText() string
+	SetStatusText(string)
+}
+
+// *** Shared ActionStatusArray interface
+type ActionStatusArray interface {
+	ros.Message
+	GetStatusArray() []ActionStatus
+	SetStatusArray([]ActionStatus)
 }
