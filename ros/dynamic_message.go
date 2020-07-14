@@ -91,14 +91,14 @@ func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 // parent ROS message; this is used internally for handling complex ROS messages.
 func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
 	// Create an empty message type.
-	m := new(DynamicMessageType)
+	m := DynamicMessageType{}
 
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
 		c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
 		if err != nil {
-			return nil, err
+			return m, err
 		}
 		context = c
 	}
@@ -124,7 +124,7 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 	// Load context for the target message.
 	spec, err := context.LoadMsg(fullname)
 	if err != nil {
-		return nil, err
+		return m, err
 	}
 
 	// Now we know all about the message!
@@ -462,8 +462,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				if oldMsgType != "" && oldMsgType == newMsgType {
 					//We've already generated this type
 				} else {
-					msgType, err = newDynamicMessageTypeNested(goField.Type, goField.Package)
+					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package)
 					_ = err
+					msgType = &msgT
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
