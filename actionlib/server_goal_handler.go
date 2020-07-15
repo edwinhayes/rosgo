@@ -156,8 +156,8 @@ func (gh *serverGoalHandler) GetGoal() ros.Message {
 func (gh *serverGoalHandler) GetGoalId() ActionGoalID {
 	if gh.goal == nil {
 		// Create a new Goal id message
-		goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
-		goalMsg := goalMsgType.NewMessage().(ActionGoalID)
+		goalMsgType, _ := NewDynamicGoalIDType()
+		goalMsg := goalMsgType.NewGoalIDMessage()
 		return goalMsg
 	}
 
@@ -170,8 +170,8 @@ func (gh *serverGoalHandler) GetGoalStatus() ActionStatus {
 		return status
 	}
 	// Create a new goal status message
-	statusMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
-	statusMsg := statusMsgType.NewMessage().(ActionStatus)
+	statusMsgType, _ := NewDynamicStatusType()
+	statusMsg := statusMsgType.NewStatusMessage()
 	return statusMsg
 }
 

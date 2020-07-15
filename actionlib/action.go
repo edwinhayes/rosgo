@@ -115,6 +115,8 @@ type ActionStatus interface {
 // *** Shared ActionStatusArray interface
 type ActionStatusArray interface {
 	ros.Message
+	GetHeader() ActionHeader
+	SetHeader(ActionHeader)
 	GetStatusArray() []ActionStatus
 	SetStatusArray([]ActionStatus)
 }

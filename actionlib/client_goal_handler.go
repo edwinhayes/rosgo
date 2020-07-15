@@ -127,12 +127,11 @@ func (gh *clientGoalHandler) Cancel() error {
 		return fmt.Errorf("trying to call cancel on inactive client goal hanlder")
 	}
 	// Create a goal id message with timestamp and goal id
-	goalMsgType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalID")
-	goalMsg := goalMsgType.NewMessage().(*ros.DynamicMessage)
-	goalMsg.Data()["stamp"] = ros.Now()
-	goalMsg.Data()["id"] = gh.actionGoalID
-	cancelMsg := goalMsg
-	gh.actionClient.cancelPub.Publish(cancelMsg)
+	goalMsgType, _ := NewDynamicGoalIDType()
+	goalMsg := goalMsgType.NewGoalIDMessage()
+	goalMsg.SetStamp(ros.Now())
+	goalMsg.SetID(gh.actionGoalID)
+	gh.actionClient.cancelPub.Publish(goalMsg)
 	gh.stateMachine.transitionTo(WaitingForCancelAck, gh, gh.transitionCb)
 	return nil
 }
@@ -180,8 +179,8 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 		state == Preempting {
 
 		// Create a status array message
-		statusArrayType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatusArray")
-		statusArrayMsg := statusArrayType.NewMessage().(*DynamicActionStatusArray)
+		statusArrayType, _ := NewDynamicStatusArrayType()
+		statusArrayMsg := statusArrayType.NewStatusArrayMessage()
 		statusArray := statusArrayMsg.GetStatusArray()
 		statusArray = append(statusArray, result.GetStatus())
 		// Update the goal handler status

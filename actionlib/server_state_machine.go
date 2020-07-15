@@ -3,8 +3,6 @@ package actionlib
 import (
 	"fmt"
 	"sync"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type Event uint8
@@ -44,8 +42,8 @@ type serverStateMachine struct {
 
 func newServerStateMachine(goalID ActionGoalID) *serverStateMachine {
 	// Create a goal status message with pending status
-	statusType, _ := ros.NewDynamicMessageType("actionlib_msgs/GoalStatus")
-	status := statusType.NewMessage().(*DynamicActionStatus)
+	statusType, _ := NewDynamicStatusType()
+	status := statusType.NewStatusMessage()
 	status.SetStatus(0)
 	return &serverStateMachine{
 		goalStatus: status,

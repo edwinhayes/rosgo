@@ -144,7 +144,9 @@ func (pub *defaultPublisher) listenRemoteSubscriber() {
 
 func (pub *defaultPublisher) Publish(msg Message) {
 	var buf bytes.Buffer
+	//fmt.Printf("Message to be published: %v\n", msg)
 	_ = msg.Serialize(&buf)
+	//fmt.Printf("Serialized bytes: %v\n", buf)
 	pub.msgChan <- buf.Bytes()
 }
 

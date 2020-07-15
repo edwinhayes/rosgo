@@ -362,3 +362,7 @@ func (m *DynamicActionStatusArray) GetStatusArray() []ActionStatus {
 func (m *DynamicActionStatusArray) SetStatusArray(statusArray []ActionStatus) {
 	m.Data()["status_list"] = statusArray
 }
+func (m *DynamicActionStatusArray) GetHeader() ActionHeader {
+	return m.Data()["header"].(*DynamicActionHeader)
+}
+func (m *DynamicActionStatusArray) SetHeader(header ActionHeader) { m.Data()["header"] = header }
