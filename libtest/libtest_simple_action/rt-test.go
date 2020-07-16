@@ -1,12 +1,11 @@
 package libtest_simple_action
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
 	"time"
-
-	"github.com/edwinhayes/rosgo/actionlib"
 
 	"github.com/edwinhayes/rosgo/ros"
 )
@@ -20,15 +19,15 @@ var feedback []int32
 type ActionClient struct {
 	node ros.Node
 	name string
-	ac   actionlib.SimpleActionClient
+	ac   ros.SimpleActionClient
 }
 
 // New Action client instantiates a new simple action client
-func newActionClient(node ros.Node, name string, actionType actionlib.ActionType) *ActionClient {
+func newActionClient(node ros.Node, name string, actionType ros.ActionType) *ActionClient {
 
 	fc := &ActionClient{
 		node: node,
-		ac:   actionlib.NewSimpleActionClient(node, name, actionType),
+		ac:   ros.NewSimpleActionClient(node, name, actionType),
 	}
 
 	fc.ac.WaitForServer(ros.NewDuration(0, 0))
@@ -46,6 +45,7 @@ func (fc *ActionClient) feedbackCb(fb *ros.DynamicMessage) {
 
 // ActionClient done subscriber callback
 func (fc *ActionClient) doneCb(state uint8, result *ros.DynamicMessage) {
+	log.Printf("DONE CALLBACK CALLED\n")
 	fc.node.Shutdown()
 }
 
@@ -60,39 +60,54 @@ func (fc *ActionClient) sendGoal(goal *ros.DynamicMessage) {
 // using the execute callback
 type ActionServer struct {
 	node   ros.Node
-	as     actionlib.SimpleActionServer
+	as     ros.SimpleActionServer
 	name   string
 	fb     ros.Message
 	result ros.Message
 }
 
 // newActionServer creates a new simple action server and starts it
-func newActionServer(node ros.Node, name string, actionType actionlib.ActionType) {
+func newActionServer(node ros.Node, name string, actionType ros.ActionType) {
 	s := &ActionServer{
 		node: node,
 		name: name,
 	}
 
-	s.as = actionlib.NewSimpleActionServer(node, name,
+	s.as = ros.NewSimpleActionServer(node, name,
 		actionType, s.executeCallback, false)
 	s.as.Start()
 }
 
 // executeCallback is the execution callback of the action server
-func (s *ActionServer) executeCallback(goal *ros.DynamicMessage) {
+func (s *ActionServer) executeCallback(goali interface{}, actionType interface{}) {
 
+	fmt.Printf("Received in execute callback: %v\n", goali)
+	goalmsg := goali.(*ros.DynamicMessage)
+	fmt.Printf("goalmsg data in internal goal callback: %v\n", goalmsg)
+	// To Do : Replace this with correct interface usage
+	goalid := goalmsg.Data()["goal_id"].(ros.ActionGoalID)
+	header := goalmsg.Data()["header"].(ros.ActionHeader)
+	goalType := actionType.(ros.ActionType).GoalType()
+	goal := goalType.NewGoalMessage()
+	goal.SetGoal(goalmsg)
+	goal.SetGoalId(goalid)
+	goal.SetHeader(header)
 	// instantiate action message types
-	feed := s.fb.(*ros.DynamicMessage)
-	result := s.result.(*ros.DynamicMessage)
+	feedType := actionType.(ros.ActionType).FeedbackType()
+	resultType := actionType.(ros.ActionType).ResultType()
 
 	// setup sequences
+	feed := feedType.NewFeedbackMessage().(*ros.DynamicActionFeedback)
+	//feed := feedMsg.(*ros.DynamicMessage)
 	seq := feed.Data()["sequence"].([]int32)
 	seq = append(seq, 0)
 	seq = append(seq, 1)
 	success := true
 
+	//goalData := goal.GetGoal().(*ros.DynamicMessage)
+
 	// This method simply publishes feedback each second, incrementing count till goal acheived
-	for i := 1; i < int(goal.Data()["order"].(int32)); i++ {
+	for i := 1; i < int(goalmsg.Data()["order"].(int32)); i++ {
 		if s.as.IsPreemptRequested() {
 			success = false
 			if err := s.as.SetPreempted(nil, ""); err != nil {
@@ -103,15 +118,16 @@ func (s *ActionServer) executeCallback(goal *ros.DynamicMessage) {
 
 		val := seq[i] + seq[i-1]
 		seq = append(seq, val)
-
+		feed.Data()["sequence"] = seq
 		s.as.PublishFeedback(feed)
 		time.Sleep(1000 * time.Millisecond)
 	}
 
 	// Once goal achieved, publish result
 	if success {
-		result.Data()["sequence"] = seq
-		if err := s.as.SetSucceeded(result, "goal"); err != nil {
+		resultMsg := resultType.NewResultMessage().(*ros.DynamicActionResult)
+		resultMsg.Data()["sequence"] = seq
+		if err := s.as.SetSucceeded(resultMsg, "goal"); err != nil {
 			return
 		}
 	}
@@ -150,7 +166,7 @@ func RTTest(t *testing.T) {
 	defer serverNode.Shutdown()
 
 	// Create a dynamic action type
-	actionType, err := actionlib.NewDynamicActionType("actionlib_tutorials/Fibonacci")
+	actionType, err := ros.NewDynamicActionType("actionlib_tutorials/Fibonacci")
 	if err != nil {
 		t.Fatalf("could not create action type: %s", err)
 	}
@@ -174,7 +190,7 @@ func RTTest(t *testing.T) {
 	for clientNode.OK() {
 
 		// Check our feedback
-		log.Println(feedback)
+		//log.Println(feedback)
 
 		_ = clientNode.SpinOnce()
 	}

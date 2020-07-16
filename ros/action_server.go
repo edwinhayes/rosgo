@@ -1,46 +1,45 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"sync"
 	"time"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type defaultActionServer struct {
-	node             ros.Node
+	node             Node
 	autoStart        bool
 	started          bool
 	action           string
 	actionType       ActionType
-	actionResult     ros.MessageType
-	actionResultType ros.MessageType
-	actionFeedback   ros.MessageType
-	actionGoal       ros.MessageType
+	actionResult     MessageType
+	actionResultType MessageType
+	actionFeedback   MessageType
+	actionGoal       MessageType
 	statusMutex      sync.RWMutex
-	statusFrequency  ros.Rate
+	statusFrequency  Rate
 	statusTimer      *time.Ticker
 	handlers         map[string]*serverGoalHandler
-	handlersTimeout  ros.Duration
+	handlersTimeout  Duration
 	handlersMutex    sync.Mutex
 	goalCallback     interface{}
 	cancelCallback   interface{}
-	lastCancel       ros.Time
+	lastCancel       Time
 	pubQueueSize     int
 	subQueueSize     int
-	goalSub          ros.Subscriber
-	cancelSub        ros.Subscriber
-	resultPub        ros.Publisher
-	feedbackPub      ros.Publisher
-	statusPub        ros.Publisher
+	goalSub          Subscriber
+	cancelSub        Subscriber
+	resultPub        Publisher
+	feedbackPub      Publisher
+	statusPub        Publisher
 	statusPubChan    chan struct{}
 	goalIDGen        *goalIDGenerator
 	shutdownChan     chan struct{}
 }
 
-func newDefaultActionServer(node ros.Node, action string, actType ActionType, goalCb interface{}, cancelCb interface{}, start bool) *defaultActionServer {
+func newDefaultActionServer(node Node, action string, actType ActionType, goalCb interface{}, cancelCb interface{}, start bool) *defaultActionServer {
 	return &defaultActionServer{
 		node:            node,
 		autoStart:       start,
@@ -50,10 +49,10 @@ func newDefaultActionServer(node ros.Node, action string, actType ActionType, go
 		actionResult:    actType.ResultType(),
 		actionFeedback:  actType.FeedbackType(),
 		actionGoal:      actType.GoalType(),
-		handlersTimeout: ros.NewDuration(60, 0),
+		handlersTimeout: NewDuration(60, 0),
 		goalCallback:    goalCb,
 		cancelCallback:  cancelCb,
-		lastCancel:      ros.Now(),
+		lastCancel:      Now(),
 	}
 }
 
@@ -70,10 +69,10 @@ func (as *defaultActionServer) init() {
 	as.actionResultType = as.actionResult
 
 	// get frequency from ros params
-	as.statusFrequency = ros.NewRate(5.0)
+	as.statusFrequency = NewRate(5.0)
 
 	// get queue sizes from ros params
-	// queue sizes not implemented by ros.Node yet
+	// queue sizes not implemented by Node yet
 	as.pubQueueSize = 50
 	as.subQueueSize = 50
 
@@ -123,12 +122,12 @@ func (as *defaultActionServer) Start() {
 }
 
 // PublishResult publishes action result message
-func (as *defaultActionServer) PublishResult(status ActionStatus, result ros.Message) {
-	msg := as.actionResult.NewMessage().(ActionResult)
+func (as *defaultActionServer) PublishResult(status ActionStatus, result Message) {
+	msg := result.(*DynamicActionResult)
 	// Create a header message with time stamp
 	headerType, _ := NewDynamicHeaderType()
 	header := headerType.NewHeaderMessage()
-	header.SetStamp(ros.Now())
+	header.SetStamp(Now())
 	msg.SetHeader(header)
 	msg.SetStatus(status)
 	msg.SetResult(result)
@@ -136,12 +135,12 @@ func (as *defaultActionServer) PublishResult(status ActionStatus, result ros.Mes
 }
 
 // PublishFeedback publishes action feedback messages
-func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback ros.Message) {
+func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback Message) {
 	msg := as.actionFeedback.NewMessage().(ActionFeedback)
 	// Create a header message with time stamp
 	headerType, _ := NewDynamicHeaderType()
 	header := headerType.NewHeaderMessage()
-	header.SetStamp(ros.Now())
+	header.SetStamp(Now())
 	msg.SetStatus(status)
 	msg.SetFeedback(feedback)
 	as.feedbackPub.Publish(msg)
@@ -157,7 +156,7 @@ func (as *defaultActionServer) getStatus() ActionStatusArray {
 			handlerTime := gh.GetHandlerDestructionTime()
 			destroyTime := handlerTime.Add(as.handlersTimeout)
 
-			if !handlerTime.IsZero() && destroyTime.Cmp(ros.Now()) <= 0 {
+			if !handlerTime.IsZero() && destroyTime.Cmp(Now()) <= 0 {
 				delete(as.handlers, id)
 				continue
 			}
@@ -172,7 +171,7 @@ func (as *defaultActionServer) getStatus() ActionStatusArray {
 	// Create a header message with time stamp
 	headerType, _ := NewDynamicHeaderType()
 	header := headerType.NewHeaderMessage().(*DynamicActionHeader)
-	header.SetStamp(ros.Now())
+	header.SetStamp(Now())
 
 	// Add status list
 	statusArrayMsg.SetStatusArray(statusList)
@@ -185,7 +184,7 @@ func (as *defaultActionServer) PublishStatus() {
 }
 
 // internalCancelCallback recieves cancel message from client
-func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event ros.MessageEvent) {
+func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event MessageEvent) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
@@ -222,7 +221,7 @@ func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event
 	if goalID.GetID() != "" && !goalFound {
 		gh := newServerGoalHandlerWithGoalId(as, goalID)
 		as.handlers[goalID.GetID()] = gh
-		gh.SetHandlerDestructionTime(ros.Now())
+		gh.SetHandlerDestructionTime(Now())
 	}
 	stamp := goalID.GetStamp()
 	if stamp.Cmp(as.lastCancel) > 0 {
@@ -233,21 +232,20 @@ func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event
 // internalGoalCallback recieves the goals from client and checks if
 // the goalID already exists in the status list. If not, it will call
 // server's goalCallback with goal that was recieved from the client.
-func (as *defaultActionServer) internalGoalCallback(goali interface{}, event ros.MessageEvent) {
+func (as *defaultActionServer) internalGoalCallback(goali interface{}, event MessageEvent) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
 	logger := *as.node.Logger()
 
 	// Convert interface to ActionGoal
-	goalmsg := goali.(*ros.DynamicMessage)
-
+	goalmsg := goali.(*DynamicMessage)
+	fmt.Printf("goalmsg data in internal goal callback: %v\n", goalmsg)
 	// To Do : Replace this with correct interface usage
-	goalid := goalmsg.Data()["goalid"].(ActionGoalID)
+	goalid := goalmsg.Data()["goal_id"].(ActionGoalID)
 	header := goalmsg.Data()["header"].(ActionHeader)
-	goalgoal := goalmsg.Data()["goal"].(*ros.DynamicMessage)
 	goal := as.actionType.GoalType().NewGoalMessage()
-	goal.SetGoal(goalgoal)
+	goal.SetGoal(goalmsg)
 	goal.SetGoalId(goalid)
 	goal.SetHeader(header)
 	goalID := goal.GetGoalId()
@@ -258,11 +256,12 @@ func (as *defaultActionServer) internalGoalCallback(goali interface{}, event ros
 			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.GetID(), st.GetStatus())
 			if st.GetStatus() == uint8(7) {
 				st.SetStatus(uint8(8))
+				log.Fatalf("Statusssssssssssssssssssssssssssss: %v", st)
 				result := as.actionResultType.NewMessage()
 				as.PublishResult(st, result)
 			}
 
-			gh.SetHandlerDestructionTime(ros.Now())
+			gh.SetHandlerDestructionTime(Now())
 			return
 		}
 	}

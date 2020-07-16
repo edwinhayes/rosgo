@@ -1,4 +1,4 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type simpleActionServer struct {
@@ -25,7 +24,7 @@ type simpleActionServer struct {
 	executorCh            chan struct{}
 }
 
-func newSimpleActionServer(node ros.Node, action string, actType ActionType, executeCb interface{}, start bool) *simpleActionServer {
+func newSimpleActionServer(node Node, action string, actType ActionType, executeCb interface{}, start bool) *simpleActionServer {
 	s := new(simpleActionServer)
 	s.actionServer = newDefaultActionServer(node, action, actType, s.internalGoalCallback, s.internalPreemptCallback, start)
 	s.newGoal = false
@@ -59,7 +58,7 @@ func (s *simpleActionServer) IsPreemptRequested() bool {
 	return s.preemptRequest
 }
 
-func (s *simpleActionServer) AcceptNewGoal() (ros.Message, error) {
+func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 	logger := *s.logger
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
@@ -103,7 +102,7 @@ func (s *simpleActionServer) IsActive() bool {
 	return false
 }
 
-func (s *simpleActionServer) SetSucceeded(result ros.Message, text string) error {
+func (s *simpleActionServer) SetSucceeded(result Message, text string) error {
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
@@ -114,7 +113,7 @@ func (s *simpleActionServer) SetSucceeded(result ros.Message, text string) error
 	return s.currentGoal.SetSucceeded(result, text)
 }
 
-func (s *simpleActionServer) SetAborted(result ros.Message, text string) error {
+func (s *simpleActionServer) SetAborted(result Message, text string) error {
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
@@ -125,7 +124,7 @@ func (s *simpleActionServer) SetAborted(result ros.Message, text string) error {
 	return s.currentGoal.SetAborted(result, text)
 }
 
-func (s *simpleActionServer) SetPreempted(result ros.Message, text string) error {
+func (s *simpleActionServer) SetPreempted(result Message, text string) error {
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
@@ -136,14 +135,14 @@ func (s *simpleActionServer) SetPreempted(result ros.Message, text string) error
 	return s.currentGoal.SetCancelled(result, text)
 }
 
-func (s *simpleActionServer) PublishFeedback(feedback ros.Message) {
+func (s *simpleActionServer) PublishFeedback(feedback Message) {
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
 	s.currentGoal.PublishFeedback(feedback)
 }
 
-func (s *simpleActionServer) GetDefaultResult() ros.Message {
+func (s *simpleActionServer) GetDefaultResult() Message {
 	return s.actionServer.actionResultType.NewMessage()
 }
 
@@ -162,11 +161,12 @@ func (s *simpleActionServer) RegisterPreemptCallback(cb interface{}) {
 }
 
 func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
+
 	logger := *s.logger
 	goalHandler := s.actionServer.getHandler(ag.GetGoalId().GetID())
 	logger.Infof("[SimpleActionServer] Server received new goal with id %s", goalHandler.GetGoalId().GetID())
 
-	var goalStamp, nextGoalStamp ros.Time
+	var goalStamp, nextGoalStamp Time
 	goalStamp = goalHandler.GetGoalId().GetStamp()
 	if s.nextGoal != nil {
 		nextGoalStamp = s.nextGoal.GetGoalId().GetStamp()
@@ -257,6 +257,7 @@ func (s *simpleActionServer) goalExecutor() {
 }
 
 func (s *simpleActionServer) execute() error {
+
 	if s.IsActive() {
 		return fmt.Errorf("should never reach this code with an active goal")
 	}
@@ -271,7 +272,7 @@ func (s *simpleActionServer) execute() error {
 			return fmt.Errorf("execute callback must exist. This is a bug in SimpleActionServer")
 		}
 
-		args := []reflect.Value{reflect.ValueOf(goal)}
+		args := []reflect.Value{reflect.ValueOf(goal), reflect.ValueOf(s.actionServer.actionType)}
 		if err := s.runCallback("execute", args); err != nil {
 			return err
 		}
@@ -309,7 +310,7 @@ func (s *simpleActionServer) runCallback(cbType string, args []reflect.Value) er
 	fun := reflect.ValueOf(callback)
 	numArgsNeeded := fun.Type().NumIn()
 
-	if numArgsNeeded <= 1 {
+	if numArgsNeeded <= 2 {
 		fun.Call(args[0:numArgsNeeded])
 	} else {
 		return fmt.Errorf("unexepcted number of arguments for callback")

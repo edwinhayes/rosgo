@@ -1,4 +1,4 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
@@ -45,6 +45,7 @@ func newServerStateMachine(goalID ActionGoalID) *serverStateMachine {
 	statusType, _ := NewDynamicStatusType()
 	status := statusType.NewStatusMessage()
 	status.SetStatus(0)
+	status.SetGoalID(goalID)
 	return &serverStateMachine{
 		goalStatus: status,
 	}

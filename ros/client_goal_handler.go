@@ -1,11 +1,10 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
 	"reflect"
 
 	modular "github.com/edwinhayes/logrus-modular"
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type clientGoalHandler struct {
@@ -24,7 +23,6 @@ func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, 
 		stateMachine: newClientStateMachine(),
 		actionGoal:   ag,
 		actionGoalID: ag.GetGoalId().GetID(),
-		//actionGoalID: ag.GetGoalId().(*ros.DynamicMessage).Data()["id"].(string),
 		transitionCb: transitionCb,
 		feedbackCb:   feedbackCb,
 		logger:       ac.logger,
@@ -36,7 +34,8 @@ func findGoalStatus(statusArr ActionStatusArray, id string) ActionStatus {
 	var status ActionStatus
 	// loop through goal status array for matching status message
 	for _, st := range statusArr.GetStatusArray() {
-		if st.GetGoalID().GetID() == id {
+		goalID := st.GetGoalID()
+		if goalID.GetID() == id {
 			status = st
 			break
 		}
@@ -95,7 +94,7 @@ func (gh *clientGoalHandler) GetTerminalState() (uint8, error) {
 	return uint8(9), nil
 }
 
-func (gh *clientGoalHandler) GetResult() (ros.Message, error) {
+func (gh *clientGoalHandler) GetResult() (Message, error) {
 	if gh.stateMachine == nil {
 		return nil, fmt.Errorf("trying to get goal status on inactive clientGoalHandler")
 	}
@@ -129,7 +128,7 @@ func (gh *clientGoalHandler) Cancel() error {
 	// Create a goal id message with timestamp and goal id
 	goalMsgType, _ := NewDynamicGoalIDType()
 	goalMsg := goalMsgType.NewGoalIDMessage()
-	goalMsg.SetStamp(ros.Now())
+	goalMsg.SetStamp(Now())
 	goalMsg.SetID(gh.actionGoalID)
 	gh.actionClient.cancelPub.Publish(goalMsg)
 	gh.stateMachine.transitionTo(WaitingForCancelAck, gh, gh.transitionCb)
@@ -181,8 +180,9 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 		// Create a status array message
 		statusArrayType, _ := NewDynamicStatusArrayType()
 		statusArrayMsg := statusArrayType.NewStatusArrayMessage()
-		statusArray := statusArrayMsg.GetStatusArray()
+		statusArray := make([]ActionStatus, 0)
 		statusArray = append(statusArray, result.GetStatus())
+		statusArrayMsg.SetStatusArray(statusArray)
 		// Update the goal handler status
 		if err := gh.updateStatus(statusArrayMsg); err != nil {
 			return err
@@ -190,7 +190,9 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 
 		gh.stateMachine.transitionTo(Done, gh, gh.transitionCb)
 		return nil
+
 	} else if state == Done {
+
 		return fmt.Errorf("got a result when we are in the `DONE` state")
 	} else {
 		return fmt.Errorf("unknown state %v", state)

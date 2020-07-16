@@ -1,28 +1,26 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
 	"sync"
 
 	modular "github.com/edwinhayes/logrus-modular"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type defaultActionClient struct {
 	started          bool
-	node             ros.Node
+	node             Node
 	action           string
 	actionType       ActionType
-	actionResult     ros.MessageType
+	actionResult     MessageType
 	actionResultType ActionResultType
 	actionFeedback   ActionFeedbackType
 	actionGoal       ActionGoalType
-	goalPub          ros.Publisher
-	cancelPub        ros.Publisher
-	resultSub        ros.Subscriber
-	feedbackSub      ros.Subscriber
-	statusSub        ros.Subscriber
+	goalPub          Publisher
+	cancelPub        Publisher
+	resultSub        Subscriber
+	feedbackSub      Subscriber
+	statusSub        Subscriber
 	logger           *modular.ModuleLogger
 	handlers         []*clientGoalHandler
 	handlersMutex    sync.RWMutex
@@ -31,7 +29,7 @@ type defaultActionClient struct {
 	callerID         string
 }
 
-func newDefaultActionClient(node ros.Node, action string, actType ActionType) *defaultActionClient {
+func newDefaultActionClient(node Node, action string, actType ActionType) *defaultActionClient {
 	ac := &defaultActionClient{
 		node:           node,
 		action:         action,
@@ -60,7 +58,7 @@ func newDefaultActionClient(node ros.Node, action string, actType ActionType) *d
 	return ac
 }
 
-func (ac *defaultActionClient) SendGoal(goal ros.Message, transitionCb, feedbackCb interface{}) ClientGoalHandler {
+func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb interface{}) ClientGoalHandler {
 	logger := *ac.logger
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
@@ -70,12 +68,12 @@ func (ac *defaultActionClient) SendGoal(goal ros.Message, transitionCb, feedback
 	// make a goalId message with timestamp and generated id
 	goalidType, _ := NewDynamicGoalIDType()
 	goalid := goalidType.NewGoalIDMessage().(*DynamicActionGoalID)
-	goalid.SetStamp(ros.Now())
+	goalid.SetStamp(Now())
 	goalid.SetID(ac.goalIDGen.generateID())
 	// make a header with timestamp
 	headerType, _ := NewDynamicHeaderType()
 	header := headerType.NewHeaderMessage().(*DynamicActionHeader)
-	header.SetStamp(ros.Now())
+	header.SetStamp(Now())
 
 	ag.SetGoal(goal)
 	ag.SetGoalId(goalid)
@@ -104,7 +102,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 	ac.cancelPub.Publish(goalid)
 }
 
-func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp ros.Time) {
+func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 	logger := *ac.logger
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
@@ -136,18 +134,18 @@ func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) {
 	}
 }
 
-func (ac *defaultActionClient) PublishCancel(cancel *ros.DynamicMessage) {
+func (ac *defaultActionClient) PublishCancel(cancel *DynamicMessage) {
 	if ac.started {
 		ac.cancelPub.Publish(cancel)
 	}
 }
 
-func (ac *defaultActionClient) WaitForServer(timeout ros.Duration) bool {
+func (ac *defaultActionClient) WaitForServer(timeout Duration) bool {
 	logger := *ac.logger
 	started := false
 	logger.Info("[ActionClient] Waiting action server to start")
-	rate := ros.CycleTime(ros.NewDuration(0, 10000000))
-	waitStart := ros.Now()
+	rate := CycleTime(NewDuration(0, 10000000))
+	waitStart := Now()
 
 LOOP:
 	for !started {
@@ -158,7 +156,7 @@ LOOP:
 		sPubs := ac.statusSub.GetNumPublishers()
 		started = (gSubs > 0 && cSubs > 0 && fPubs > 0 && rPubs > 0 && sPubs > 0)
 
-		now := ros.Now()
+		now := Now()
 		diff := now.Diff(waitStart)
 		if !timeout.IsZero() && diff.Cmp(timeout) >= 0 {
 			break LOOP
@@ -187,10 +185,19 @@ func (ac *defaultActionClient) DeleteGoalHandler(gh *clientGoalHandler) {
 	}
 }
 
-func (ac *defaultActionClient) internalResultCallback(result ActionResult, event ros.MessageEvent) {
+func (ac *defaultActionClient) internalResultCallback(results interface{}, event MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
+
+	resultMsg := results.(*DynamicMessage)
+	// Create an action result
+	result := ac.actionResult.(*DynamicActionResultType).NewResultMessage()
+	result.SetResult(resultMsg)
+	result.SetHeader(resultMsg.Data()["header"].(ActionHeader))
+	result.SetStatus(resultMsg.Data()["status"].(ActionStatus))
+
+	fmt.Printf("STATUS DONE %v\n", result.GetStatus().GetGoalID())
 
 	for _, h := range ac.handlers {
 		if err := h.updateResult(result); err != nil {
@@ -199,7 +206,7 @@ func (ac *defaultActionClient) internalResultCallback(result ActionResult, event
 	}
 }
 
-func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback, event ros.MessageEvent) {
+func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback, event MessageEvent) {
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
@@ -208,7 +215,7 @@ func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback,
 	}
 }
 
-func (ac *defaultActionClient) internalStatusCallback(statusArr ActionStatusArray, event ros.MessageEvent) {
+func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, event MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
@@ -220,9 +227,21 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr ActionStatusArra
 		logger.Debug("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
 	}
 
+	// Create status array from interface
+	statusArrayType, err := NewDynamicStatusArrayType()
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+	statusArray := statusArrayType.NewStatusArrayMessage()
+
+	statusMsg := statusArr.(*DynamicMessage)
+	statusArray.SetStatusArray(statusMsg.Data()["status_list"].([]ActionStatus))
+	statusArray.SetHeader(statusMsg.Data()["header"].(ActionHeader))
+
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
-		if err := h.updateStatus(statusArr); err != nil {
+		if err := h.updateStatus(statusArray); err != nil {
 			logger.Error(err)
 		}
 	}

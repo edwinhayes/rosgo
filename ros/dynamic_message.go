@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -25,6 +24,7 @@ import (
 // at compiletime by gengo.
 type DynamicMessageType struct {
 	spec *libgengo.MsgSpec
+	data map[string]interface{}
 }
 
 // DynamicMessage abstracts an instance of a ROS Message whose type is only known at runtime.  The schema of the message is denoted by the referenced DynamicMessageType, while the
@@ -82,7 +82,9 @@ func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
 }
 
 func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
-	return newDynamicMessageTypeNested(typeName, "")
+	t, err := newDynamicMessageTypeNested(typeName, "")
+	t.data = make(map[string]interface{})
+	return t, err
 }
 
 // newDynamicMessageTypeNested generates a DynamicMessageType from the available ROS message definitions.  The first time the function is run, a message 'context' is created by
@@ -157,6 +159,11 @@ func (t *DynamicMessageType) MD5Sum() string {
 func (t *DynamicMessageType) NewMessage() Message {
 	// Don't instantiate messages for incomplete types.
 	return t.NewDynamicMessage()
+}
+
+// Data returns the data map field of the DynamicMessageType
+func (m *DynamicMessageType) Data() map[string]interface{} {
+	return m.data
 }
 
 func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
@@ -656,12 +663,60 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 
 // Serialize converts a DynamicMessage into a TCPROS bytestream allowing it to be published to other nodes; required for ros.Message.
 func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
-	// THIS METHOD IS BASICALLY AN UNTEMPLATED COPY OF THE TEMPLATE IN LIBGENGO.
-
+	action := false
 	var err error = nil
 
+	// TODO: Remove print lines
+	// TODO: Match this spec with deserializer
+	ignoreMap := make(map[string]interface{})
+
+	// We need to check if there are other fields within the message which aren't contained in the dynamicType
+	if m.dynamicType.data != nil {
+		// We have extra fields to serialize!
+		action = true
+		// We will skip these fields in the standard serialization process
+		ignoreMap = m.dynamicType.data
+	}
+
+	// Serialize standard spec fields
+	err = m.SerializeMessage(buf, ignoreMap)
+
+	// We found additional fields, make the assumption it is a action type
+	if action {
+		for fieldName, _ := range m.dynamicType.data {
+			switch fieldName {
+			case "status_list":
+				fieldMsg := m.data[fieldName].([]ActionStatus)
+				for _, actStatus := range fieldMsg {
+					act := actStatus.(*DynamicActionStatus)
+					err = act.Serialize(buf)
+				}
+			case "status":
+				fieldMsg := m.data[fieldName].(*DynamicActionStatus)
+				err = fieldMsg.Serialize(buf)
+			case "goal_id":
+				fieldMsg := m.data[fieldName].(*DynamicActionGoalID)
+				err = fieldMsg.Serialize(buf)
+			case "header":
+				fieldMsg := m.data[fieldName].(*DynamicActionHeader)
+				err = fieldMsg.Serialize(buf)
+			default:
+				// It is just a dynamic message
+				fieldMsg := m.data[fieldName].(*DynamicMessage)
+				err = fieldMsg.Serialize(buf)
+			}
+		}
+	}
+	return err
+}
+func (m *DynamicMessage) SerializeMessage(buf *bytes.Buffer, ignore map[string]interface{}) error {
+	var err error = nil
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
+		if _, ok := ignore[field.Name]; ok {
+			// Ignore this field
+			continue
+		}
 		if field.IsArray {
 			// It's an array.
 
@@ -880,6 +935,7 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			if field.IsBuiltin {
 				if field.Type == "string" {
 					// Make sure we've actually got a string.
+
 					str, ok := item.(string)
 					if !ok {
 						return errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(item).Name() + ", expected string.")
@@ -894,7 +950,6 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 					if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 						return errors.Wrap(err, "Field: "+field.Name)
 					}
-
 				} else if field.Type == "time" {
 					// Make sure we've actually got a time.
 					t, ok := item.(Time)
@@ -1056,7 +1111,6 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			}
 		}
 	}
-
 	// All done.
 	return err
 }
@@ -1067,11 +1121,88 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
 	var err error = nil
-	tmpData := make(map[string]interface{})
+	action := false
 	m.data = nil
+	ignoreMap := make(map[string]interface{})
 
+	//We check the messageType data to see if there are any additional fields
+	if len(m.dynamicType.Data()) != 0 {
+		action = true
+		ignoreMap = m.dynamicType.data
+	}
+
+	err = m.DeserializeMessage(buf, ignoreMap)
+
+	if action {
+		for fieldName, field := range m.dynamicType.Data() {
+			switch fieldName {
+			case "status_list":
+				fieldMsg := field.([]ActionStatus)
+				newFieldMsg := make([]ActionStatus, 0)
+				for _, actStatus := range fieldMsg {
+					act := actStatus.(*DynamicActionStatus)
+					err = act.Deserialize(buf)
+					newFieldMsg = append(newFieldMsg, act)
+				}
+				// Check a data map has been delcared
+				if m.data == nil {
+					m.data = make(map[string]interface{})
+				}
+				// Insert sub message into message data
+				m.data[fieldName] = newFieldMsg
+			case "status":
+				fieldMsg := field.(*DynamicActionStatus)
+				err = fieldMsg.Deserialize(buf)
+				// Check a data map has been delcared
+				if m.data == nil {
+					m.data = make(map[string]interface{})
+				}
+				// Insert sub message into message data
+				m.data[fieldName] = fieldMsg
+			case "goal_id":
+				fieldMsg := field.(*DynamicActionGoalID)
+				err = fieldMsg.Deserialize(buf)
+				// Check a data map has been delcared
+				if m.data == nil {
+					m.data = make(map[string]interface{})
+				}
+				// Insert sub message into message data
+				m.data[fieldName] = fieldMsg
+			case "header":
+				fieldMsg := field.(*DynamicActionHeader)
+				err = fieldMsg.Deserialize(buf)
+				// Check a data map has been delcared
+				if m.data == nil {
+					m.data = make(map[string]interface{})
+				}
+				// Insert sub message into message data
+				m.data[fieldName] = fieldMsg
+			default:
+				// It is just a dynamic message
+				fieldMsg := field.(*DynamicMessage)
+				err = fieldMsg.Deserialize(buf)
+				// Check a data map has been delcared
+				if m.data == nil {
+					m.data = make(map[string]interface{})
+				}
+				// Insert sub message into message data
+				m.data[fieldName] = fieldMsg
+			}
+
+		}
+	}
+	return err
+}
+
+func (m *DynamicMessage) DeserializeMessage(buf *bytes.Reader, ignore map[string]interface{}) error {
+	var err error
+	tmpData := make(map[string]interface{})
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
+		if _, ok := ignore[field.Name]; ok {
+			// Ignore this field
+			continue
+		}
 		if field.IsArray {
 			// It's an array.
 
@@ -1223,7 +1354,6 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 			}
 		} else {
 			// Else it's a scalar.  This is just the same as above, with the '[i]' bits removed.
-
 			if field.IsBuiltin {
 				if field.Type == "string" {
 					// The string will start with a declaration of the number of characters.
@@ -1327,13 +1457,14 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 	// All done.
 	m.data = tmpData
+
 	return err
 }
 
-func (m *DynamicMessage) String() string {
-	// Just print out the data!
-	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
-}
+// func (m *DynamicMessage) String() string {
+// 	// Just print out the data!
+// 	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
+// }
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
 

@@ -1,8 +1,4 @@
-package actionlib
-
-import (
-	"github.com/edwinhayes/rosgo/ros"
-)
+package ros
 
 type ActionType interface {
 	MD5Sum() string
@@ -20,90 +16,90 @@ type Action interface {
 }
 
 type ActionGoalType interface {
-	ros.MessageType
+	MessageType
 	NewGoalMessage() ActionGoal
 }
 
 type ActionGoalIDType interface {
-	ros.MessageType
+	MessageType
 	NewGoalIDMessage() ActionGoalID
 }
 
 type ActionHeaderType interface {
-	ros.MessageType
+	MessageType
 	NewHeaderMessage() ActionHeader
 }
 
 type ActionStatusType interface {
-	ros.MessageType
+	MessageType
 	NewStatusMessage() ActionStatus
 }
 
 type ActionStatusArrayType interface {
-	ros.MessageType
+	MessageType
 	NewStatusArrayMessage() ActionStatusArray
 }
 
 type ActionFeedbackType interface {
-	ros.MessageType
+	MessageType
 	NewFeedbackMessage() ActionFeedback
 }
 
 type ActionResultType interface {
-	ros.MessageType
+	MessageType
 	NewResultMessage() ActionResult
 }
 
 type ActionGoal interface {
-	ros.Message
+	Message
 	GetHeader() ActionHeader
 	GetGoalId() ActionGoalID
-	GetGoal() ros.Message
+	GetGoal() Message
 	SetHeader(ActionHeader)
 	SetGoalId(ActionGoalID)
-	SetGoal(ros.Message)
+	SetGoal(Message)
 }
 
 type ActionGoalID interface {
-	ros.Message
+	Message
 	GetID() string
 	SetID(string)
-	GetStamp() ros.Time
-	SetStamp(ros.Time)
+	GetStamp() Time
+	SetStamp(Time)
 }
 
 // * ActionFeedback interface
 type ActionFeedback interface {
-	ros.Message
+	Message
 	GetHeader() ActionHeader
 	GetStatus() ActionStatus
-	GetFeedback() ros.Message
+	GetFeedback() Message
 	SetHeader(ActionHeader)
 	SetStatus(ActionStatus)
-	SetFeedback(ros.Message)
+	SetFeedback(Message)
 }
 
 // * ActionResult interface
 type ActionResult interface {
-	ros.Message
+	Message
 	GetHeader() ActionHeader
 	GetStatus() ActionStatus
-	GetResult() ros.Message
+	GetResult() Message
 	SetHeader(ActionHeader)
 	SetStatus(ActionStatus)
-	SetResult(ros.Message)
+	SetResult(Message)
 }
 
 // *** Shared ActionHeader interface
 type ActionHeader interface {
-	ros.Message
-	GetStamp() ros.Time
-	SetStamp(ros.Time)
+	Message
+	GetStamp() Time
+	SetStamp(Time)
 }
 
 // *** Shared ActionStatus interface
 type ActionStatus interface {
-	ros.Message
+	Message
 	GetGoalID() ActionGoalID
 	SetGoalID(ActionGoalID)
 	GetStatus() uint8
@@ -114,7 +110,7 @@ type ActionStatus interface {
 
 // *** Shared ActionStatusArray interface
 type ActionStatusArray interface {
-	ros.Message
+	Message
 	GetHeader() ActionHeader
 	SetHeader(ActionHeader)
 	GetStatusArray() []ActionStatus

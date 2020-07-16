@@ -1,4 +1,4 @@
-package actionlib
+package ros
 
 import (
 	"container/list"

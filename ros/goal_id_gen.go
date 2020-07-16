@@ -1,10 +1,8 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
 	"sync"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type goalIDGenerator struct {
@@ -25,6 +23,6 @@ func (g *goalIDGenerator) generateID() string {
 
 	g.goals++
 
-	timeNow := ros.Now()
+	timeNow := Now()
 	return fmt.Sprintf("%s-%d-%d-%d", g.nodeName, g.goals, timeNow.Sec, timeNow.NSec)
 }

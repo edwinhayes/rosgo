@@ -1,4 +1,4 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 const (
@@ -26,7 +25,7 @@ type simpleActionClient struct {
 	logger      *modular.ModuleLogger
 }
 
-func newSimpleActionClient(node ros.Node, action string, actionType ActionType) *simpleActionClient {
+func newSimpleActionClient(node Node, action string, actionType ActionType) *simpleActionClient {
 	return &simpleActionClient{
 		ac:          newDefaultActionClient(node, action, actionType),
 		simpleState: SimpleStateDone,
@@ -35,7 +34,7 @@ func newSimpleActionClient(node ros.Node, action string, actionType ActionType) 
 	}
 }
 
-func (sc *simpleActionClient) SendGoal(goal ros.Message, doneCb, activeCb, feedbackCb interface{}) {
+func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) {
 	sc.StopTrackingGoal()
 	sc.doneCb = doneCb
 	sc.activeCb = activeCb
@@ -45,7 +44,7 @@ func (sc *simpleActionClient) SendGoal(goal ros.Message, doneCb, activeCb, feedb
 	sc.gh = sc.ac.SendGoal(goal, sc.transitionHandler, sc.feedbackHandler)
 }
 
-func (sc *simpleActionClient) SendGoalAndWait(goal ros.Message, executeTimeout, preeptTimeout ros.Duration) (uint8, error) {
+func (sc *simpleActionClient) SendGoalAndWait(goal Message, executeTimeout, preeptTimeout Duration) (uint8, error) {
 	logger := *sc.logger
 	sc.SendGoal(goal, nil, nil, nil)
 	if !sc.WaitForResult(executeTimeout) {
@@ -61,18 +60,18 @@ func (sc *simpleActionClient) SendGoalAndWait(goal ros.Message, executeTimeout, 
 	return sc.GetState()
 }
 
-func (sc *simpleActionClient) WaitForServer(timeout ros.Duration) bool {
+func (sc *simpleActionClient) WaitForServer(timeout Duration) bool {
 	return sc.ac.WaitForServer(timeout)
 }
 
-func (sc *simpleActionClient) WaitForResult(timeout ros.Duration) bool {
+func (sc *simpleActionClient) WaitForResult(timeout Duration) bool {
 	logger := *sc.logger
 	if sc.gh == nil {
 		logger.Errorf("[SimpleActionClient] Called WaitForResult when no goal exists")
 		return false
 	}
 
-	waitStart := ros.Now()
+	waitStart := Now()
 	waitStart = waitStart.Add(timeout)
 
 LOOP:
@@ -83,7 +82,7 @@ LOOP:
 		case <-time.After(100 * time.Millisecond):
 		}
 
-		if !timeout.IsZero() && waitStart.Cmp(ros.Now()) <= 0 {
+		if !timeout.IsZero() && waitStart.Cmp(Now()) <= 0 {
 			break LOOP
 		}
 	}
@@ -91,7 +90,7 @@ LOOP:
 	return sc.simpleState == SimpleStateDone
 }
 
-func (sc *simpleActionClient) GetResult() (ros.Message, error) {
+func (sc *simpleActionClient) GetResult() (Message, error) {
 	if sc.gh == nil {
 		return nil, fmt.Errorf("called get result when no goal running")
 	}
@@ -130,7 +129,7 @@ func (sc *simpleActionClient) CancelAllGoals() {
 	sc.ac.CancelAllGoals()
 }
 
-func (sc *simpleActionClient) CancelAllGoalsBeforeTime(stamp ros.Time) {
+func (sc *simpleActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 	sc.ac.CancelAllGoalsBeforeTime(stamp)
 }
 
@@ -231,7 +230,7 @@ func (sc *simpleActionClient) sendDone() {
 	}
 }
 
-func (sc *simpleActionClient) feedbackHandler(gh ClientGoalHandler, msg ros.Message) {
+func (sc *simpleActionClient) feedbackHandler(gh ClientGoalHandler, msg Message) {
 	if sc.gh == nil || sc.gh != gh {
 		return
 	}

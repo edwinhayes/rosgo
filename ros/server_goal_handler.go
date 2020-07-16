@@ -1,18 +1,17 @@
-package actionlib
+package ros
 
 import (
 	"fmt"
 	"hash/fnv"
+	"log"
 	"sync"
-
-	"github.com/edwinhayes/rosgo/ros"
 )
 
 type serverGoalHandler struct {
 	as                     ActionServer
 	sm                     *serverStateMachine
 	goal                   ActionGoal
-	handlerDestructionTime ros.Time
+	handlerDestructionTime Time
 	handlerMutex           sync.RWMutex
 }
 
@@ -31,14 +30,14 @@ func newServerGoalHandlerWithGoalId(as ActionServer, goalID ActionGoalID) *serve
 	}
 }
 
-func (gh *serverGoalHandler) GetHandlerDestructionTime() ros.Time {
+func (gh *serverGoalHandler) GetHandlerDestructionTime() Time {
 	gh.handlerMutex.RLock()
 	defer gh.handlerMutex.RUnlock()
 
 	return gh.handlerDestructionTime
 }
 
-func (gh *serverGoalHandler) SetHandlerDestructionTime(t ros.Time) {
+func (gh *serverGoalHandler) SetHandlerDestructionTime(t Time) {
 	gh.handlerMutex.Lock()
 	defer gh.handlerMutex.Unlock()
 
@@ -60,7 +59,7 @@ func (gh *serverGoalHandler) SetAccepted(text string) error {
 	return nil
 }
 
-func (gh *serverGoalHandler) SetCancelled(result ros.Message, text string) error {
+func (gh *serverGoalHandler) SetCancelled(result Message, text string) error {
 	if gh.goal == nil {
 		return fmt.Errorf("attempt to set handler on an uninitialized handler handler")
 	}
@@ -71,13 +70,13 @@ func (gh *serverGoalHandler) SetCancelled(result ros.Message, text string) error
 			" or recalling state, it is currently in state: %d", status.GetStatus())
 	}
 
-	gh.SetHandlerDestructionTime(ros.Now())
+	gh.SetHandlerDestructionTime(Now())
 	gh.as.PublishResult(status, result)
 
 	return nil
 }
 
-func (gh *serverGoalHandler) SetRejected(result ros.Message, text string) error {
+func (gh *serverGoalHandler) SetRejected(result Message, text string) error {
 	if gh.goal == nil {
 		return fmt.Errorf("attempt to set handler on an uninitialized handler handler")
 	}
@@ -88,13 +87,13 @@ func (gh *serverGoalHandler) SetRejected(result ros.Message, text string) error 
 			"or recalling state, it is currently in state: %d", status.GetStatus())
 	}
 
-	gh.SetHandlerDestructionTime(ros.Now())
+	gh.SetHandlerDestructionTime(Now())
 	gh.as.PublishResult(status, result)
 
 	return nil
 }
 
-func (gh *serverGoalHandler) SetAborted(result ros.Message, text string) error {
+func (gh *serverGoalHandler) SetAborted(result Message, text string) error {
 	if gh.goal == nil {
 		return fmt.Errorf("attempt to set handler on an uninitialized handler handler")
 	}
@@ -105,24 +104,24 @@ func (gh *serverGoalHandler) SetAborted(result ros.Message, text string) error {
 			"or recalling state, it is currently in state: %d", status.GetStatus())
 	}
 
-	gh.SetHandlerDestructionTime(ros.Now())
+	gh.SetHandlerDestructionTime(Now())
 	gh.as.PublishResult(status, result)
 
 	return nil
 }
 
-func (gh *serverGoalHandler) SetSucceeded(result ros.Message, text string) error {
+func (gh *serverGoalHandler) SetSucceeded(result Message, text string) error {
 	if gh.goal == nil {
 		return fmt.Errorf("attempt to set handler on an uninitialized handler handler")
 	}
 
 	status, err := gh.sm.transition(Succeed, text)
 	if err != nil {
-		return fmt.Errorf("to transition to an Succeeded state, the goal must be in a pending"+
+		log.Fatalf("to transition to an Succeeded state, the goal must be in a pending"+
 			"or recalling state, it is currently in state: %d", status.GetStatus())
 	}
 
-	gh.SetHandlerDestructionTime(ros.Now())
+	gh.SetHandlerDestructionTime(Now())
 	gh.as.PublishResult(status, result)
 
 	return nil
@@ -137,15 +136,15 @@ func (gh *serverGoalHandler) SetCancelRequested() bool {
 		return false
 	}
 
-	gh.SetHandlerDestructionTime(ros.Now())
+	gh.SetHandlerDestructionTime(Now())
 	return true
 }
 
-func (gh *serverGoalHandler) PublishFeedback(feedback ros.Message) {
+func (gh *serverGoalHandler) PublishFeedback(feedback Message) {
 	gh.as.PublishFeedback(gh.sm.getStatus(), feedback)
 }
 
-func (gh *serverGoalHandler) GetGoal() ros.Message {
+func (gh *serverGoalHandler) GetGoal() Message {
 	if gh.goal == nil {
 		return nil
 	}
@@ -172,6 +171,7 @@ func (gh *serverGoalHandler) GetGoalStatus() ActionStatus {
 	// Create a new goal status message
 	statusMsgType, _ := NewDynamicStatusType()
 	statusMsg := statusMsgType.NewStatusMessage()
+	fmt.Printf("Goal handler produced this status message: %v\n", statusMsg)
 	return statusMsg
 }
 

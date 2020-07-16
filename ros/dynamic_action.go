@@ -1,13 +1,11 @@
-package actionlib
+package ros
 
 // IMPORT REQUIRED PACKAGES.
 
 import (
-	"os"
 	"strings"
 
 	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/edwinhayes/rosgo/ros"
 	"github.com/pkg/errors"
 )
 
@@ -36,47 +34,32 @@ type DynamicAction struct {
 }
 
 // DynamicAction* interfaces.
-type DynamicActionGoal struct{ ros.DynamicMessage }
-type DynamicActionFeedback struct{ ros.DynamicMessage }
-type DynamicActionResult struct{ ros.DynamicMessage }
+type DynamicActionGoal struct{ DynamicMessage }
+type DynamicActionFeedback struct{ DynamicMessage }
+type DynamicActionResult struct{ DynamicMessage }
 
 // DynamicActionType* type interfaces
-type DynamicActionGoalType struct{ ros.DynamicMessageType }
-type DynamicActionFeedbackType struct{ ros.DynamicMessageType }
-type DynamicActionResultType struct{ ros.DynamicMessageType }
+type DynamicActionGoalType struct{ DynamicMessageType }
+type DynamicActionFeedbackType struct{ DynamicMessageType }
+type DynamicActionResultType struct{ DynamicMessageType }
 
 // DynamicAction** shared interfaces.
-type DynamicActionGoalID struct{ ros.DynamicMessage }
-type DynamicActionHeader struct{ ros.DynamicMessage }
-type DynamicActionStatus struct{ ros.DynamicMessage }
-type DynamicActionStatusArray struct{ ros.DynamicMessage }
+type DynamicActionGoalID struct{ DynamicMessage }
+type DynamicActionHeader struct{ DynamicMessage }
+type DynamicActionStatus struct{ DynamicMessage }
+type DynamicActionStatusArray struct{ DynamicMessage }
 
 // DynamicActionType** shared type interfaces
-type DynamicActionGoalIDType struct{ ros.DynamicMessageType }
-type DynamicActionHeaderType struct{ ros.DynamicMessageType }
-type DynamicActionStatusType struct{ ros.DynamicMessageType }
-type DynamicActionStatusArrayType struct{ ros.DynamicMessageType }
+type DynamicActionGoalIDType struct{ DynamicMessageType }
+type DynamicActionHeaderType struct{ DynamicMessageType }
+type DynamicActionStatusType struct{ DynamicMessageType }
+type DynamicActionStatusArrayType struct{ DynamicMessageType }
 
 // DEFINE PRIVATE STRUCTURES.
 
 // DEFINE PUBLIC GLOBALS.
 
 // DEFINE PRIVATE GLOBALS.
-
-var rosPkgPath string // Colon separated list of paths to search for message definitions on.
-
-var context *libgengo.PkgContext // We'll try to preserve a single message context to avoid reloading each time.
-
-// DEFINE PUBLIC STATIC FUNCTIONS.
-
-func GetRuntimePackagePath() string {
-	// If a package path hasn't been set at the time of first use, by default we'll just use the ROS environment default.
-	if rosPkgPath == "" {
-		rosPkgPath = os.Getenv("ROS_PACKAGE_PATH")
-	}
-	// All done.
-	return rosPkgPath
-}
 
 // NewDynamicActionType generates a DynamicActionType corresponding to the specified typeName from the available ROS action definitions; typeName should be a fully-qualified
 // ROS action type name.  The first time the function is run, a message/service/action 'context' is created by searching through the available ROS definitions, then the ROS action to
@@ -122,17 +105,15 @@ func newDynamicActionTypeNested(typeName string, packageName string) (*DynamicAc
 	m.text = spec.Text
 
 	// Create Dynamic Goal Type
-	goal := DynamicActionGoalType{}
-	goalType, err := ros.NewDynamicMessageTypeLiteral(spec.Goal.FullName)
+	goal, err := NewDynamicActionGoalType(spec.Goal.FullName)
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
+		return nil, err
 	}
-	goal.DynamicMessageType = goalType
-	m.goalType = &goal
+	m.goalType = goal
 
 	// Create Dynamic Feedback Type
 	feedback := DynamicActionFeedbackType{}
-	feedbackType, err := ros.NewDynamicMessageTypeLiteral(spec.Feedback.FullName)
+	feedbackType, err := NewDynamicMessageTypeLiteral(spec.Feedback.FullName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating feedback type")
 	}
@@ -140,13 +121,11 @@ func newDynamicActionTypeNested(typeName string, packageName string) (*DynamicAc
 	m.feedbackType = &feedback
 
 	// Create Dynamic Result Type
-	result := DynamicActionResultType{}
-	resultType, err := ros.NewDynamicMessageTypeLiteral(spec.Result.FullName)
+	result, err := NewDynamicActionResultType(spec.Result.FullName)
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating result type")
+		return nil, err
 	}
-	result.DynamicMessageType = resultType
-	m.resultType = &result
+	m.resultType = result
 	// We've successfully made a new service type matching the requested ROS type.
 	return m, nil
 
@@ -200,6 +179,50 @@ func (a *DynamicAction) GetActionFeedback() ActionFeedback { return a.Feedback }
 // GetActionResult returns the actionlib.ActionResult of the DynamicAction; required for actionlib.Action.
 func (a *DynamicAction) GetActionResult() ActionResult { return a.Result }
 
+// DynamicAction* Type instantiation Functions
+// NewDynamicActionGoalType creates a new ActionGoalType interface
+func NewDynamicActionGoalType(name string) (ActionGoalType, error) {
+	goal := DynamicActionGoalType{}
+	goalType, err := NewDynamicMessageTypeLiteral(name)
+	if err != nil {
+		return nil, errors.Wrap(err, "error generating feedback type")
+	}
+	// A goal type requires the fields GoalID and Header
+	header, err := NewDynamicHeaderType()
+	if err != nil {
+		return nil, err
+	}
+	goalid, err := NewDynamicGoalIDType()
+	if err != nil {
+		return nil, err
+	}
+	goalType.Data()["goal_id"] = goalid.NewGoalIDMessage()
+	goalType.Data()["header"] = header.NewHeaderMessage()
+	goal.DynamicMessageType = goalType
+	return &goal, nil
+}
+
+func NewDynamicActionResultType(name string) (ActionResultType, error) {
+	result := DynamicActionResultType{}
+	resultType, err := NewDynamicMessageTypeLiteral(name)
+	if err != nil {
+		return nil, errors.Wrap(err, "error generating feedback type")
+	}
+	// A goal type requires the fields GoalID and Header
+	header, err := NewDynamicHeaderType()
+	if err != nil {
+		return nil, err
+	}
+	status, err := NewDynamicStatusType()
+	if err != nil {
+		return nil, err
+	}
+	resultType.Data()["status"] = status.NewStatusMessage()
+	resultType.Data()["header"] = header.NewHeaderMessage()
+	result.DynamicMessageType = resultType
+	return &result, nil
+}
+
 // DynamicAction* Message instantiation Functions
 // NewGoalMessage creates a new ActionGoal message
 func (a *DynamicActionGoalType) NewGoalMessage() ActionGoal {
@@ -226,10 +249,11 @@ func (a *DynamicActionResultType) NewResultMessage() ActionResult {
 // NewDynamicGoalIDType creates a new ActionGoalIDType interface
 func NewDynamicGoalIDType() (ActionGoalIDType, error) {
 	goalid := DynamicActionGoalIDType{}
-	goalType, err := ros.NewDynamicMessageTypeLiteral("actionlib_msgs/GoalID")
+	goalType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalID")
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating feedback type")
 	}
+
 	goalid.DynamicMessageType = goalType
 	return &goalid, nil
 }
@@ -237,7 +261,7 @@ func NewDynamicGoalIDType() (ActionGoalIDType, error) {
 // NewDynamicHeaderType creates a new ActionHeaderType interface, which is essentially a std_msg header
 func NewDynamicHeaderType() (ActionHeaderType, error) {
 	header := DynamicActionHeaderType{}
-	headerType, err := ros.NewDynamicMessageTypeLiteral("std_msgs/Header")
+	headerType, err := NewDynamicMessageTypeLiteral("std_msgs/Header")
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating feedback type")
 	}
@@ -248,10 +272,16 @@ func NewDynamicHeaderType() (ActionHeaderType, error) {
 // NewDynamicStatusType creates a new ActionStatusType interface
 func NewDynamicStatusType() (ActionStatusType, error) {
 	status := DynamicActionStatusType{}
-	statusType, err := ros.NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatus")
+	statusType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatus")
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating feedback type")
 	}
+	// An action status type requires the field GoalID
+	goalid, err := NewDynamicGoalIDType()
+	if err != nil {
+		return nil, err
+	}
+	statusType.Data()["goal_id"] = goalid.NewGoalIDMessage()
 	status.DynamicMessageType = statusType
 	return &status, nil
 }
@@ -259,10 +289,26 @@ func NewDynamicStatusType() (ActionStatusType, error) {
 // NewDynamicStatusArrayType creates a new ActionStatusArrayType interface
 func NewDynamicStatusArrayType() (ActionStatusArrayType, error) {
 	statusArray := DynamicActionStatusArrayType{}
-	statusArrayType, err := ros.NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatusArray")
+	statusArrayType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatusArray")
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating feedback type")
 	}
+	// A status array type requires an action status array
+	statusType, err := NewDynamicStatusType()
+	if err != nil {
+		return nil, err
+	}
+	status := statusType.NewStatusMessage()
+	internalStatusArray := make([]ActionStatus, 0)
+	internalStatusArray = append(internalStatusArray, status)
+	statusArrayType.Data()["status_list"] = internalStatusArray
+	// Also requires a header
+	header, err := NewDynamicHeaderType()
+	if err != nil {
+		return nil, err
+	}
+	statusArrayType.Data()["header"] = header.NewHeaderMessage()
+
 	statusArray.DynamicMessageType = statusArrayType
 	return &statusArray, nil
 }
@@ -298,29 +344,31 @@ func (a *DynamicActionStatusArrayType) NewStatusArrayMessage() ActionStatusArray
 
 // Dynamic Action Goal Interface
 // Get and set functions of DynamicActionGoal interface
-func (m *DynamicActionGoal) SetGoal(goal ros.Message)      { m.Data()["goal"] = goal }
-func (m *DynamicActionGoal) GetGoal() ros.Message          { return m.Data()["goal"].(*ros.DynamicMessage) }
-func (m *DynamicActionGoal) GetGoalId() ActionGoalID       { return m.Data()["goalid"].(*DynamicActionGoalID) }
-func (m *DynamicActionGoal) SetGoalId(goalid ActionGoalID) { m.Data()["goalid"] = goalid }
+func (m *DynamicActionGoal) SetGoal(goal Message) { m.Data()["goal"] = goal }
+func (m *DynamicActionGoal) GetGoal() Message     { return m.Data()["goal"].(*DynamicMessage) }
+func (m *DynamicActionGoal) GetGoalId() ActionGoalID {
+	return m.Data()["goal_id"].(*DynamicActionGoalID)
+}
+func (m *DynamicActionGoal) SetGoalId(goalid ActionGoalID) { m.Data()["goal_id"] = goalid }
 func (m *DynamicActionGoal) GetHeader() ActionHeader       { return m.Data()["header"].(*DynamicActionHeader) }
 func (m *DynamicActionGoal) SetHeader(header ActionHeader) { m.Data()["header"] = header }
 
 // Get and Set Functions of DynamicActionGoalID
-func (m *DynamicActionGoalID) GetID() string           { return m.Data()["id"].(string) }
-func (m *DynamicActionGoalID) SetID(id string)         { m.Data()["id"] = id }
-func (m *DynamicActionGoalID) GetStamp() ros.Time      { return m.Data()["stamp"].(ros.Time) }
-func (m *DynamicActionGoalID) SetStamp(stamp ros.Time) { m.Data()["stamp"] = stamp }
+func (m *DynamicActionGoalID) GetID() string       { return m.Data()["id"].(string) }
+func (m *DynamicActionGoalID) SetID(id string)     { m.Data()["id"] = id }
+func (m *DynamicActionGoalID) GetStamp() Time      { return m.Data()["stamp"].(Time) }
+func (m *DynamicActionGoalID) SetStamp(stamp Time) { m.Data()["stamp"] = stamp }
 
 //
 
 // Dynamic Action Feedback Interface
 // Get and set functions of DynamicActionFeedback interface
-func (m *DynamicActionFeedback) SetFeedback(goal ros.Message) { m.Data()["feedback"] = goal }
-func (m *DynamicActionFeedback) GetFeedback() ros.Message {
-	return m.Data()["goal"].(*ros.DynamicMessage)
+func (m *DynamicActionFeedback) SetFeedback(goal Message) { m.Data()["feedback"] = goal }
+func (m *DynamicActionFeedback) GetFeedback() Message {
+	return m.Data()["feedback"].(*DynamicMessage)
 }
 func (m *DynamicActionFeedback) GetStatus() ActionStatus {
-	return m.Data()["goalid"].(*DynamicActionStatus)
+	return m.Data()["status"].(*DynamicActionStatus)
 }
 func (m *DynamicActionFeedback) SetStatus(status ActionStatus) { m.Data()["status"] = status }
 func (m *DynamicActionFeedback) GetHeader() ActionHeader {
@@ -332,10 +380,14 @@ func (m *DynamicActionFeedback) SetHeader(header ActionHeader) { m.Data()["heade
 
 // Dynamic Action Feedback Interface
 // Get and set functions of DynamicActionFeedback interface
-func (m *DynamicActionResult) SetResult(result ros.Message) { m.Data()["result"] = result }
-func (m *DynamicActionResult) GetResult() ros.Message       { return m.Data()["goal"].(*ros.DynamicMessage) }
+func (m *DynamicActionResult) SetResult(result Message) { m.Data()["result"] = result }
+func (m *DynamicActionResult) GetResult() Message       { return m.Data()["result"].(*DynamicMessage) }
 func (m *DynamicActionResult) GetStatus() ActionStatus {
-	return m.Data()["goalid"].(*DynamicActionStatus)
+	// goalStat := m.Data()["status"].(*DynamicMessage)
+	// goalStatusType := NewDynamicStatusType()
+	// goalStatus := goalStatusType.NewStatusMessage()
+	// goalStatus.Set
+	return m.Data()["status"].(*DynamicActionStatus)
 }
 func (m *DynamicActionResult) SetStatus(status ActionStatus) { m.Data()["status"] = status }
 func (m *DynamicActionResult) GetHeader() ActionHeader {
@@ -344,16 +396,18 @@ func (m *DynamicActionResult) GetHeader() ActionHeader {
 func (m *DynamicActionResult) SetHeader(header ActionHeader) { m.Data()["header"] = header }
 
 // Get and Set Functions of shared type DynamicActionStatus
-func (m *DynamicActionStatus) GetGoalID() ActionGoalID   { return m.Data()["id"].(*DynamicActionGoalID) }
-func (m *DynamicActionStatus) SetGoalID(id ActionGoalID) { m.Data()["id"] = id }
+func (m *DynamicActionStatus) GetGoalID() ActionGoalID {
+	return m.Data()["goal_id"].(*DynamicActionGoalID)
+}
+func (m *DynamicActionStatus) SetGoalID(id ActionGoalID) { m.Data()["goal_id"] = id }
 func (m *DynamicActionStatus) GetStatus() uint8          { return m.Data()["status"].(uint8) }
 func (m *DynamicActionStatus) SetStatus(status uint8)    { m.Data()["status"] = status }
 func (m *DynamicActionStatus) GetStatusText() string     { return m.Data()["text"].(string) }
 func (m *DynamicActionStatus) SetStatusText(text string) { m.Data()["text"] = text }
 
 // Get and set functions of shared type DynamicActionHeader
-func (m *DynamicActionHeader) GetStamp() ros.Time      { return m.Data()["stamp"].(ros.Time) }
-func (m *DynamicActionHeader) SetStamp(stamp ros.Time) { m.Data()["stamp"] = stamp }
+func (m *DynamicActionHeader) GetStamp() Time      { return m.Data()["stamp"].(Time) }
+func (m *DynamicActionHeader) SetStamp(stamp Time) { m.Data()["stamp"] = stamp }
 
 // Get and set functions of the shared type DynamicActionStatusArray
 func (m *DynamicActionStatusArray) GetStatusArray() []ActionStatus {
