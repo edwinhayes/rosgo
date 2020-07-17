@@ -42,8 +42,7 @@ type serverStateMachine struct {
 
 func newServerStateMachine(goalID ActionGoalID) *serverStateMachine {
 	// Create a goal status message with pending status
-	statusType, _ := NewDynamicStatusType()
-	status := statusType.NewStatusMessage()
+	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
 	status.SetStatus(0)
 	status.SetGoalID(goalID)
 	return &serverStateMachine{

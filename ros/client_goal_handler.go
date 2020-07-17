@@ -126,11 +126,10 @@ func (gh *clientGoalHandler) Cancel() error {
 		return fmt.Errorf("trying to call cancel on inactive client goal hanlder")
 	}
 	// Create a goal id message with timestamp and goal id
-	goalMsgType, _ := NewDynamicGoalIDType()
-	goalMsg := goalMsgType.NewGoalIDMessage()
-	goalMsg.SetStamp(Now())
-	goalMsg.SetID(gh.actionGoalID)
-	gh.actionClient.cancelPub.Publish(goalMsg)
+	cancel := NewActionGoalIDType().NewGoalIDMessage()
+	cancel.SetStamp(Now())
+	cancel.SetID(gh.actionGoalID)
+	gh.actionClient.cancelPub.Publish(cancel)
 	gh.stateMachine.transitionTo(WaitingForCancelAck, gh, gh.transitionCb)
 	return nil
 }
@@ -178,13 +177,12 @@ func (gh *clientGoalHandler) updateResult(result ActionResult) error {
 		state == Preempting {
 
 		// Create a status array message
-		statusArrayType, _ := NewDynamicStatusArrayType()
-		statusArrayMsg := statusArrayType.NewStatusArrayMessage()
-		statusArray := make([]ActionStatus, 0)
-		statusArray = append(statusArray, result.GetStatus())
-		statusArrayMsg.SetStatusArray(statusArray)
+		statusArray := NewActionStatusArrayType().NewStatusArrayMessage()
+		array := make([]ActionStatus, 0)
+		array = append(array, result.GetStatus())
+		statusArray.SetStatusArray(array)
 		// Update the goal handler status
-		if err := gh.updateStatus(statusArrayMsg); err != nil {
+		if err := gh.updateStatus(statusArray); err != nil {
 			return err
 		}
 

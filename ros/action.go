@@ -9,35 +9,9 @@ type ActionType interface {
 	NewAction() Action
 }
 
-type Action interface {
-	GetActionGoal() ActionGoal
-	GetActionFeedback() ActionFeedback
-	GetActionResult() ActionResult
-}
-
 type ActionGoalType interface {
 	MessageType
 	NewGoalMessage() ActionGoal
-}
-
-type ActionGoalIDType interface {
-	MessageType
-	NewGoalIDMessage() ActionGoalID
-}
-
-type ActionHeaderType interface {
-	MessageType
-	NewHeaderMessage() ActionHeader
-}
-
-type ActionStatusType interface {
-	MessageType
-	NewStatusMessage() ActionStatus
-}
-
-type ActionStatusArrayType interface {
-	MessageType
-	NewStatusArrayMessage() ActionStatusArray
 }
 
 type ActionFeedbackType interface {
@@ -50,12 +24,33 @@ type ActionResultType interface {
 	NewResultMessage() ActionResult
 }
 
+type ActionGoalIDType interface {
+	MessageType
+	NewGoalIDMessage() ActionGoalID
+}
+
+type ActionStatusType interface {
+	MessageType
+	NewStatusMessage() ActionStatus
+}
+
+type ActionStatusArrayType interface {
+	MessageType
+	NewStatusArrayMessage() ActionStatusArray
+}
+
+type Action interface {
+	GetActionGoal() ActionGoal
+	GetActionFeedback() ActionFeedback
+	GetActionResult() ActionResult
+}
+
 type ActionGoal interface {
 	Message
-	GetHeader() ActionHeader
+	GetHeader() Message
 	GetGoalId() ActionGoalID
 	GetGoal() Message
-	SetHeader(ActionHeader)
+	SetHeader(Message)
 	SetGoalId(ActionGoalID)
 	SetGoal(Message)
 }
@@ -71,10 +66,10 @@ type ActionGoalID interface {
 // * ActionFeedback interface
 type ActionFeedback interface {
 	Message
-	GetHeader() ActionHeader
+	GetHeader() Message
 	GetStatus() ActionStatus
 	GetFeedback() Message
-	SetHeader(ActionHeader)
+	SetHeader(Message)
 	SetStatus(ActionStatus)
 	SetFeedback(Message)
 }
@@ -82,10 +77,10 @@ type ActionFeedback interface {
 // * ActionResult interface
 type ActionResult interface {
 	Message
-	GetHeader() ActionHeader
+	GetHeader() Message
 	GetStatus() ActionStatus
 	GetResult() Message
-	SetHeader(ActionHeader)
+	SetHeader(Message)
 	SetStatus(ActionStatus)
 	SetResult(Message)
 }
@@ -95,6 +90,8 @@ type ActionHeader interface {
 	Message
 	GetStamp() Time
 	SetStamp(Time)
+	GetFrameID() string
+	SetFrameID(string)
 }
 
 // *** Shared ActionStatus interface
@@ -111,8 +108,8 @@ type ActionStatus interface {
 // *** Shared ActionStatusArray interface
 type ActionStatusArray interface {
 	Message
-	GetHeader() ActionHeader
-	SetHeader(ActionHeader)
+	GetHeader() Message
+	SetHeader(Message)
 	GetStatusArray() []ActionStatus
 	SetStatusArray([]ActionStatus)
 }

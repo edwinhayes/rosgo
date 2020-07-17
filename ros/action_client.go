@@ -13,9 +13,9 @@ type defaultActionClient struct {
 	action           string
 	actionType       ActionType
 	actionResult     MessageType
-	actionResultType ActionResultType
-	actionFeedback   ActionFeedbackType
-	actionGoal       ActionGoalType
+	actionResultType MessageType
+	actionFeedback   MessageType
+	actionGoal       MessageType
 	goalPub          Publisher
 	cancelPub        Publisher
 	resultSub        Subscriber
@@ -45,15 +45,13 @@ func newDefaultActionClient(node Node, action string, actType ActionType) *defau
 	// Create goal publisher
 	ac.goalPub, _ = node.NewPublisher(fmt.Sprintf("%s/goal", action), actType.GoalType())
 	// Create cancel publisher
-	goalidType, _ := NewDynamicGoalIDType()
-	ac.cancelPub, _ = node.NewPublisher(fmt.Sprintf("%s/cancel", action), goalidType)
+	ac.cancelPub, _ = node.NewPublisher(fmt.Sprintf("%s/cancel", action), NewActionGoalIDType())
 	// Create result subscriber
 	ac.resultSub, _ = node.NewSubscriber(fmt.Sprintf("%s/result", action), actType.ResultType(), ac.internalResultCallback)
 	// Create feedback subscriber
 	ac.feedbackSub, _ = node.NewSubscriber(fmt.Sprintf("%s/feedback", action), actType.FeedbackType(), ac.internalFeedbackCallback)
 	// Create status subscriber
-	statusArrayType, _ := NewDynamicStatusArrayType()
-	ac.statusSub, _ = node.NewSubscriber(fmt.Sprintf("%s/status", action), statusArrayType, ac.internalStatusCallback)
+	ac.statusSub, _ = node.NewSubscriber(fmt.Sprintf("%s/status", action), NewActionStatusArrayType(), ac.internalStatusCallback)
 
 	return ac
 }
@@ -64,20 +62,17 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
 	}
 
-	ag := ac.actionType.GoalType().NewGoalMessage()
+	ag := ac.actionType.GoalType().NewGoalMessage().(*DynamicActionGoal)
 	// make a goalId message with timestamp and generated id
-	goalidType, _ := NewDynamicGoalIDType()
-	goalid := goalidType.NewGoalIDMessage().(*DynamicActionGoalID)
+	//goalid := ag.GetGoalId()
+	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	goalid.SetStamp(Now())
 	goalid.SetID(ac.goalIDGen.generateID())
 	// make a header with timestamp
-	headerType, _ := NewDynamicHeaderType()
-	header := headerType.NewHeaderMessage().(*DynamicActionHeader)
-	header.SetStamp(Now())
 
 	ag.SetGoal(goal)
 	ag.SetGoalId(goalid)
-	ag.SetHeader(header)
+	ag.SetHeader(NewActionHeader())
 
 	ac.PublishActionGoal(ag)
 
@@ -97,8 +92,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 		return
 	}
 	// Create a goal id message
-	goalidType, _ := NewDynamicGoalIDType()
-	goalid := goalidType.NewGoalIDMessage().(*DynamicActionGoalID)
+	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	ac.cancelPub.Publish(goalid)
 }
 
@@ -109,8 +103,7 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 		return
 	}
 	// Create a goal id message using timestamp
-	goalidType, _ := NewDynamicGoalIDType()
-	goalid := goalidType.NewGoalIDMessage().(*DynamicActionGoalID)
+	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	goalid.SetStamp(stamp)
 	ac.cancelPub.Publish(goalid)
 }
@@ -190,12 +183,22 @@ func (ac *defaultActionClient) internalResultCallback(results interface{}, event
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
+	// Interface to ActionResult
 	resultMsg := results.(*DynamicMessage)
-	// Create an action result
-	result := ac.actionResult.(*DynamicActionResultType).NewResultMessage()
-	result.SetResult(resultMsg)
-	result.SetHeader(resultMsg.Data()["header"].(ActionHeader))
-	result.SetStatus(resultMsg.Data()["status"].(ActionStatus))
+	result := ac.actionType.ResultType().NewResultMessage().(*DynamicActionResult)
+	result.SetHeader(resultMsg.Data()["header"].(Message))
+	result.SetResult(resultMsg.Data()["result"].(Message))
+	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
+	statusMsg := resultMsg.Data()["status"].(*DynamicMessage)
+	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+	goalID.SetID(goalidMsg.Data()["id"].(string))
+	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+
+	status.SetGoalID(goalID)
+	status.SetStatus(statusMsg.Data()["status"].(uint8))
+	status.SetStatusText(statusMsg.Data()["text"].(string))
+	result.SetStatus(status)
 
 	fmt.Printf("STATUS DONE %v\n", result.GetStatus().GetGoalID())
 
@@ -206,12 +209,30 @@ func (ac *defaultActionClient) internalResultCallback(results interface{}, event
 	}
 }
 
-func (ac *defaultActionClient) internalFeedbackCallback(feedback ActionFeedback, event MessageEvent) {
+func (ac *defaultActionClient) internalFeedbackCallback(feedback interface{}, event MessageEvent) {
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
+	// Interface to ActionFeedback
+	feedMsg := feedback.(*DynamicMessage)
+	feed := ac.actionType.FeedbackType().NewFeedbackMessage().(*DynamicActionFeedback)
+	feed.SetFeedback(feedMsg.Data()["feedback"].(Message))
+	feed.SetHeader(feedMsg.Data()["header"].(Message))
+	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
+	statusMsg := feedMsg.Data()["status"].(*DynamicMessage)
+	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+	goalID.SetID(goalidMsg.Data()["id"].(string))
+	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+
+	status.SetGoalID(goalID)
+	status.SetStatus(statusMsg.Data()["status"].(uint8))
+	status.SetStatusText(statusMsg.Data()["text"].(string))
+
+	feed.SetStatus(status)
+
 	for _, h := range ac.handlers {
-		h.updateFeedback(feedback)
+		h.updateFeedback(feed)
 	}
 }
 
@@ -226,22 +247,27 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, eve
 	} else if ac.callerID != event.PublisherName {
 		logger.Debug("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
 	}
-
-	// Create status array from interface
-	statusArrayType, err := NewDynamicStatusArrayType()
-	if err != nil {
-		logger.Error(err)
-		return
+	statusArray := statusArr.(*DynamicMessage)
+	status := NewActionStatusArrayType().NewStatusArrayMessage().(*DynamicActionStatusArray)
+	statusMsgs := statusArray.Data()["status_list"].([]Message)
+	statusList := make([]ActionStatus, 0)
+	for _, statusMsg := range statusMsgs {
+		buildStatus := NewActionStatusType().NewStatusMessage()
+		goalidMsg := statusMsg.(*DynamicMessage).Data()["goal_id"].(*DynamicMessage)
+		goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+		goalID.SetID(goalidMsg.Data()["id"].(string))
+		goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+		buildStatus.SetGoalID(goalID)
+		buildStatus.SetStatus(statusMsg.(*DynamicMessage).Data()["status"].(uint8))
+		buildStatus.SetStatusText(statusMsg.(*DynamicMessage).Data()["text"].(string))
+		statusList = append(statusList, buildStatus)
 	}
-	statusArray := statusArrayType.NewStatusArrayMessage()
-
-	statusMsg := statusArr.(*DynamicMessage)
-	statusArray.SetStatusArray(statusMsg.Data()["status_list"].([]ActionStatus))
-	statusArray.SetHeader(statusMsg.Data()["header"].(ActionHeader))
+	status.SetStatusArray(statusList)
+	status.SetHeader(statusArray.Data()["header"].(Message))
 
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
-		if err := h.updateStatus(statusArray); err != nil {
+		if err := h.updateStatus(status); err != nil {
 			logger.Error(err)
 		}
 	}

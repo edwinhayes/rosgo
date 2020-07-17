@@ -119,7 +119,6 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 				if err := m.Deserialize(reader); err != nil {
 					logger.Error(sub.topic, " : ", err)
 				}
-				fmt.Printf("Subscriber %s received message: %v\n", sub.topic, m)
 				// TODO: Investigate this
 				args := []reflect.Value{reflect.ValueOf(m), reflect.ValueOf(msgEvent.event)}
 				for _, callback := range callbacks {

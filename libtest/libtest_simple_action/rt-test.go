@@ -40,12 +40,13 @@ func (fc *ActionClient) activeCb() {
 
 // ActionClient feedback subscriber callback
 func (fc *ActionClient) feedbackCb(fb *ros.DynamicMessage) {
+	log.Printf("Received feedback: %v\n", fb)
 	feedback = fb.Data()["sequence"].([]int32)
 }
 
 // ActionClient done subscriber callback
 func (fc *ActionClient) doneCb(state uint8, result *ros.DynamicMessage) {
-	log.Printf("DONE CALLBACK CALLED\n")
+	log.Printf("DONE CALLBACK CALLED. RESULT: %v\n", result)
 	fc.node.Shutdown()
 }
 
@@ -79,35 +80,27 @@ func newActionServer(node ros.Node, name string, actionType ros.ActionType) {
 }
 
 // executeCallback is the execution callback of the action server
-func (s *ActionServer) executeCallback(goali interface{}, actionType interface{}) {
+func (s *ActionServer) executeCallback(goals interface{}, actionType interface{}) {
 
-	fmt.Printf("Received in execute callback: %v\n", goali)
-	goalmsg := goali.(*ros.DynamicMessage)
-	fmt.Printf("goalmsg data in internal goal callback: %v\n", goalmsg)
-	// To Do : Replace this with correct interface usage
-	goalid := goalmsg.Data()["goal_id"].(ros.ActionGoalID)
-	header := goalmsg.Data()["header"].(ros.ActionHeader)
-	goalType := actionType.(ros.ActionType).GoalType()
-	goal := goalType.NewGoalMessage()
-	goal.SetGoal(goalmsg)
-	goal.SetGoalId(goalid)
-	goal.SetHeader(header)
+	fmt.Printf("Received in execute callback: %v\n", goals)
+	goalMsg := goals.(*ros.DynamicMessage)
+
 	// instantiate action message types
 	feedType := actionType.(ros.ActionType).FeedbackType()
 	resultType := actionType.(ros.ActionType).ResultType()
 
 	// setup sequences
 	feed := feedType.NewFeedbackMessage().(*ros.DynamicActionFeedback)
-	//feed := feedMsg.(*ros.DynamicMessage)
-	seq := feed.Data()["sequence"].([]int32)
+
+	seq := make([]int32, 0)
 	seq = append(seq, 0)
 	seq = append(seq, 1)
+	feedMsg := feed.GetFeedback().(*ros.DynamicMessage)
+	feedMsg.Data()["sequence"] = seq
 	success := true
 
-	//goalData := goal.GetGoal().(*ros.DynamicMessage)
-
 	// This method simply publishes feedback each second, incrementing count till goal acheived
-	for i := 1; i < int(goalmsg.Data()["order"].(int32)); i++ {
+	for i := 1; i < int(goalMsg.Data()["order"].(int32)); i++ {
 		if s.as.IsPreemptRequested() {
 			success = false
 			if err := s.as.SetPreempted(nil, ""); err != nil {
@@ -118,14 +111,16 @@ func (s *ActionServer) executeCallback(goali interface{}, actionType interface{}
 
 		val := seq[i] + seq[i-1]
 		seq = append(seq, val)
-		feed.Data()["sequence"] = seq
-		s.as.PublishFeedback(feed)
+		feedMsg.Data()["sequence"] = seq
+
+		s.as.PublishFeedback(feedMsg)
 		time.Sleep(1000 * time.Millisecond)
 	}
 
 	// Once goal achieved, publish result
 	if success {
-		resultMsg := resultType.NewResultMessage().(*ros.DynamicActionResult)
+		result := resultType.NewResultMessage().(*ros.DynamicActionResult)
+		resultMsg := result.GetResult().(*ros.DynamicMessage)
 		resultMsg.Data()["sequence"] = seq
 		if err := s.as.SetSucceeded(resultMsg, "goal"); err != nil {
 			return
@@ -179,12 +174,13 @@ func RTTest(t *testing.T) {
 	go spinServer(serverNode, quitThread)
 
 	// Create a goal message for the client
-	goalMsg := actionType.GoalType().NewMessage().(*ros.DynamicMessage)
-	goalMsg.Data()["order"] = int32(10)
+	goalMsg := actionType.GoalType().NewGoalMessage()
+	goal := goalMsg.GetGoal().(*ros.DynamicMessage)
+	goal.Data()["order"] = int32(10)
 
 	// Create a client and send the goal to the server
 	fc := newActionClient(clientNode, "fibonacci", actionType)
-	fc.sendGoal(goalMsg)
+	fc.sendGoal(goal)
 
 	// Spin the client node
 	for clientNode.OK() {

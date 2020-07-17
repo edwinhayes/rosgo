@@ -155,8 +155,7 @@ func (gh *serverGoalHandler) GetGoal() Message {
 func (gh *serverGoalHandler) GetGoalId() ActionGoalID {
 	if gh.goal == nil {
 		// Create a new Goal id message
-		goalMsgType, _ := NewDynamicGoalIDType()
-		goalMsg := goalMsgType.NewGoalIDMessage()
+		goalMsg := NewActionGoalIDType().NewGoalIDMessage()
 		return goalMsg
 	}
 
@@ -169,10 +168,8 @@ func (gh *serverGoalHandler) GetGoalStatus() ActionStatus {
 		return status
 	}
 	// Create a new goal status message
-	statusMsgType, _ := NewDynamicStatusType()
-	statusMsg := statusMsgType.NewStatusMessage()
-	fmt.Printf("Goal handler produced this status message: %v\n", statusMsg)
-	return statusMsg
+	status = NewActionStatusType().NewMessage().(*DynamicActionStatus)
+	return status
 }
 
 func (gh *serverGoalHandler) Equal(other ServerGoalHandler) bool {

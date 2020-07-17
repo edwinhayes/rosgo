@@ -55,8 +55,7 @@ type clientStateMachine struct {
 
 func newClientStateMachine() *clientStateMachine {
 	// Create a goal status message for the state machine
-	statusType, _ := NewDynamicStatusType()
-	status := statusType.NewStatusMessage().(*DynamicActionStatus)
+	status := NewActionStatusType().NewStatusMessage()
 	// Set the status to pending
 	status.SetStatus(uint8(0))
 	// Return new state machine with message and state

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/pkg/errors"
 )
 
 // DEFINE PUBLIC STRUCTURES.
@@ -45,13 +44,11 @@ type DynamicActionResultType struct{ DynamicMessageType }
 
 // DynamicAction** shared interfaces.
 type DynamicActionGoalID struct{ DynamicMessage }
-type DynamicActionHeader struct{ DynamicMessage }
 type DynamicActionStatus struct{ DynamicMessage }
 type DynamicActionStatusArray struct{ DynamicMessage }
 
 // DynamicActionType** shared type interfaces
 type DynamicActionGoalIDType struct{ DynamicMessageType }
-type DynamicActionHeaderType struct{ DynamicMessageType }
 type DynamicActionStatusType struct{ DynamicMessageType }
 type DynamicActionStatusArrayType struct{ DynamicMessageType }
 
@@ -105,33 +102,90 @@ func newDynamicActionTypeNested(typeName string, packageName string) (*DynamicAc
 	m.text = spec.Text
 
 	// Create Dynamic Goal Type
-	goal, err := NewDynamicActionGoalType(spec.Goal.FullName)
-	if err != nil {
-		return nil, err
-	}
-	m.goalType = goal
+	goalType := &DynamicActionGoalType{}
+	goalType.spec = spec.ActionGoal
+	m.goalType = goalType
 
 	// Create Dynamic Feedback Type
-	feedback := DynamicActionFeedbackType{}
-	feedbackType, err := NewDynamicMessageTypeLiteral(spec.Feedback.FullName)
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	feedback.DynamicMessageType = feedbackType
-	m.feedbackType = &feedback
+	feedbackType := &DynamicActionFeedbackType{}
+	feedbackType.spec = spec.ActionFeedback
+	m.feedbackType = feedbackType
 
 	// Create Dynamic Result Type
-	result, err := NewDynamicActionResultType(spec.Result.FullName)
-	if err != nil {
-		return nil, err
-	}
-	m.resultType = result
+	resultType := &DynamicActionResultType{}
+	resultType.spec = spec.ActionResult
+	m.resultType = resultType
+
 	// We've successfully made a new service type matching the requested ROS type.
 	return m, nil
 
 }
 
 // DEFINE PUBLIC RECEIVER FUNCTIONS.
+
+// DynamicActionGoalID Type and New Message instantiators
+func NewActionGoalIDType() ActionGoalIDType {
+	goalid := DynamicActionGoalIDType{}
+	goalType, _ := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalID")
+	goalid.DynamicMessageType = goalType
+	return &goalid
+}
+func (a *DynamicActionGoalIDType) NewGoalIDMessage() ActionGoalID {
+	m := DynamicActionGoalID{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+// DynamicActionStatus Type and New Message instantiators
+func NewActionStatusType() ActionStatusType {
+	status := DynamicActionStatusType{}
+	statusType, _ := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatus")
+	status.DynamicMessageType = statusType
+	return &status
+}
+func (a *DynamicActionStatusType) NewStatusMessage() ActionStatus {
+	m := DynamicActionStatus{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+// DynamicActionStatusArray Type and New Message instantiators
+func NewActionStatusArrayType() ActionStatusArrayType {
+	statusArray := DynamicActionStatusArrayType{}
+	statusArrayType, _ := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatusArray")
+	statusArray.DynamicMessageType = statusArrayType
+	return &statusArray
+}
+func (a *DynamicActionStatusArrayType) NewStatusArrayMessage() ActionStatusArray {
+	m := DynamicActionStatusArray{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+func (a *DynamicActionGoalType) NewGoalMessage() ActionGoal {
+	m := DynamicActionGoal{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+func (a *DynamicActionFeedbackType) NewFeedbackMessage() ActionFeedback {
+	m := DynamicActionFeedback{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+func (a *DynamicActionResultType) NewResultMessage() ActionResult {
+	m := DynamicActionResult{}
+	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
+	return &m
+}
+
+func NewActionHeader() Message {
+	headerType, _ := NewDynamicMessageType("std_msgs/Header")
+	header := headerType.NewMessage().(*DynamicMessage)
+	header.Data()["stamp"] = Now()
+	return header
+}
 
 //	DynamicActionType
 
@@ -162,9 +216,9 @@ func (t *DynamicActionType) NewAction() Action {
 	// But otherwise, make a new one.
 	a := new(DynamicAction)
 	a.dynamicType = t
-	a.Goal = t.GoalType().NewGoalMessage().(*DynamicActionGoal)
-	a.Feedback = t.FeedbackType().NewFeedbackMessage().(*DynamicActionFeedback)
-	a.Result = t.ResultType().NewResultMessage().(*DynamicActionResult)
+	a.Goal = t.GoalType().NewMessage().(*DynamicActionGoal)
+	a.Feedback = t.FeedbackType().NewMessage().(*DynamicActionFeedback)
+	a.Result = t.ResultType().NewMessage().(*DynamicActionResult)
 	return a
 }
 
@@ -179,169 +233,6 @@ func (a *DynamicAction) GetActionFeedback() ActionFeedback { return a.Feedback }
 // GetActionResult returns the actionlib.ActionResult of the DynamicAction; required for actionlib.Action.
 func (a *DynamicAction) GetActionResult() ActionResult { return a.Result }
 
-// DynamicAction* Type instantiation Functions
-// NewDynamicActionGoalType creates a new ActionGoalType interface
-func NewDynamicActionGoalType(name string) (ActionGoalType, error) {
-	goal := DynamicActionGoalType{}
-	goalType, err := NewDynamicMessageTypeLiteral(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	// A goal type requires the fields GoalID and Header
-	header, err := NewDynamicHeaderType()
-	if err != nil {
-		return nil, err
-	}
-	goalid, err := NewDynamicGoalIDType()
-	if err != nil {
-		return nil, err
-	}
-	goalType.Data()["goal_id"] = goalid.NewGoalIDMessage()
-	goalType.Data()["header"] = header.NewHeaderMessage()
-	goal.DynamicMessageType = goalType
-	return &goal, nil
-}
-
-func NewDynamicActionResultType(name string) (ActionResultType, error) {
-	result := DynamicActionResultType{}
-	resultType, err := NewDynamicMessageTypeLiteral(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	// A goal type requires the fields GoalID and Header
-	header, err := NewDynamicHeaderType()
-	if err != nil {
-		return nil, err
-	}
-	status, err := NewDynamicStatusType()
-	if err != nil {
-		return nil, err
-	}
-	resultType.Data()["status"] = status.NewStatusMessage()
-	resultType.Data()["header"] = header.NewHeaderMessage()
-	result.DynamicMessageType = resultType
-	return &result, nil
-}
-
-// DynamicAction* Message instantiation Functions
-// NewGoalMessage creates a new ActionGoal message
-func (a *DynamicActionGoalType) NewGoalMessage() ActionGoal {
-	m := DynamicActionGoal{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// NewFeedbackMessage creates a new ActionFeedback message
-func (a *DynamicActionFeedbackType) NewFeedbackMessage() ActionFeedback {
-	m := DynamicActionFeedback{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// NewResultMessage creates a new ActionResult message
-func (a *DynamicActionResultType) NewResultMessage() ActionResult {
-	m := DynamicActionResult{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// DynamicActionType* Type instantiation functions
-// NewDynamicGoalIDType creates a new ActionGoalIDType interface
-func NewDynamicGoalIDType() (ActionGoalIDType, error) {
-	goalid := DynamicActionGoalIDType{}
-	goalType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalID")
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-
-	goalid.DynamicMessageType = goalType
-	return &goalid, nil
-}
-
-// NewDynamicHeaderType creates a new ActionHeaderType interface, which is essentially a std_msg header
-func NewDynamicHeaderType() (ActionHeaderType, error) {
-	header := DynamicActionHeaderType{}
-	headerType, err := NewDynamicMessageTypeLiteral("std_msgs/Header")
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	header.DynamicMessageType = headerType
-	return &header, nil
-}
-
-// NewDynamicStatusType creates a new ActionStatusType interface
-func NewDynamicStatusType() (ActionStatusType, error) {
-	status := DynamicActionStatusType{}
-	statusType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatus")
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	// An action status type requires the field GoalID
-	goalid, err := NewDynamicGoalIDType()
-	if err != nil {
-		return nil, err
-	}
-	statusType.Data()["goal_id"] = goalid.NewGoalIDMessage()
-	status.DynamicMessageType = statusType
-	return &status, nil
-}
-
-// NewDynamicStatusArrayType creates a new ActionStatusArrayType interface
-func NewDynamicStatusArrayType() (ActionStatusArrayType, error) {
-	statusArray := DynamicActionStatusArrayType{}
-	statusArrayType, err := NewDynamicMessageTypeLiteral("actionlib_msgs/GoalStatusArray")
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating feedback type")
-	}
-	// A status array type requires an action status array
-	statusType, err := NewDynamicStatusType()
-	if err != nil {
-		return nil, err
-	}
-	status := statusType.NewStatusMessage()
-	internalStatusArray := make([]ActionStatus, 0)
-	internalStatusArray = append(internalStatusArray, status)
-	statusArrayType.Data()["status_list"] = internalStatusArray
-	// Also requires a header
-	header, err := NewDynamicHeaderType()
-	if err != nil {
-		return nil, err
-	}
-	statusArrayType.Data()["header"] = header.NewHeaderMessage()
-
-	statusArray.DynamicMessageType = statusArrayType
-	return &statusArray, nil
-}
-
-// DynamicActionType* Message instantiation functions (parallels NewMessage() functionality)
-// NewGoalIDMessage creates a new ActionGoalID message
-func (a *DynamicActionGoalIDType) NewGoalIDMessage() ActionGoalID {
-	m := DynamicActionGoalID{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// NewHeaderMessage creates a new ActionHeader message
-func (a *DynamicActionHeaderType) NewHeaderMessage() ActionHeader {
-	m := DynamicActionHeader{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// NewStatusMessage creates a new ActionStatus message
-func (a *DynamicActionStatusType) NewStatusMessage() ActionStatus {
-	m := DynamicActionStatus{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
-// NewStatusArrayMessage creates a new ActionStatusArray message
-func (a *DynamicActionStatusArrayType) NewStatusArrayMessage() ActionStatusArray {
-	m := DynamicActionStatusArray{}
-	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
-	return &m
-}
-
 // Dynamic Action Goal Interface
 // Get and set functions of DynamicActionGoal interface
 func (m *DynamicActionGoal) SetGoal(goal Message) { m.Data()["goal"] = goal }
@@ -350,8 +241,8 @@ func (m *DynamicActionGoal) GetGoalId() ActionGoalID {
 	return m.Data()["goal_id"].(*DynamicActionGoalID)
 }
 func (m *DynamicActionGoal) SetGoalId(goalid ActionGoalID) { m.Data()["goal_id"] = goalid }
-func (m *DynamicActionGoal) GetHeader() ActionHeader       { return m.Data()["header"].(*DynamicActionHeader) }
-func (m *DynamicActionGoal) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+func (m *DynamicActionGoal) GetHeader() Message            { return m.Data()["header"].(*DynamicMessage) }
+func (m *DynamicActionGoal) SetHeader(header Message)      { m.Data()["header"] = header }
 
 // Get and Set Functions of DynamicActionGoalID
 func (m *DynamicActionGoalID) GetID() string       { return m.Data()["id"].(string) }
@@ -371,10 +262,10 @@ func (m *DynamicActionFeedback) GetStatus() ActionStatus {
 	return m.Data()["status"].(*DynamicActionStatus)
 }
 func (m *DynamicActionFeedback) SetStatus(status ActionStatus) { m.Data()["status"] = status }
-func (m *DynamicActionFeedback) GetHeader() ActionHeader {
-	return m.Data()["header"].(*DynamicActionHeader)
+func (m *DynamicActionFeedback) GetHeader() Message {
+	return m.Data()["header"].(*DynamicMessage)
 }
-func (m *DynamicActionFeedback) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+func (m *DynamicActionFeedback) SetHeader(header Message) { m.Data()["header"] = header }
 
 //
 
@@ -383,17 +274,13 @@ func (m *DynamicActionFeedback) SetHeader(header ActionHeader) { m.Data()["heade
 func (m *DynamicActionResult) SetResult(result Message) { m.Data()["result"] = result }
 func (m *DynamicActionResult) GetResult() Message       { return m.Data()["result"].(*DynamicMessage) }
 func (m *DynamicActionResult) GetStatus() ActionStatus {
-	// goalStat := m.Data()["status"].(*DynamicMessage)
-	// goalStatusType := NewDynamicStatusType()
-	// goalStatus := goalStatusType.NewStatusMessage()
-	// goalStatus.Set
 	return m.Data()["status"].(*DynamicActionStatus)
 }
 func (m *DynamicActionResult) SetStatus(status ActionStatus) { m.Data()["status"] = status }
-func (m *DynamicActionResult) GetHeader() ActionHeader {
-	return m.Data()["header"].(*DynamicActionHeader)
+func (m *DynamicActionResult) GetHeader() Message {
+	return m.Data()["header"].(*DynamicMessage)
 }
-func (m *DynamicActionResult) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+func (m *DynamicActionResult) SetHeader(header Message) { m.Data()["header"] = header }
 
 // Get and Set Functions of shared type DynamicActionStatus
 func (m *DynamicActionStatus) GetGoalID() ActionGoalID {
@@ -405,10 +292,6 @@ func (m *DynamicActionStatus) SetStatus(status uint8)    { m.Data()["status"] = 
 func (m *DynamicActionStatus) GetStatusText() string     { return m.Data()["text"].(string) }
 func (m *DynamicActionStatus) SetStatusText(text string) { m.Data()["text"] = text }
 
-// Get and set functions of shared type DynamicActionHeader
-func (m *DynamicActionHeader) GetStamp() Time      { return m.Data()["stamp"].(Time) }
-func (m *DynamicActionHeader) SetStamp(stamp Time) { m.Data()["stamp"] = stamp }
-
 // Get and set functions of the shared type DynamicActionStatusArray
 func (m *DynamicActionStatusArray) GetStatusArray() []ActionStatus {
 	return m.Data()["status_list"].([]ActionStatus)
@@ -416,7 +299,7 @@ func (m *DynamicActionStatusArray) GetStatusArray() []ActionStatus {
 func (m *DynamicActionStatusArray) SetStatusArray(statusArray []ActionStatus) {
 	m.Data()["status_list"] = statusArray
 }
-func (m *DynamicActionStatusArray) GetHeader() ActionHeader {
-	return m.Data()["header"].(*DynamicActionHeader)
+func (m *DynamicActionStatusArray) GetHeader() Message {
+	return m.Data()["header"].(*DynamicMessage)
 }
-func (m *DynamicActionStatusArray) SetHeader(header ActionHeader) { m.Data()["header"] = header }
+func (m *DynamicActionStatusArray) SetHeader(header Message) { m.Data()["header"] = header }

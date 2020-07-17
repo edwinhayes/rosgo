@@ -2,7 +2,6 @@ package ros
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"sync"
 	"time"
@@ -79,15 +78,13 @@ func (as *defaultActionServer) init() {
 	// Create goal subscription
 	as.goalSub, _ = as.node.NewSubscriber(fmt.Sprintf("%s/goal", as.action), as.actionType.GoalType(), as.internalGoalCallback)
 	// Create a cancel subscription
-	goalidType, _ := NewDynamicGoalIDType()
-	as.cancelSub, _ = as.node.NewSubscriber(fmt.Sprintf("%s/cancel", as.action), goalidType, as.internalCancelCallback)
+	as.cancelSub, _ = as.node.NewSubscriber(fmt.Sprintf("%s/cancel", as.action), NewActionGoalIDType(), as.internalCancelCallback)
 	// Create result publisher
 	as.resultPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/result", as.action), as.actionType.ResultType())
 	// Create feedback publisher
 	as.feedbackPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/feedback", as.action), as.actionType.FeedbackType())
 	// Create Status publisher
-	statusArrayType, _ := NewDynamicStatusArrayType()
-	as.statusPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/status", as.action), statusArrayType)
+	as.statusPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/status", as.action), NewActionStatusArrayType())
 }
 
 func (as *defaultActionServer) Start() {
@@ -123,12 +120,9 @@ func (as *defaultActionServer) Start() {
 
 // PublishResult publishes action result message
 func (as *defaultActionServer) PublishResult(status ActionStatus, result Message) {
-	msg := result.(*DynamicActionResult)
-	// Create a header message with time stamp
-	headerType, _ := NewDynamicHeaderType()
-	header := headerType.NewHeaderMessage()
-	header.SetStamp(Now())
-	msg.SetHeader(header)
+	msg := as.actionResult.(*DynamicActionResultType).NewResultMessage()
+
+	msg.SetHeader(NewActionHeader())
 	msg.SetStatus(status)
 	msg.SetResult(result)
 	as.resultPub.Publish(msg)
@@ -136,11 +130,9 @@ func (as *defaultActionServer) PublishResult(status ActionStatus, result Message
 
 // PublishFeedback publishes action feedback messages
 func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback Message) {
-	msg := as.actionFeedback.NewMessage().(ActionFeedback)
-	// Create a header message with time stamp
-	headerType, _ := NewDynamicHeaderType()
-	header := headerType.NewHeaderMessage()
-	header.SetStamp(Now())
+	msg := as.actionFeedback.(*DynamicActionFeedbackType).NewFeedbackMessage()
+
+	msg.SetHeader(NewActionHeader())
 	msg.SetStatus(status)
 	msg.SetFeedback(feedback)
 	as.feedbackPub.Publish(msg)
@@ -165,18 +157,12 @@ func (as *defaultActionServer) getStatus() ActionStatusArray {
 		}
 	}
 	// Create a goal status array message
-	statusArrayType, _ := NewDynamicStatusArrayType()
-	statusArrayMsg := statusArrayType.NewStatusArrayMessage()
-
-	// Create a header message with time stamp
-	headerType, _ := NewDynamicHeaderType()
-	header := headerType.NewHeaderMessage().(*DynamicActionHeader)
-	header.SetStamp(Now())
+	statusArray := NewActionStatusArrayType().NewStatusArrayMessage().(*DynamicActionStatusArray)
 
 	// Add status list
-	statusArrayMsg.SetStatusArray(statusList)
-	statusArrayMsg.SetHeader(header)
-	return statusArrayMsg
+	statusArray.SetStatusArray(statusList)
+	statusArray.SetHeader(NewActionHeader())
+	return statusArray
 }
 
 func (as *defaultActionServer) PublishStatus() {
@@ -232,23 +218,28 @@ func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event
 // internalGoalCallback recieves the goals from client and checks if
 // the goalID already exists in the status list. If not, it will call
 // server's goalCallback with goal that was recieved from the client.
-func (as *defaultActionServer) internalGoalCallback(goali interface{}, event MessageEvent) {
+func (as *defaultActionServer) internalGoalCallback(goals interface{}, event MessageEvent) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
 	logger := *as.node.Logger()
 
-	// Convert interface to ActionGoal
-	goalmsg := goali.(*DynamicMessage)
-	fmt.Printf("goalmsg data in internal goal callback: %v\n", goalmsg)
-	// To Do : Replace this with correct interface usage
-	goalid := goalmsg.Data()["goal_id"].(ActionGoalID)
-	header := goalmsg.Data()["header"].(ActionHeader)
-	goal := as.actionType.GoalType().NewGoalMessage()
-	goal.SetGoal(goalmsg)
-	goal.SetGoalId(goalid)
-	goal.SetHeader(header)
-	goalID := goal.GetGoalId()
+	// Convert interface to Message
+	goalmsg := goals.(*DynamicMessage)
+
+	// Create an action goal
+	goal := as.actionType.GoalType().NewGoalMessage().(*DynamicActionGoal)
+
+	//Create a goal id
+	goalid := goalmsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage()
+	goalID.SetStamp(goalid.Data()["stamp"].(Time))
+	goalID.SetID(goalid.Data()["id"].(string))
+
+	// Set the
+	goal.SetGoal(goalmsg.Data()["goal"].(Message))
+	goal.SetGoalId(goalID)
+	goal.SetHeader(goalmsg.Data()["header"].(Message))
 
 	for id, gh := range as.handlers {
 		if goalID.GetID() == id {
@@ -256,7 +247,6 @@ func (as *defaultActionServer) internalGoalCallback(goali interface{}, event Mes
 			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.GetID(), st.GetStatus())
 			if st.GetStatus() == uint8(7) {
 				st.SetStatus(uint8(8))
-				log.Fatalf("Statusssssssssssssssssssssssssssss: %v", st)
 				result := as.actionResultType.NewMessage()
 				as.PublishResult(st, result)
 			}
@@ -270,8 +260,7 @@ func (as *defaultActionServer) internalGoalCallback(goali interface{}, event Mes
 	if len(id) == 0 {
 		id = as.goalIDGen.generateID()
 		// Create goal id message with id and time stamp
-		goalIDType, _ := NewDynamicGoalIDType()
-		newGoalID := goalIDType.NewGoalIDMessage()
+		newGoalID := NewActionGoalIDType().NewGoalIDMessage()
 		newGoalID.SetID(id)
 		newGoalID.SetStamp(goalID.GetStamp())
 		// Set goal id
