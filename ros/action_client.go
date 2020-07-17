@@ -178,64 +178,36 @@ func (ac *defaultActionClient) DeleteGoalHandler(gh *clientGoalHandler) {
 	}
 }
 
-func (ac *defaultActionClient) internalResultCallback(results interface{}, event MessageEvent) {
+// Internal Result Callback for Result subscriber
+func (ac *defaultActionClient) internalResultCallback(result interface{}, event MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
 	// Interface to ActionResult
-	resultMsg := results.(*DynamicMessage)
-	result := ac.actionType.ResultType().NewResultMessage().(*DynamicActionResult)
-	result.SetHeader(resultMsg.Data()["header"].(Message))
-	result.SetResult(resultMsg.Data()["result"].(Message))
-	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
-	statusMsg := resultMsg.Data()["status"].(*DynamicMessage)
-	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
-	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
-	goalID.SetID(goalidMsg.Data()["id"].(string))
-	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
-
-	status.SetGoalID(goalID)
-	status.SetStatus(statusMsg.Data()["status"].(uint8))
-	status.SetStatusText(statusMsg.Data()["text"].(string))
-	result.SetStatus(status)
-
-	fmt.Printf("STATUS DONE %v\n", result.GetStatus().GetGoalID())
+	results := ac.actionType.ResultType().(*DynamicActionResultType).NewResultMessageFromInterface(result)
 
 	for _, h := range ac.handlers {
-		if err := h.updateResult(result); err != nil {
+		if err := h.updateResult(results); err != nil {
 			logger.Error(err)
 		}
 	}
 }
 
+// Itnernal Feedback Callback for Feedback subscriber
 func (ac *defaultActionClient) internalFeedbackCallback(feedback interface{}, event MessageEvent) {
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
 	// Interface to ActionFeedback
-	feedMsg := feedback.(*DynamicMessage)
-	feed := ac.actionType.FeedbackType().NewFeedbackMessage().(*DynamicActionFeedback)
-	feed.SetFeedback(feedMsg.Data()["feedback"].(Message))
-	feed.SetHeader(feedMsg.Data()["header"].(Message))
-	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
-	statusMsg := feedMsg.Data()["status"].(*DynamicMessage)
-	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
-	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
-	goalID.SetID(goalidMsg.Data()["id"].(string))
-	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
-
-	status.SetGoalID(goalID)
-	status.SetStatus(statusMsg.Data()["status"].(uint8))
-	status.SetStatusText(statusMsg.Data()["text"].(string))
-
-	feed.SetStatus(status)
+	feed := ac.actionType.FeedbackType().(*DynamicActionFeedbackType).NewFeedbackMessageFromInterface(feedback)
 
 	for _, h := range ac.handlers {
 		h.updateFeedback(feed)
 	}
 }
 
+// Internal Status Callback for status subscriber
 func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, event MessageEvent) {
 	logger := *ac.logger
 	ac.handlersMutex.RLock()
@@ -247,27 +219,13 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, eve
 	} else if ac.callerID != event.PublisherName {
 		logger.Debug("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
 	}
-	statusArray := statusArr.(*DynamicMessage)
-	status := NewActionStatusArrayType().NewStatusArrayMessage().(*DynamicActionStatusArray)
-	statusMsgs := statusArray.Data()["status_list"].([]Message)
-	statusList := make([]ActionStatus, 0)
-	for _, statusMsg := range statusMsgs {
-		buildStatus := NewActionStatusType().NewStatusMessage()
-		goalidMsg := statusMsg.(*DynamicMessage).Data()["goal_id"].(*DynamicMessage)
-		goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
-		goalID.SetID(goalidMsg.Data()["id"].(string))
-		goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
-		buildStatus.SetGoalID(goalID)
-		buildStatus.SetStatus(statusMsg.(*DynamicMessage).Data()["status"].(uint8))
-		buildStatus.SetStatusText(statusMsg.(*DynamicMessage).Data()["text"].(string))
-		statusList = append(statusList, buildStatus)
-	}
-	status.SetStatusArray(statusList)
-	status.SetHeader(statusArray.Data()["header"].(Message))
+
+	// Interface to status array conversion
+	statusArray := NewActionStatusArrayType().(*DynamicActionStatusArrayType).NewStatusArrayFromInterface(statusArr)
 
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
-		if err := h.updateStatus(status); err != nil {
+		if err := h.updateStatus(statusArray); err != nil {
 			logger.Error(err)
 		}
 	}

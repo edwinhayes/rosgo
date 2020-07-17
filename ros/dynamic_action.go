@@ -162,24 +162,112 @@ func (a *DynamicActionStatusArrayType) NewStatusArrayMessage() ActionStatusArray
 	return &m
 }
 
+// NewStatusArrayFromInterface creates an ActionStatusArray provided an interface.
+// Used where serialization/deserialization removes traces of action interface types from a message
+func (a *DynamicActionStatusArrayType) NewStatusArrayFromInterface(statusArr interface{}) ActionStatusArray {
+	statusArray := statusArr.(*DynamicMessage)
+	status := a.NewStatusArrayMessage().(*DynamicActionStatusArray)
+	statusMsgs := statusArray.Data()["status_list"].([]Message)
+	statusList := make([]ActionStatus, 0)
+	for _, statusMsg := range statusMsgs {
+		buildStatus := NewActionStatusType().NewStatusMessage()
+		goalidMsg := statusMsg.(*DynamicMessage).Data()["goal_id"].(*DynamicMessage)
+		goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+		goalID.SetID(goalidMsg.Data()["id"].(string))
+		goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+		buildStatus.SetGoalID(goalID)
+		buildStatus.SetStatus(statusMsg.(*DynamicMessage).Data()["status"].(uint8))
+		buildStatus.SetStatusText(statusMsg.(*DynamicMessage).Data()["text"].(string))
+		statusList = append(statusList, buildStatus)
+	}
+	status.SetStatusArray(statusList)
+	status.SetHeader(statusArray.Data()["header"].(Message))
+	return status
+}
+
+// Instnatiators for main Action message types. These functions copy dynamic messages into the
+// dynamic action message type.
+// Create a new Goal message from DynamicActionGoalType
 func (a *DynamicActionGoalType) NewGoalMessage() ActionGoal {
 	m := DynamicActionGoal{}
 	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
 	return &m
 }
 
+// NewGoalMessageFromInterface creates an ActionGoal provided an interface.
+// Used where serialization/deserialization removes traces of action interface types from a message
+func (a *DynamicActionGoalType) NewGoalMessageFromInterface(goal interface{}) ActionGoal {
+	goalmsg := goal.(*DynamicMessage)
+	actionGoal := a.NewGoalMessage().(*DynamicActionGoal)
+	goalid := goalmsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage()
+	goalID.SetStamp(goalid.Data()["stamp"].(Time))
+	goalID.SetID(goalid.Data()["id"].(string))
+
+	actionGoal.SetGoal(goalmsg.Data()["goal"].(Message))
+	actionGoal.SetGoalId(goalID)
+	actionGoal.SetHeader(goalmsg.Data()["header"].(Message))
+	return actionGoal
+}
+
+// Create a new Feedback message from DynamicActionFeedbackType
 func (a *DynamicActionFeedbackType) NewFeedbackMessage() ActionFeedback {
 	m := DynamicActionFeedback{}
 	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
 	return &m
 }
 
+// NewFeedbackMessageFromInterface creates an ActionFeedback provided an interface.
+// Used where serialization/deserialization removes traces of action interface types from a message
+func (a *DynamicActionFeedbackType) NewFeedbackMessageFromInterface(feedback interface{}) ActionFeedback {
+	feedMsg := feedback.(*DynamicMessage)
+	feed := a.NewFeedbackMessage().(*DynamicActionFeedback)
+	feed.SetFeedback(feedMsg.Data()["feedback"].(Message))
+	feed.SetHeader(feedMsg.Data()["header"].(Message))
+	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
+	statusMsg := feedMsg.Data()["status"].(*DynamicMessage)
+	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+	goalID.SetID(goalidMsg.Data()["id"].(string))
+	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+
+	status.SetGoalID(goalID)
+	status.SetStatus(statusMsg.Data()["status"].(uint8))
+	status.SetStatusText(statusMsg.Data()["text"].(string))
+
+	feed.SetStatus(status)
+	return feed
+}
+
+// Create a new Result message from DynamicActionResultType
 func (a *DynamicActionResultType) NewResultMessage() ActionResult {
 	m := DynamicActionResult{}
 	m.DynamicMessage = *a.DynamicMessageType.NewDynamicMessage()
 	return &m
 }
 
+// NewResultMessageFromInterface creates an ActionResult provided an interface.
+// Used where serialization/deserialization removes traces of action interface types from a message
+func (a *DynamicActionResultType) NewResultMessageFromInterface(result interface{}) ActionResult {
+	res := a.NewResultMessage().(*DynamicActionResult)
+	resultMsg := result.(*DynamicMessage)
+	res.SetHeader(resultMsg.Data()["header"].(Message))
+	res.SetResult(resultMsg.Data()["result"].(Message))
+	status := NewActionStatusType().NewStatusMessage().(*DynamicActionStatus)
+	statusMsg := resultMsg.Data()["status"].(*DynamicMessage)
+	goalidMsg := statusMsg.Data()["goal_id"].(*DynamicMessage)
+	goalID := NewActionGoalIDType().NewGoalIDMessage().(*DynamicActionGoalID)
+	goalID.SetID(goalidMsg.Data()["id"].(string))
+	goalID.SetStamp(goalidMsg.Data()["stamp"].(Time))
+
+	status.SetGoalID(goalID)
+	status.SetStatus(statusMsg.Data()["status"].(uint8))
+	status.SetStatusText(statusMsg.Data()["text"].(string))
+	res.SetStatus(status)
+	return res
+}
+
+// Create a new standard header message. Convenience function
 func NewActionHeader() Message {
 	headerType, _ := NewDynamicMessageType("std_msgs/Header")
 	header := headerType.NewMessage().(*DynamicMessage)

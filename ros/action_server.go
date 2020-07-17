@@ -225,21 +225,8 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 	logger := *as.node.Logger()
 
 	// Convert interface to Message
-	goalmsg := goals.(*DynamicMessage)
-
-	// Create an action goal
-	goal := as.actionType.GoalType().NewGoalMessage().(*DynamicActionGoal)
-
-	//Create a goal id
-	goalid := goalmsg.Data()["goal_id"].(*DynamicMessage)
-	goalID := NewActionGoalIDType().NewGoalIDMessage()
-	goalID.SetStamp(goalid.Data()["stamp"].(Time))
-	goalID.SetID(goalid.Data()["id"].(string))
-
-	// Set the
-	goal.SetGoal(goalmsg.Data()["goal"].(Message))
-	goal.SetGoalId(goalID)
-	goal.SetHeader(goalmsg.Data()["header"].(Message))
+	goal := as.actionType.GoalType().(*DynamicActionGoalType).NewGoalMessageFromInterface(goals).(*DynamicActionGoal)
+	goalID := goal.GetGoalId()
 
 	for id, gh := range as.handlers {
 		if goalID.GetID() == id {

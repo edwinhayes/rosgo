@@ -185,12 +185,8 @@ func RTTest(t *testing.T) {
 	// Spin the client node
 	for clientNode.OK() {
 
-		// Check our feedback
-		//log.Println(feedback)
-
 		_ = clientNode.SpinOnce()
 	}
 	quitThread <- struct{}{}
 	// Our client ended because done was called
-	t.Fatal("done")
 }
