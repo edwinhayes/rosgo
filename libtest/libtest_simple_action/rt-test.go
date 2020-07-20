@@ -123,7 +123,7 @@ func (s *ActionServer) executeCallback(goals interface{}, actionType interface{}
 		feedMsg.Data()["sequence"] = seq
 
 		s.as.PublishFeedback(feedMsg)
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	// Once goal achieved, publish result
@@ -185,7 +185,7 @@ func RTTest(t *testing.T) {
 	// Create a goal message for the client
 	goalMsg := actionType.GoalType().NewGoalMessage()
 	goal := goalMsg.GetGoal().(*ros.DynamicMessage)
-	goal.Data()["order"] = int32(10)
+	goal.Data()["order"] = int32(5)
 
 	// Create a client and send the goal to the server
 	fc, err := newActionClient(clientNode, "fibonacci", actionType)
