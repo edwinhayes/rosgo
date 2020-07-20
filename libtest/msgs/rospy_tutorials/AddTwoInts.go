@@ -2,7 +2,7 @@
 package rospy_tutorials
 
 import (
-	"github.com/edwinhayes/rosgo/ros"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 // Service type metadata

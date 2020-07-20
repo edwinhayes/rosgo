@@ -1,4 +1,4 @@
-module github.com/edwinhayes/rosgo
+module github.com/team-rocos/rosgo
 
 go 1.13
 

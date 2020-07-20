@@ -2,8 +2,9 @@ package main
 
 //go:generate gengo msg std_msgs/String
 import (
-	"github.com/edwinhayes/rosgo/libtest/libtest_publish_subscribe"
 	"testing"
+
+	"github.com/team-rocos/rosgo/libtest/libtest_publish_subscribe"
 )
 
 func main() {

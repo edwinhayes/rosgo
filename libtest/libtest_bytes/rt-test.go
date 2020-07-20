@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/edwinhayes/rosgo/ros"
 	"testing"
+
+	"github.com/team-rocos/rosgo/ros"
 )
 
 //RTTest tests the serialization, deserialization, and JSON functions of dynamic_message.

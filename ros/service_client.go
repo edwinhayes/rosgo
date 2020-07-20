@@ -3,12 +3,13 @@ package ros
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/pkg/errors"
 
 	modular "github.com/edwinhayes/logrus-modular"
 )
@@ -92,7 +93,10 @@ func (c *defaultServiceClient) Call(srv Service) error {
 
 	// 3. Send request
 	var buf bytes.Buffer
-	_ = srv.ReqMessage().Serialize(&buf)
+	err = srv.ReqMessage().Serialize(&buf)
+	if err != nil {
+		return errors.Wrap(err, "service call failed to serialize")
+	}
 	reqMsg := buf.Bytes()
 	size := uint32(len(reqMsg))
 	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
@@ -110,20 +114,21 @@ func (c *defaultServiceClient) Call(srv Service) error {
 	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
 	if err := binary.Read(conn, binary.LittleEndian, &ok); err != nil {
 		return err
-	}
-	if ok == 0 {
-		var size uint32
-		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
-		if err := binary.Read(conn, binary.LittleEndian, &size); err != nil {
-			return err
+	} else {
+		if ok == 0 {
+			var size uint32
+			conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+			if err := binary.Read(conn, binary.LittleEndian, &size); err != nil {
+				return err
+			}
+			errMsg := make([]byte, int(size))
+			conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+			if _, err := io.ReadFull(conn, errMsg); err != nil {
+				return err
+			} else {
+				return errors.New(string(errMsg))
+			}
 		}
-		errMsg := make([]byte, int(size))
-		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
-		if _, err := io.ReadFull(conn, errMsg); err != nil {
-			return err
-		}
-		return errors.New(string(errMsg))
-
 	}
 
 	// 5. Receive response

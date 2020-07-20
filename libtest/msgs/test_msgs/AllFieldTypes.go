@@ -4,8 +4,9 @@ package test_msgs
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/edwinhayes/rosgo/ros"
-	"github.com/edwinhayes/rosgo/libtest/msgs/std_msgs"
+
+	"github.com/team-rocos/rosgo/libtest/msgs/std_msgs"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 const (

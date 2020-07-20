@@ -4,7 +4,8 @@ package std_msgs
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/edwinhayes/rosgo/ros"
+
+	"github.com/team-rocos/rosgo/ros"
 )
 
 type _MsgColorRGBA struct {

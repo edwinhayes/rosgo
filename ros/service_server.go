@@ -294,7 +294,7 @@ func (s *remoteClientSession) start() {
 	case err := <-s.errorChan:
 		logger.Error(err)
 		// 4. Write OK byte
-		var ok byte = 0
+		var ok byte
 		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
 		if err := binary.Write(conn, binary.LittleEndian, &ok); err != nil {
 			panic(err)

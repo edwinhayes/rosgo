@@ -2,7 +2,6 @@ package ros
 
 import (
 	"bytes"
-	"container/list"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
+	"github.com/pkg/errors"
 )
 
 type remoteSubscriberSessionError struct {
@@ -19,7 +19,8 @@ type remoteSubscriberSessionError struct {
 }
 
 func (e *remoteSubscriberSessionError) Error() string {
-	return fmt.Sprintf("remoteSubscriberSession %v error: %v", e.session, e.err)
+	return fmt.Sprintf("remoteSubscriberSession: %s topic: %s error: %v",
+		e.session.callerID, e.session.topic, e.err)
 }
 
 type defaultPublisher struct {
@@ -28,7 +29,8 @@ type defaultPublisher struct {
 	msgType            MessageType
 	msgChan            chan []byte
 	shutdownChan       chan struct{}
-	sessions           *list.List
+	sesssionIDCount    int
+	sessions           map[int]*remoteSubscriberSession
 	sessionChan        chan *remoteSubscriberSession
 	sessionErrorChan   chan error
 	listenerErrorChan  chan error
@@ -45,11 +47,11 @@ func newDefaultPublisher(node *defaultNode,
 	pub.topic = topic
 	pub.msgType = msgType
 	pub.shutdownChan = make(chan struct{}, 10)
+	pub.sessions = make(map[int]*remoteSubscriberSession)
 	pub.msgChan = make(chan []byte, 10)
 	pub.listenerErrorChan = make(chan error, 10)
 	pub.sessionChan = make(chan *remoteSubscriberSession, 10)
 	pub.sessionErrorChan = make(chan error, 10)
-	pub.sessions = list.New()
 	pub.connectCallback = connectCallback
 	pub.disconnectCallback = disconnectCallback
 	if listener, err := listenRandomPort(node.listenIP, 10); err != nil {
@@ -76,27 +78,27 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 		select {
 		case msg := <-pub.msgChan:
 			logger.Debug("Receive msgChan")
-			for e := pub.sessions.Front(); e != nil; e = e.Next() {
-				session := e.Value.(*remoteSubscriberSession)
+			for _, s := range pub.sessions {
+				session := s
 				session.msgChan <- msg
 			}
+
 		case err := <-pub.listenerErrorChan:
 			logger.Debugf("Listener closed unexpectedly: %s", err)
 			pub.listener.Close()
 			return
+
 		case s := <-pub.sessionChan:
-			pub.sessions.PushBack(s)
+			pub.sessions[s.id] = s
 			go s.start()
+
 		case err := <-pub.sessionErrorChan:
 			logger.Error(err)
 			if sessionError, ok := err.(*remoteSubscriberSessionError); ok {
-				for e := pub.sessions.Front(); e != nil; e = e.Next() {
-					if e.Value == sessionError.session {
-						pub.sessions.Remove(e)
-						break
-					}
-				}
+				id := sessionError.session.id
+				delete(pub.sessions, id)
 			}
+
 		case <-pub.shutdownChan:
 			logger.Debug("defaultPublisher.start Receive shutdownChan")
 			pub.listener.Close()
@@ -105,11 +107,11 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 			if err != nil {
 				logger.Warn(err)
 			}
-			for e := pub.sessions.Front(); e != nil; e = e.Next() {
-				session := e.Value.(*remoteSubscriberSession)
-				session.quitChan <- struct{}{}
+
+			for id, s := range pub.sessions {
+				s.quitChan <- struct{}{}
+				delete(pub.sessions, id)
 			}
-			pub.sessions.Init() // Clear all sessions
 			return
 		}
 	}
@@ -134,15 +136,31 @@ func (pub *defaultPublisher) listenRemoteSubscriber() {
 		}
 
 		logger.Debugf("Connected %s", conn.RemoteAddr().String())
-		session := newRemoteSubscriberSession(pub, conn)
+		id := pub.sesssionIDCount
+		pub.sesssionIDCount++
+		session := newRemoteSubscriberSession(pub, id, conn)
 		pub.sessionChan <- session
 	}
+}
+
+func (pub *defaultPublisher) TryPublish(msg Message) error {
+	var buf bytes.Buffer
+	err := msg.Serialize(&buf)
+	if err != nil {
+		return errors.Wrap(err, "failed to serialize message:")
+	}
+	pub.msgChan <- buf.Bytes()
+	return nil
 }
 
 func (pub *defaultPublisher) Publish(msg Message) {
 	var buf bytes.Buffer
 	_ = msg.Serialize(&buf)
 	pub.msgChan <- buf.Bytes()
+}
+
+func (pub *defaultPublisher) GetNumSubscribers() int {
+	return len(pub.sessions)
 }
 
 func (pub *defaultPublisher) Shutdown() {
@@ -160,12 +178,17 @@ func (pub *defaultPublisher) hostAndPort() (string, string, error) {
 }
 
 type remoteSubscriberSession struct {
+	id                 int
 	conn               net.Conn
 	nodeID             string
+	callerID           string
 	topic              string
 	typeText           string
 	md5sum             string
 	typeName           string
+	sizeBytesSent      uint32
+	msgBytesSent       uint32
+	numSent            int64
 	quitChan           chan struct{}
 	msgChan            chan []byte
 	errorChan          chan error
@@ -174,14 +197,18 @@ type remoteSubscriberSession struct {
 	disconnectCallback func(SingleSubscriberPublisher)
 }
 
-func newRemoteSubscriberSession(pub *defaultPublisher, conn net.Conn) *remoteSubscriberSession {
+func newRemoteSubscriberSession(pub *defaultPublisher, id int, conn net.Conn) *remoteSubscriberSession {
 	session := new(remoteSubscriberSession)
+	session.id = id
 	session.conn = conn
 	session.nodeID = pub.node.qualifiedName
 	session.topic = pub.topic
 	session.typeText = pub.msgType.Text()
 	session.md5sum = pub.msgType.MD5Sum()
 	session.typeName = pub.msgType.Name()
+	session.sizeBytesSent = 0
+	session.msgBytesSent = 0
+	session.numSent = 0
 	session.quitChan = make(chan struct{})
 	session.msgChan = make(chan []byte, 10)
 	session.errorChan = pub.sessionErrorChan
@@ -218,7 +245,7 @@ func (session *remoteSubscriberSession) start() {
 	ssp := &singleSubPub{
 		topic:   session.topic,
 		msgChan: session.msgChan,
-		// callerId is filled in after header gets read later in this function.
+		// callerID is filled in after header gets read later in this function.
 	}
 
 	defer func() {
@@ -265,7 +292,7 @@ func (session *remoteSubscriberSession) start() {
 			session.topic, session.md5sum, headerMap["md5sum"])
 		return
 	}
-
+	session.callerID = headerMap["callerid"]
 	ssp.subName = headerMap["callerid"]
 	if session.connectCallback != nil {
 		go session.connectCallback(ssp)

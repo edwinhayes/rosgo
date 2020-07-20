@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edwinhayes/rosgo/libgengo"
+	"github.com/team-rocos/rosgo/libgengo"
 )
 
 func TestConvertConstantValue(t *testing.T) {
@@ -119,7 +119,7 @@ Bar[42] xfa
 `
 
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	}
@@ -168,7 +168,7 @@ func TestMD5_std_msgs(t *testing.T) {
 	}
 
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	} else {
@@ -221,7 +221,7 @@ func TestMD5_sensor_msgs(t *testing.T) {
 	}
 
 	rosPkgPath := os.Getenv("ROS_PACKAGE_PATH")
-	ctx, e := libgengo.NewMsgContext(strings.Split(rosPkgPath, ":"))
+	ctx, e := libgengo.NewPkgContext(strings.Split(rosPkgPath, ":"))
 	if e != nil {
 		t.Errorf("Failed to create MsgContext.")
 	}

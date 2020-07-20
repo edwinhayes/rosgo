@@ -8,13 +8,14 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/pkg/errors"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/buger/jsonparser"
+	"github.com/pkg/errors"
+	"github.com/team-rocos/rosgo/libgengo"
 )
 
 // DEFINE PUBLIC STRUCTURES.
@@ -36,13 +37,22 @@ type DynamicMessage struct {
 
 // DEFINE PRIVATE STRUCTURES.
 
+type dynamicMessageLike interface {
+	Serialize(buf *bytes.Buffer) error
+	GetDynamicType() *DynamicMessageType
+}
+
+func (d *DynamicMessage) GetDynamicType() *DynamicMessageType {
+	return d.dynamicType
+}
+
 // DEFINE PUBLIC GLOBALS.
 
 // DEFINE PRIVATE GLOBALS.
 
 var rosPkgPath string // Colon separated list of paths to search for message definitions on.
 
-var context *libgengo.MsgContext // We'll try to preserve a single message context to avoid reloading each time.
+var context *libgengo.PkgContext // We'll try to preserve a single message context to avoid reloading each time.
 
 // DEFINE PUBLIC STATIC FUNCTIONS.
 
@@ -76,23 +86,29 @@ func ResetContext() {
 // ROS message type name.  The first time the function is run, a message 'context' is created by searching through the available ROS message definitions, then the ROS message to
 // be used for the definition is looked up by name.  On subsequent calls, the ROS message type is looked up directly from the existing context.
 func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
-	return newDynamicMessageTypeNested(typeName, "")
+	t, err := newDynamicMessageTypeNested(typeName, "")
+	return &t, err
+}
+
+func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
+	t, err := newDynamicMessageTypeNested(typeName, "")
+	return t, err
 }
 
 // newDynamicMessageTypeNested generates a DynamicMessageType from the available ROS message definitions.  The first time the function is run, a message 'context' is created by
 // searching through the available ROS message definitions, then the ROS message type to use for the defintion is looked up by name.  On subsequent calls, the ROS message type
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
-func newDynamicMessageTypeNested(typeName string, packageName string) (*DynamicMessageType, error) {
+func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
 	// Create an empty message type.
-	m := new(DynamicMessageType)
+	m := DynamicMessageType{}
 
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
-		c, err := libgengo.NewMsgContext(strings.Split(GetRuntimePackagePath(), ":"))
+		c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
 		if err != nil {
-			return nil, err
+			return m, err
 		}
 		context = c
 	}
@@ -118,7 +134,7 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (*DynamicM
 	// Load context for the target message.
 	spec, err := context.LoadMsg(fullname)
 	if err != nil {
-		return nil, err
+		return m, err
 	}
 
 	// Now we know all about the message!
@@ -150,16 +166,17 @@ func (t *DynamicMessageType) MD5Sum() string {
 // NewMessage creates a new DynamicMessage instantiating the message type; required for ros.MessageType.
 func (t *DynamicMessageType) NewMessage() Message {
 	// Don't instantiate messages for incomplete types.
-	if t.spec == nil {
-		return nil
-	}
+	return t.NewDynamicMessage()
+}
+
+func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
-	d := new(DynamicMessage)
+	d := &DynamicMessage{}
 	d.dynamicType = t
 	var err error
 	d.data, err = zeroValueData(t.Name())
 	if err != nil {
-		return nil
+		return d
 	}
 	return d
 }
@@ -455,8 +472,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				if oldMsgType != "" && oldMsgType == newMsgType {
 					//We've already generated this type
 				} else {
-					msgType, err = newDynamicMessageTypeNested(goField.Type, goField.Package)
+					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package)
 					_ = err
+					msgType = &msgT
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
@@ -654,6 +672,7 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
+
 		if field.IsArray {
 			// It's an array.
 
@@ -845,12 +864,12 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 					// Else it's not a builtin.
 
 					// Confirm the message we're holding is actually the correct type.
-					msg, ok := arrayItem.(*DynamicMessage)
+					msg, ok := arrayItem.(dynamicMessageLike)
 					if !ok {
 						return errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(arrayItem).Name() + ", expected Message.")
 					}
-					if msg.dynamicType.spec.ShortName != field.Type {
-						return errors.New("Field: " + field.Name + ": Found msg " + msg.dynamicType.spec.ShortName + ", expected " + field.Type + ".")
+					if msg.GetDynamicType().spec.ShortName != field.Type {
+						return errors.New("Field: " + field.Name + ": Found msg " + msg.GetDynamicType().spec.ShortName + ", expected " + field.Type + ".")
 					}
 					// Otherwise, we just recursively serialise it.
 					if err = msg.Serialize(buf); err != nil {
@@ -1034,12 +1053,12 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				// Else it's not a builtin.
 
 				// Confirm the message we're holding is actually the correct type.
-				msg, ok := item.(*DynamicMessage)
+				msg, ok := item.(dynamicMessageLike)
 				if !ok {
 					return errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(item).Name() + ", expected Message.")
 				}
-				if msg.dynamicType.spec.ShortName != field.Type {
-					return errors.New("Field: " + field.Name + ": Found msg " + msg.dynamicType.spec.ShortName + ", expected " + field.Type + ".")
+				if msg.GetDynamicType().spec.ShortName != field.Type {
+					return errors.New("Field: " + field.Name + ": Found msg " + msg.GetDynamicType().spec.ShortName + ", expected " + field.Type + ".")
 				}
 				// Otherwise, we just recursively serialise it.
 				if err = msg.Serialize(buf); err != nil {
@@ -1064,6 +1083,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
+
 		if field.IsArray {
 			// It's an array.
 

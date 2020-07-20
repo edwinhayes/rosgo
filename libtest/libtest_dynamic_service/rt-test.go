@@ -1,26 +1,30 @@
-package libtest_service
+package libtest_dynamic_service
 
-//go:generate gengo srv rospy_tutorials/AddTwoInts
 import (
 	"os"
 	"testing"
 
-	"github.com/team-rocos/rosgo/libtest/msgs/rospy_tutorials"
 	"github.com/team-rocos/rosgo/ros"
 )
 
-var service rospy_tutorials.AddTwoInts
+var service *ros.DynamicService
 
 //Callback function for ros service
-func callback(srv *rospy_tutorials.AddTwoInts) error {
-	srv.Response.Sum = srv.Request.A + srv.Request.B
+func callback(srv ros.Service) error {
+	req := srv.ReqMessage().(*ros.DynamicMessage)
+	if req.Data()["data"] == true {
+		res := srv.ResMessage().(*ros.DynamicMessage)
+		res.Data()["success"] = true
+		res.Data()["message"] = "dynamic message worked"
+	}
 	return nil
 }
 
 //Go routine function to spin server node to be run in separate thread
 func spinServer(node ros.Node, quit <-chan bool) {
-	//Initialize server
-	server := node.NewServiceServer("/add_two_ints", rospy_tutorials.SrvAddTwoInts, callback)
+
+	//Initialize server - Server can keep using static service for now
+	server := node.NewServiceServer("/add_two_ints", service.Type(), callback)
 	defer server.Shutdown()
 	for {
 		select {
@@ -38,14 +42,24 @@ func spinServer(node ros.Node, quit <-chan bool) {
 func RTTest(t *testing.T) {
 	//func main() {
 	//Initialize nodes ; skip error tests
+	var err error
 	node, err := ros.NewNode("client", os.Args)
 	node2, err := ros.NewNode("server", os.Args)
 	//Defer node shutdown
 	defer node.Shutdown()
 	defer node2.Shutdown()
 
+	// Create dynamic service
+	srv, err := ros.NewDynamicServiceType("std_srvs/SetBool")
+	if err != nil {
+		t.Errorf("failed to create service: %s", err)
+	}
+	service = srv.NewService().(*ros.DynamicService)
+	req := service.ReqMessage().(*ros.DynamicMessage)
+	req.Data()["data"] = true
+
 	//Initialize Client
-	cli := node.NewServiceClient("/add_two_ints", rospy_tutorials.SrvAddTwoInts)
+	cli := node.NewServiceClient("/add_two_ints", service.Type())
 	if cli == nil {
 		t.Error("Failed to initialize client")
 	}
@@ -57,23 +71,14 @@ func RTTest(t *testing.T) {
 
 	for node.OK() {
 		//Create  and call service request
-		service.Request.A = 10
-		service.Request.B = 10
-		if err = cli.Call(&service); err != nil {
+		if err = cli.Call(service); err != nil {
 		}
-
-		//When a response is recieved
-		if service.Response.Sum != 0 {
-			//Check if response is correct
-			if service.Response.Sum == 20 {
-				cli.Shutdown()
-				defer close(quitThread)
-				return
-			}
-			//Response incorrect
+		res := service.ResMessage().(*ros.DynamicMessage)
+		if res.Data()["success"] == true {
+			// Succeeded
 			cli.Shutdown()
 			defer close(quitThread)
-			t.Error("Incorrect response recieved from server")
+			return
 		}
 		//Spin client node
 		_ = node.SpinOnce()

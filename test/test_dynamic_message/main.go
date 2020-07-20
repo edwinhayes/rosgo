@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/edwinhayes/rosgo/libtest/libtest_dynamic_message"
 	"testing"
+
+	"github.com/team-rocos/rosgo/libtest/libtest_dynamic_message"
 )
 
 func main() {

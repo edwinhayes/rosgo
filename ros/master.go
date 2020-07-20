@@ -2,7 +2,8 @@ package ros
 
 import (
 	"fmt"
-	"github.com/edwinhayes/rosgo/xmlrpc"
+
+	"github.com/team-rocos/rosgo/xmlrpc"
 )
 
 //callRosApi performs an XML-RPC call to the ROS system. CalleeUri is the address to send the request
