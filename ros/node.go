@@ -483,20 +483,24 @@ func (node *defaultNode) GetServiceTypes() (map[string]*serviceHeader, error) {
 		// Probe the service
 		result, err := callRosAPI(node.masterURI, "lookupService", node.qualifiedName, serviceName)
 		if err != nil {
-			return nil, err
+			node.logger.Errorf("failed to lookup service %s : %s", serviceName, err)
+			continue
 		}
 
 		serviceRawURL, converted := result.(string)
 		if !converted {
-			return nil, fmt.Errorf("Result of 'lookupService' is not a string")
+			node.logger.Errorf("Result of 'lookupService' is not a string")
+			continue
 		}
 		var serviceURL *url.URL
 		if serviceURL, err = url.Parse(serviceRawURL); err != nil {
-			return nil, err
+			node.logger.Error(err)
+			continue
 		}
 		var conn net.Conn
 		if conn, err = net.Dial("tcp", serviceURL.Host); err != nil {
-			return nil, err
+			node.logger.Error(err)
+			continue
 		}
 
 		// Write connection header
@@ -508,13 +512,15 @@ func (node *defaultNode) GetServiceTypes() (map[string]*serviceHeader, error) {
 
 		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
 		if err := writeConnectionHeader(headers, conn); err != nil {
-			return nil, err
+			node.logger.Error(err)
+			continue
 		}
 		// Read reponse header
 		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
 		resHeaders, err := readConnectionHeader(conn)
 		if err != nil {
-			return nil, err
+			node.logger.Error(err)
+			continue
 		}
 		// Convert headers to map
 		resHeaderMap := make(map[string]string)
