@@ -1,10 +1,11 @@
 package libtest_param
 
 import (
-	"github.com/edwinhayes/rosgo/ros"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/team-rocos/rosgo/ros"
 )
 
 //RTTest creates a node and makes ros api calls to the ros parameter server

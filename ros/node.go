@@ -17,9 +17,9 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
-	"github.com/edwinhayes/rosgo/xmlrpc"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/team-rocos/rosgo/xmlrpc"
 )
 
 const (

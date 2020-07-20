@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/edwinhayes/rosgo/libtest/msgs/std_msgs"
-	"github.com/edwinhayes/rosgo/ros"
+	"github.com/team-rocos/rosgo/libtest/msgs/std_msgs"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 var message string

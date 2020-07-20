@@ -1,6 +1,6 @@
 ## rosgo
 
-[![GoDoc](https://godoc.org/github.com/edwinhayes/rosgo?status.svg)](https://godoc.org/github.com/edwinhayes/rosgo) 
+[![GoDoc](https://godoc.org/github.com/team-rocos/rosgo?status.svg)](https://godoc.org/github.com/team-rocos/rosgo) 
 [![Build Status](https://travis-ci.org/edwinhayes/rosgo.svg?branch=master)](https://travis-ci.org/edwinhayes/rosgo)
 
 ## Package Summary
@@ -10,7 +10,7 @@
 - Author: Akio Ochiai
 - Maintainer: Fetch Robotics
 - License: Apache License 2.0
-- Source: git [https://github.com/edwinhayes/rosgo](https://github.com/edwinhayes/rosgo)
+- Source: git [https://github.com/team-rocos/rosgo](https://github.com/team-rocos/rosgo)
 - ROS Version Support: [Indigo] [Jade] [Melodic]
 
 ## Prerequisites

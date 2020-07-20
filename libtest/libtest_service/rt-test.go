@@ -2,10 +2,11 @@ package libtest_service
 
 //go:generate gengo srv rospy_tutorials/AddTwoInts
 import (
-	"github.com/edwinhayes/rosgo/libtest/msgs/rospy_tutorials"
-	"github.com/edwinhayes/rosgo/ros"
 	"os"
 	"testing"
+
+	"github.com/team-rocos/rosgo/libtest/msgs/rospy_tutorials"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 var service rospy_tutorials.AddTwoInts

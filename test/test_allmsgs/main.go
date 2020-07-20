@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/edwinhayes/rosgo/libtest/libtest_allmsgs"
 	"testing"
+
+	"github.com/team-rocos/rosgo/libtest/libtest_allmsgs"
 )
 
 func main() {

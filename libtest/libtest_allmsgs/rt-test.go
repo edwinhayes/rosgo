@@ -3,11 +3,12 @@ package libtest_allmsgs
 import (
 	"bytes"
 	"fmt"
-	"github.com/edwinhayes/rosgo/libgengo"
-	"github.com/edwinhayes/rosgo/ros"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/team-rocos/rosgo/libgengo"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 //RTTest searches all ros message files on the ros environment (opt/ros + catkin)

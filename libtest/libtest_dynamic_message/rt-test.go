@@ -1,10 +1,11 @@
 package libtest_dynamic_message
 
 import (
-	"github.com/edwinhayes/rosgo/ros"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/team-rocos/rosgo/ros"
 )
 
 var message string

@@ -5,7 +5,7 @@ package ros
 import (
 	"strings"
 
-	"github.com/edwinhayes/rosgo/libgengo"
+	"github.com/team-rocos/rosgo/libgengo"
 )
 
 // DEFINE PUBLIC STRUCTURES.

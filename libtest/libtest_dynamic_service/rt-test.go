@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/edwinhayes/rosgo/ros"
+	"github.com/team-rocos/rosgo/ros"
 )
 
 var service *ros.DynamicService

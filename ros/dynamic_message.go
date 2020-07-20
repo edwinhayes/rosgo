@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
-	"github.com/edwinhayes/rosgo/libgengo"
 	"github.com/pkg/errors"
+	"github.com/team-rocos/rosgo/libgengo"
 )
 
 // DEFINE PUBLIC STRUCTURES.
