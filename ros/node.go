@@ -18,6 +18,7 @@ import (
 
 	modular "github.com/edwinhayes/logrus-modular"
 	"github.com/edwinhayes/rosgo/xmlrpc"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -465,78 +466,76 @@ func (node *defaultNode) GetSystemState() ([]interface{}, error) {
 	return list, nil
 }
 
-// GetServiceTypes uses getSystemState, and probes the services to return service types
-func (node *defaultNode) GetServiceTypes() (map[string]*serviceHeader, error) {
+// Get Service string list via getSystemState
+func (node *defaultNode) GetServiceList() ([]string, error) {
 	// Get the system state
 	sysState, err := node.GetSystemState()
 	if err != nil {
 		node.logger.Errorf("Failed to call getSystemState() for %s.", err)
 		return nil, err
 	}
-	// result map
-	serviceTypes := make(map[string]*serviceHeader)
+	serviceList := make([]string, 0)
 	// Get the service list
 	services := sysState[2].([]interface{})
 	for _, s := range services {
 		serviceItem := s.([]interface{})
-		serviceName := serviceItem[0].(string)
-		// Probe the service
-		result, err := callRosAPI(node.masterURI, "lookupService", node.qualifiedName, serviceName)
-		if err != nil {
-			node.logger.Errorf("failed to lookup service %s : %s", serviceName, err)
-			continue
-		}
-
-		serviceRawURL, converted := result.(string)
-		if !converted {
-			node.logger.Errorf("Result of 'lookupService' is not a string")
-			continue
-		}
-		var serviceURL *url.URL
-		if serviceURL, err = url.Parse(serviceRawURL); err != nil {
-			node.logger.Error(err)
-			continue
-		}
-		var conn net.Conn
-		if conn, err = net.Dial("tcp", serviceURL.Host); err != nil {
-			node.logger.Error(err)
-			continue
-		}
-
-		// Write connection header
-		var headers []header
-		headers = append(headers, header{"probe", "1"})
-		headers = append(headers, header{"md5sum", "*"})
-		headers = append(headers, header{"callerid", node.qualifiedName})
-		headers = append(headers, header{"service", serviceName})
-
-		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
-		if err := writeConnectionHeader(headers, conn); err != nil {
-			node.logger.Error(err)
-			continue
-		}
-		// Read reponse header
-		conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
-		resHeaders, err := readConnectionHeader(conn)
-		if err != nil {
-			node.logger.Error(err)
-			continue
-		}
-		// Convert headers to map
-		resHeaderMap := make(map[string]string)
-		for _, h := range resHeaders {
-			resHeaderMap[h.key] = h.value
-		}
-		srvHeader := serviceHeader{
-			callerid:     resHeaderMap["callerid"],
-			md5sum:       resHeaderMap["md5sum"],
-			requestType:  resHeaderMap["request_type"],
-			responseType: resHeaderMap["response_type"],
-			serviceType:  resHeaderMap["type"],
-		}
-		serviceTypes[serviceName] = &srvHeader
+		serviceList = append(serviceList, serviceItem[0].(string))
 	}
-	return serviceTypes, nil
+	return serviceList, nil
+}
+
+// GetServiceType probes a service to return service type
+func (node *defaultNode) GetServiceType(serviceName string) (*serviceHeader, error) {
+
+	// Probe the service
+	result, err := callRosAPI(node.masterURI, "lookupService", node.qualifiedName, serviceName)
+	if err != nil {
+		return nil, errors.Errorf("failed to lookup service %s : %s", serviceName, err)
+	}
+
+	serviceRawURL, converted := result.(string)
+	if !converted {
+		return nil, errors.Errorf("Result of 'lookupService' is not a string")
+	}
+	var serviceURL *url.URL
+	if serviceURL, err = url.Parse(serviceRawURL); err != nil {
+		return nil, err
+	}
+	var conn net.Conn
+	if conn, err = net.Dial("tcp", serviceURL.Host); err != nil {
+		return nil, err
+	}
+
+	// Write connection header
+	var headers []header
+	headers = append(headers, header{"probe", "1"})
+	headers = append(headers, header{"md5sum", "*"})
+	headers = append(headers, header{"callerid", node.qualifiedName})
+	headers = append(headers, header{"service", serviceName})
+
+	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	if err := writeConnectionHeader(headers, conn); err != nil {
+		return nil, err
+	}
+	// Read reponse header
+	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	resHeaders, err := readConnectionHeader(conn)
+	if err != nil {
+		return nil, err
+	}
+	// Convert headers to map
+	resHeaderMap := make(map[string]string)
+	for _, h := range resHeaders {
+		resHeaderMap[h.key] = h.value
+	}
+	srvHeader := serviceHeader{
+		callerid:     resHeaderMap["callerid"],
+		md5sum:       resHeaderMap["md5sum"],
+		requestType:  resHeaderMap["request_type"],
+		responseType: resHeaderMap["response_type"],
+		serviceType:  resHeaderMap["type"],
+	}
+	return &srvHeader, nil
 }
 
 // Master API call for getPublishedTopics
