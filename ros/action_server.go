@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type defaultActionServer struct {
@@ -55,7 +57,9 @@ func newDefaultActionServer(node Node, action string, actType ActionType, goalCb
 	}
 }
 
-func (as *defaultActionServer) init() {
+func (as *defaultActionServer) initialize() error {
+	var err error
+
 	as.statusPubChan = make(chan struct{}, 10)
 	as.shutdownChan = make(chan struct{}, 10)
 
@@ -76,15 +80,32 @@ func (as *defaultActionServer) init() {
 	as.subQueueSize = 50
 
 	// Create goal subscription
-	as.goalSub, _ = as.node.NewSubscriber(fmt.Sprintf("%s/goal", as.action), as.actionType.GoalType(), as.internalGoalCallback)
+	as.goalSub, err = as.node.NewSubscriber(fmt.Sprintf("%s/goal", as.action), as.actionType.GoalType(), as.internalGoalCallback)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create goal publisher:")
+	}
 	// Create a cancel subscription
-	as.cancelSub, _ = as.node.NewSubscriber(fmt.Sprintf("%s/cancel", as.action), NewActionGoalIDType(), as.internalCancelCallback)
+	as.cancelSub, err = as.node.NewSubscriber(fmt.Sprintf("%s/cancel", as.action), NewActionGoalIDType(), as.internalCancelCallback)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create goal publisher:")
+	}
 	// Create result publisher
-	as.resultPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/result", as.action), as.actionType.ResultType())
+	as.resultPub, err = as.node.NewPublisher(fmt.Sprintf("%s/result", as.action), as.actionType.ResultType())
+	if err != nil {
+		return errors.Wrap(err, "Failed to create goal publisher:")
+	}
 	// Create feedback publisher
-	as.feedbackPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/feedback", as.action), as.actionType.FeedbackType())
+	as.feedbackPub, err = as.node.NewPublisher(fmt.Sprintf("%s/feedback", as.action), as.actionType.FeedbackType())
+	if err != nil {
+		return errors.Wrap(err, "Failed to create goal publisher:")
+	}
 	// Create Status publisher
-	as.statusPub, _ = as.node.NewPublisher(fmt.Sprintf("%s/status", as.action), NewActionStatusArrayType())
+	as.statusPub, err = as.node.NewPublisher(fmt.Sprintf("%s/status", as.action), NewActionStatusArrayType())
+	if err != nil {
+		return errors.Wrap(err, "Failed to create goal publisher:")
+	}
+
+	return nil
 }
 
 func (as *defaultActionServer) Start() {
@@ -95,7 +116,10 @@ func (as *defaultActionServer) Start() {
 	}()
 
 	// initialize subscribers and publishers
-	as.init()
+	err := as.initialize()
+	if err != nil {
+		logger.Errorf("failed to initialize action server: %s", err)
+	}
 
 	// start status publish ticker that notifies at 5hz
 	as.statusTimer = time.NewTicker(time.Second / 5.0)
@@ -107,7 +131,6 @@ func (as *defaultActionServer) Start() {
 		select {
 		case <-as.shutdownChan:
 			return
-
 		case <-as.statusTimer.C:
 			as.PublishStatus()
 

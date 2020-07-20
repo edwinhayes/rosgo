@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	modular "github.com/edwinhayes/logrus-modular"
+	"github.com/pkg/errors"
 )
 
 type defaultActionClient struct {
@@ -29,7 +30,9 @@ type defaultActionClient struct {
 	callerID         string
 }
 
-func newDefaultActionClient(node Node, action string, actType ActionType) *defaultActionClient {
+func newDefaultActionClient(node Node, action string, actType ActionType) (*defaultActionClient, error) {
+	var err error
+
 	ac := &defaultActionClient{
 		node:           node,
 		action:         action,
@@ -43,46 +46,66 @@ func newDefaultActionClient(node Node, action string, actType ActionType) *defau
 	}
 
 	// Create goal publisher
-	ac.goalPub, _ = node.NewPublisher(fmt.Sprintf("%s/goal", action), actType.GoalType())
+	ac.goalPub, err = node.NewPublisher(fmt.Sprintf("%s/goal", action), actType.GoalType())
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create goal publisher:")
+	}
 	// Create cancel publisher
-	ac.cancelPub, _ = node.NewPublisher(fmt.Sprintf("%s/cancel", action), NewActionGoalIDType())
+	ac.cancelPub, err = node.NewPublisher(fmt.Sprintf("%s/cancel", action), NewActionGoalIDType())
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create cancel publisher:")
+	}
 	// Create result subscriber
-	ac.resultSub, _ = node.NewSubscriber(fmt.Sprintf("%s/result", action), actType.ResultType(), ac.internalResultCallback)
+	ac.resultSub, err = node.NewSubscriber(fmt.Sprintf("%s/result", action), actType.ResultType(), ac.internalResultCallback)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create result subscriber:")
+	}
 	// Create feedback subscriber
-	ac.feedbackSub, _ = node.NewSubscriber(fmt.Sprintf("%s/feedback", action), actType.FeedbackType(), ac.internalFeedbackCallback)
+	ac.feedbackSub, err = node.NewSubscriber(fmt.Sprintf("%s/feedback", action), actType.FeedbackType(), ac.internalFeedbackCallback)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create feedback subscriber:")
+	}
 	// Create status subscriber
-	ac.statusSub, _ = node.NewSubscriber(fmt.Sprintf("%s/status", action), NewActionStatusArrayType(), ac.internalStatusCallback)
-
-	return ac
+	ac.statusSub, err = node.NewSubscriber(fmt.Sprintf("%s/status", action), NewActionStatusArrayType(), ac.internalStatusCallback)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create status subscriber:")
+	}
+	return ac, nil
 }
 
-func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb interface{}) ClientGoalHandler {
+func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb interface{}) (ClientGoalHandler, error) {
 	logger := *ac.logger
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
 	}
 
+	// Create a new action goal message
 	ag := ac.actionType.GoalType().NewGoalMessage().(*DynamicActionGoal)
+
 	// make a goalId message with timestamp and generated id
-	//goalid := ag.GetGoalId()
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	goalid.SetStamp(Now())
 	goalid.SetID(ac.goalIDGen.generateID())
-	// make a header with timestamp
 
+	// set the action goal fields
 	ag.SetGoal(goal)
 	ag.SetGoalId(goalid)
 	ag.SetHeader(NewActionHeader())
 
-	ac.PublishActionGoal(ag)
+	// publish the goal to the action server
+	err := ac.PublishActionGoal(ag)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to publish action goal")
+	}
 
+	// create an internal handler to track this goal
 	handler := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
 
 	ac.handlersMutex.Lock()
 	ac.handlers = append(ac.handlers, handler)
 	ac.handlersMutex.Unlock()
 
-	return handler
+	return handler, nil
 }
 
 func (ac *defaultActionClient) CancelAllGoals() {
@@ -108,6 +131,28 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 	ac.cancelPub.Publish(goalid)
 }
 
+// Shutdown client ends an action client and its pub/subs, but keeps the node alive
+func (ac *defaultActionClient) ShutdownClient() {
+	ac.handlersMutex.Lock()
+	defer ac.handlersMutex.Unlock()
+
+	ac.started = false
+	for _, h := range ac.handlers {
+		h.Shutdown(false)
+	}
+
+	// Shutdown publishers and subscribers
+	ac.goalPub.Shutdown()
+	ac.cancelPub.Shutdown()
+	ac.resultSub.Shutdown()
+	ac.feedbackSub.Shutdown()
+	ac.statusSub.Shutdown()
+
+	ac.handlers = nil
+
+}
+
+// Shutdown completely ends a client and its associated node
 func (ac *defaultActionClient) Shutdown() {
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
@@ -121,10 +166,17 @@ func (ac *defaultActionClient) Shutdown() {
 	ac.node.Shutdown()
 }
 
-func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) {
+func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) error {
 	if ac.started {
-		ac.goalPub.Publish(ag)
+		err := ac.goalPub.TryPublish(ag)
+		if err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return errors.New("action client not started")
 	}
+
 }
 
 func (ac *defaultActionClient) PublishCancel(cancel *DynamicMessage) {

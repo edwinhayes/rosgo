@@ -10,6 +10,7 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
+	"github.com/pkg/errors"
 )
 
 type remoteSubscriberSessionError struct {
@@ -140,6 +141,16 @@ func (pub *defaultPublisher) listenRemoteSubscriber() {
 		session := newRemoteSubscriberSession(pub, id, conn)
 		pub.sessionChan <- session
 	}
+}
+
+func (pub *defaultPublisher) TryPublish(msg Message) error {
+	var buf bytes.Buffer
+	err := msg.Serialize(&buf)
+	if err != nil {
+		return errors.Wrap(err, "failed to serialize message:")
+	}
+	pub.msgChan <- buf.Bytes()
+	return nil
 }
 
 func (pub *defaultPublisher) Publish(msg Message) {

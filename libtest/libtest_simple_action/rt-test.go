@@ -23,15 +23,20 @@ type ActionClient struct {
 }
 
 // New Action client instantiates a new simple action client
-func newActionClient(node ros.Node, name string, actionType ros.ActionType) *ActionClient {
+func newActionClient(node ros.Node, name string, actionType ros.ActionType) (*ActionClient, error) {
+
+	client, err := ros.NewSimpleActionClient(node, name, actionType)
+	if err != nil {
+		return nil, err
+	}
 
 	fc := &ActionClient{
 		node: node,
-		ac:   ros.NewSimpleActionClient(node, name, actionType),
+		ac:   client,
 	}
 
 	fc.ac.WaitForServer(ros.NewDuration(0, 0))
-	return fc
+	return fc, err
 }
 
 // Action Client active subscriber callback
@@ -51,8 +56,12 @@ func (fc *ActionClient) doneCb(state uint8, result *ros.DynamicMessage) {
 }
 
 // ActionClient send goal function used to send a goal to simple action server
-func (fc *ActionClient) sendGoal(goal *ros.DynamicMessage) {
-	fc.ac.SendGoal(goal, fc.doneCb, fc.activeCb, fc.feedbackCb)
+func (fc *ActionClient) sendGoal(goal *ros.DynamicMessage) error {
+	err := fc.ac.SendGoal(goal, fc.doneCb, fc.activeCb, fc.feedbackCb)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ActionServer
@@ -179,8 +188,14 @@ func RTTest(t *testing.T) {
 	goal.Data()["order"] = int32(10)
 
 	// Create a client and send the goal to the server
-	fc := newActionClient(clientNode, "fibonacci", actionType)
-	fc.sendGoal(goal)
+	fc, err := newActionClient(clientNode, "fibonacci", actionType)
+	if err != nil {
+		t.Fatalf("failed to create action client: %v", err)
+	}
+	err = fc.sendGoal(goal)
+	if err != nil {
+		t.Fatalf("failed to send action goal: %v", err)
+	}
 
 	// Spin the client node
 	for clientNode.OK() {

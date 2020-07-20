@@ -66,6 +66,7 @@ func NewNodeWithLogs(name string, logger *modular.ModuleLogger, args []string) (
 
 //Publisher is interface for publisher and shutdown function
 type Publisher interface {
+	TryPublish(msg Message) error
 	Publish(msg Message)
 	GetNumSubscribers() int
 	Shutdown()

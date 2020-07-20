@@ -1,6 +1,6 @@
 package ros
 
-func NewActionClient(node Node, action string, actionType ActionType) ActionClient {
+func NewActionClient(node Node, action string, actionType ActionType) (ActionClient, error) {
 	return newDefaultActionClient(node, action, actionType)
 }
 
@@ -8,7 +8,7 @@ func NewActionServer(node Node, action string, actionType ActionType, goalCb, ca
 	return newDefaultActionServer(node, action, actionType, goalCb, cancelCb, autoStart)
 }
 
-func NewSimpleActionClient(node Node, action string, actionType ActionType) SimpleActionClient {
+func NewSimpleActionClient(node Node, action string, actionType ActionType) (SimpleActionClient, error) {
 	return newSimpleActionClient(node, action, actionType)
 }
 
@@ -26,7 +26,7 @@ func NewServerGoalHandlerWithGoalId(as ActionServer, goalID ActionGoalID) Server
 
 type ActionClient interface {
 	WaitForServer(timeout Duration) bool
-	SendGoal(goal Message, transitionCallback interface{}, feedbackCallback interface{}) ClientGoalHandler
+	SendGoal(goal Message, transitionCallback interface{}, feedbackCallback interface{}) (ClientGoalHandler, error)
 	CancelAllGoals()
 	CancelAllGoalsBeforeTime(stamp Time)
 }
@@ -42,7 +42,7 @@ type ActionServer interface {
 }
 
 type SimpleActionClient interface {
-	SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{})
+	SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) error
 	SendGoalAndWait(goal Message, executeTimeout, preeptTimeout Duration) (uint8, error)
 	WaitForServer(timeout Duration) bool
 	WaitForResult(timeout Duration) bool

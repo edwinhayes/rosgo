@@ -3,12 +3,13 @@ package ros
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/pkg/errors"
 
 	modular "github.com/edwinhayes/logrus-modular"
 )
@@ -92,7 +93,10 @@ func (c *defaultServiceClient) Call(srv Service) error {
 
 	// 3. Send request
 	var buf bytes.Buffer
-	_ = srv.ReqMessage().Serialize(&buf)
+	err = srv.ReqMessage().Serialize(&buf)
+	if err != nil {
+		return errors.Wrap(err, "service call failed to serialize")
+	}
 	reqMsg := buf.Bytes()
 	size := uint32(len(reqMsg))
 	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))

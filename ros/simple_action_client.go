@@ -25,23 +25,32 @@ type simpleActionClient struct {
 	logger      *modular.ModuleLogger
 }
 
-func newSimpleActionClient(node Node, action string, actionType ActionType) *simpleActionClient {
+func newSimpleActionClient(node Node, action string, actionType ActionType) (*simpleActionClient, error) {
+	client, err := newDefaultActionClient(node, action, actionType)
+	if err != nil {
+		return nil, err
+	}
 	return &simpleActionClient{
-		ac:          newDefaultActionClient(node, action, actionType),
+		ac:          client,
 		simpleState: SimpleStateDone,
 		doneChan:    make(chan struct{}, 10),
 		logger:      node.Logger(),
-	}
+	}, nil
 }
 
-func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) {
+func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) error {
 	sc.StopTrackingGoal()
 	sc.doneCb = doneCb
 	sc.activeCb = activeCb
 	sc.feedbackCb = feedbackCb
 
 	sc.setSimpleState(SimpleStatePending)
-	sc.gh = sc.ac.SendGoal(goal, sc.transitionHandler, sc.feedbackHandler)
+	gh, err := sc.ac.SendGoal(goal, sc.transitionHandler, sc.feedbackHandler)
+	if err != nil {
+		return err
+	}
+	sc.gh = gh
+	return nil
 }
 
 func (sc *simpleActionClient) SendGoalAndWait(goal Message, executeTimeout, preeptTimeout Duration) (uint8, error) {
