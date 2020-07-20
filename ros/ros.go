@@ -45,7 +45,7 @@ type Node interface {
 
 	GetSystemState() ([]interface{}, error)
 	GetServiceList() ([]string, error)
-	GetServiceType(string) (*serviceHeader, error)
+	GetServiceType(string) (*ServiceHeader, error)
 	GetPublishedTopics(subgraph string) ([]interface{}, error)
 	GetTopicTypes() []interface{}
 

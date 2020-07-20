@@ -91,12 +91,12 @@ type defaultNode struct {
 }
 
 // serviceheader is the header returned from probing a ros service, containing all type information
-type serviceHeader struct {
-	callerid     string
-	md5sum       string
-	requestType  string
-	responseType string
-	serviceType  string
+type ServiceHeader struct {
+	Callerid     string
+	Md5sum       string
+	RequestType  string
+	ResponseType string
+	ServiceType  string
 }
 
 func listenRandomPort(address string, trialLimit int) (net.Listener, error) {
@@ -485,7 +485,7 @@ func (node *defaultNode) GetServiceList() ([]string, error) {
 }
 
 // GetServiceType probes a service to return service type
-func (node *defaultNode) GetServiceType(serviceName string) (*serviceHeader, error) {
+func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, error) {
 
 	// Probe the service
 	result, err := callRosAPI(node.masterURI, "lookupService", node.qualifiedName, serviceName)
@@ -528,12 +528,12 @@ func (node *defaultNode) GetServiceType(serviceName string) (*serviceHeader, err
 	for _, h := range resHeaders {
 		resHeaderMap[h.key] = h.value
 	}
-	srvHeader := serviceHeader{
-		callerid:     resHeaderMap["callerid"],
-		md5sum:       resHeaderMap["md5sum"],
-		requestType:  resHeaderMap["request_type"],
-		responseType: resHeaderMap["response_type"],
-		serviceType:  resHeaderMap["type"],
+	srvHeader := ServiceHeader{
+		Callerid:     resHeaderMap["callerid"],
+		Md5sum:       resHeaderMap["md5sum"],
+		RequestType:  resHeaderMap["request_type"],
+		ResponseType: resHeaderMap["response_type"],
+		ServiceType:  resHeaderMap["type"],
 	}
 	return &srvHeader, nil
 }
