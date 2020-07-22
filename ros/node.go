@@ -479,13 +479,19 @@ func (node *defaultNode) GetServiceList() ([]string, error) {
 	services := sysState[2].([]interface{})
 	for _, s := range services {
 		serviceItem := s.([]interface{})
-		serviceList = append(serviceList, serviceItem[0].(string))
+
+		serviceName := strings.Replace(serviceItem[0].(string), "/", "", 1)
+
+		serviceList = append(serviceList, serviceName)
 	}
 	return serviceList, nil
 }
 
 // GetServiceType probes a service to return service type
 func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, error) {
+
+	// Result relative name
+	serviceName = node.nameResolver.remap(serviceName)
 
 	// Probe the service
 	result, err := callRosAPI(node.masterURI, "lookupService", node.qualifiedName, serviceName)
@@ -527,6 +533,10 @@ func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, err
 	resHeaderMap := make(map[string]string)
 	for _, h := range resHeaders {
 		resHeaderMap[h.key] = h.value
+	}
+	// Check whether the response was a succesful header
+	if len(resHeaders) == 1 {
+		return nil, errors.Errorf("error probing service type: %s", resHeaders[0])
 	}
 	srvHeader := ServiceHeader{
 		Callerid:     resHeaderMap["callerid"],

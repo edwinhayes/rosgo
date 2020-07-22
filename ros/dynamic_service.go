@@ -83,7 +83,7 @@ func newDynamicServiceTypeNested(typeName string, packageName string) (*DynamicS
 	}
 
 	// Now we know all about the service!
-	m.name = spec.ShortName
+	m.name = spec.FullName
 	m.md5sum = spec.MD5Sum
 	m.text = spec.Text
 	m.reqType, err = NewDynamicMessageType(spec.Request.FullName)
