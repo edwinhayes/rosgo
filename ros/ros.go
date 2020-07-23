@@ -46,7 +46,8 @@ type Node interface {
 	GetSystemState() ([]interface{}, error)
 	GetServiceList() ([]string, error)
 	GetServiceType(string) (*ServiceHeader, error)
-	GetPublishedTopics(subgraph string) ([]interface{}, error)
+	GetPublishedActions(subgraph string) (map[string]string, error)
+	GetPublishedTopics(subgraph string) (map[string]string, error)
 	GetTopicTypes() []interface{}
 
 	Logger() *modular.ModuleLogger
