@@ -480,9 +480,7 @@ func (node *defaultNode) GetServiceList() ([]string, error) {
 	for _, s := range services {
 		serviceItem := s.([]interface{})
 
-		serviceName := strings.Replace(serviceItem[0].(string), "/", "", 1)
-
-		serviceList = append(serviceList, serviceName)
+		serviceList = append(serviceList, serviceItem[0].(string))
 	}
 	return serviceList, nil
 }
