@@ -547,7 +547,7 @@ func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, err
 }
 
 // Master API call for getPublishedTopics
-func (node *defaultNode) GetPublishedTopics(subgraph string) ([]interface{}, error) {
+func (node *defaultNode) GetPublishedTopics(subgraph string) (map[string]string, error) {
 	node.logger.Debug("Call Master API getPublishedTopics")
 	result, err := callRosAPI(node.masterURI, "getPublishedTopics",
 		node.qualifiedName,
@@ -561,7 +561,35 @@ func (node *defaultNode) GetPublishedTopics(subgraph string) ([]interface{}, err
 		node.logger.Errorf("result is not []string but %s.", reflect.TypeOf(result).String())
 	}
 	node.logger.Trace("Result: ", list)
-	return list, nil
+	// Convert to map
+	topicMap := make(map[string]string)
+	for _, v := range list {
+		topic := v.([]interface{})
+		topicMap[topic[0].(string)] = topic[1].(string)
+	}
+	return topicMap, nil
+}
+
+// GetPublishedActions uses PublishedTopics to find a topic that meets the action server requirements
+func (node *defaultNode) GetPublishedActions(subgraph string) (map[string]string, error) {
+	topics, err := node.GetPublishedTopics(subgraph)
+	if err != nil {
+		return nil, err
+	}
+	actionMap := make(map[string]string)
+	for topicName, topicType := range topics {
+		// if the published topic contains /result, it could be an action
+		if strings.Contains(topicName, "/result") {
+
+			prefix := strings.Replace(topicName, "/result", "", -1)
+			// ensure its counterparts exist
+			if (topics[prefix+"/status"] != "") && (topics[prefix+"/feedback"] != "") {
+				// append action server uri to map including trimmed action type name
+				actionMap[prefix] = strings.Replace(topicType, "ActionResult", "", -1)
+			}
+		}
+	}
+	return actionMap, nil
 }
 
 // Master API call for getTopicTypes
