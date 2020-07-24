@@ -68,13 +68,13 @@ func (c *defaultServiceClient) Call(srv Service) error {
 	for _, h := range headers {
 		logger.Debugf("  `%s` = `%s`", h.key, h.value)
 	}
-	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
 	if err := writeConnectionHeader(headers, conn); err != nil {
 		return err
 	}
 
 	// 2. Read reponse header
-	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
 	resHeaders, err := readConnectionHeader(conn)
 	if err != nil {
 		return err
