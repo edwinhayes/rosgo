@@ -517,12 +517,12 @@ func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, err
 	headers = append(headers, header{"callerid", node.qualifiedName})
 	headers = append(headers, header{"service", serviceName})
 
-	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
 	if err := writeConnectionHeader(headers, conn); err != nil {
 		return nil, err
 	}
 	// Read reponse header
-	conn.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
 	resHeaders, err := readConnectionHeader(conn)
 	if err != nil {
 		return nil, err
