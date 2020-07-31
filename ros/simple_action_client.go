@@ -69,8 +69,8 @@ func (sc *simpleActionClient) SendGoalAndWait(goal Message, executeTimeout, pree
 	return sc.GetState()
 }
 
-func (sc *simpleActionClient) ShutdownClient() {
-	sc.ac.ShutdownClient()
+func (sc *simpleActionClient) ShutdownClient(status bool, feedback bool, result bool) {
+	sc.ac.ShutdownClient(status, feedback, result)
 }
 
 func (sc *simpleActionClient) WaitForServer(timeout Duration) bool {

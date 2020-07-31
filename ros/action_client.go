@@ -132,7 +132,8 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 }
 
 // Shutdown client ends an action client and its pub/subs, but keeps the node alive
-func (ac *defaultActionClient) ShutdownClient() {
+// Takes a set of current active subscription booleans as to not remove any subscribers that the node is consuming
+func (ac *defaultActionClient) ShutdownClient(status bool, feedback bool, result bool) {
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
 
@@ -142,14 +143,19 @@ func (ac *defaultActionClient) ShutdownClient() {
 	}
 
 	// Shutdown publishers and subscribers
-	ac.goalPub.Shutdown()
-	ac.cancelPub.Shutdown()
-	ac.resultSub.Shutdown()
-	ac.feedbackSub.Shutdown()
-	ac.statusSub.Shutdown()
+	ac.node.RemovePublisher(fmt.Sprintf("%s/goal", ac.action))
+	ac.node.RemovePublisher(fmt.Sprintf("%s/cancel", ac.action))
 
+	if !feedback {
+		ac.node.RemoveSubscriber(fmt.Sprintf("%s/feedback", ac.action))
+	}
+	if !result {
+		ac.node.RemoveSubscriber(fmt.Sprintf("%s/result", ac.action))
+	}
+	if !status {
+		ac.node.RemoveSubscriber(fmt.Sprintf("%s/status", ac.action))
+	}
 	ac.handlers = nil
-
 }
 
 // Shutdown completely ends a client and its associated node
