@@ -52,6 +52,7 @@ type SimpleActionClient interface {
 	CancelAllGoals()
 	CancelAllGoalsBeforeTime(stamp Time)
 	CancelGoal() error
+	ShutdownClient(bool, bool, bool)
 	StopTrackingGoal()
 }
 
