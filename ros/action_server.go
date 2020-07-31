@@ -193,13 +193,16 @@ func (as *defaultActionServer) PublishStatus() {
 }
 
 // internalCancelCallback recieves cancel message from client
-func (as *defaultActionServer) internalCancelCallback(goalID ActionGoalID, event MessageEvent) {
+func (as *defaultActionServer) internalCancelCallback(goalid interface{}, event MessageEvent) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
 	goalFound := false
 	logger := *as.node.Logger()
 	logger.Debug("Action server has received a new cancel request")
+
+	goalIDType := NewActionGoalIDType()
+	goalID := goalIDType.(*DynamicActionGoalIDType).NewGoalIDMessageFromInterface(goalid).(*DynamicActionGoalID)
 
 	for id, gh := range as.handlers {
 		idStamp := goalID.GetStamp()

@@ -210,6 +210,17 @@ func (a *DynamicActionGoalType) NewGoalMessageFromInterface(goal interface{}) Ac
 	return actionGoal
 }
 
+// NewGoalIDMessageFromInterface create an ActionGoalID provided an interface
+// Used where serialization/deserialization removes traces of action interface types from a message
+func (a *DynamicActionGoalIDType) NewGoalIDMessageFromInterface(goalID interface{}) ActionGoalID {
+	goalIDmsg := goalID.(*DynamicMessage)
+	actionGoalID := a.NewGoalIDMessage().(*DynamicActionGoalID)
+
+	actionGoalID.SetStamp(goalIDmsg.Data()["stamp"].(Time))
+	actionGoalID.SetID(goalIDmsg.Data()["id"].(string))
+	return actionGoalID
+}
+
 // Create a new Feedback message from DynamicActionFeedbackType
 func (a *DynamicActionFeedbackType) NewFeedbackMessage() ActionFeedback {
 	m := DynamicActionFeedback{}
