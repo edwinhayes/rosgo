@@ -451,7 +451,7 @@ func (node *defaultNode) NewPublisherWithCallbacks(topic string, msgType Message
 
 // Master API for getSystemState
 func (node *defaultNode) GetSystemState() ([]interface{}, error) {
-	node.logger.Debug("Call Master API getSystemState")
+	node.logger.Trace("Call Master API getSystemState")
 	result, err := callRosAPI(node.masterURI, "getSystemState",
 		node.qualifiedName)
 	if err != nil {
@@ -548,7 +548,7 @@ func (node *defaultNode) GetServiceType(serviceName string) (*ServiceHeader, err
 
 // Master API call for getPublishedTopics
 func (node *defaultNode) GetPublishedTopics(subgraph string) (map[string]string, error) {
-	node.logger.Debug("Call Master API getPublishedTopics")
+	node.logger.Trace("Call Master API getPublishedTopics")
 	result, err := callRosAPI(node.masterURI, "getPublishedTopics",
 		node.qualifiedName,
 		subgraph)
@@ -594,7 +594,7 @@ func (node *defaultNode) GetPublishedActions(subgraph string) (map[string]string
 
 // Master API call for getTopicTypes
 func (node *defaultNode) GetTopicTypes() []interface{} {
-	node.logger.Debug("Call Master API getTopicTypes")
+	node.logger.Trace("Call Master API getTopicTypes")
 	result, err := callRosAPI(node.masterURI, "getTopicTypes",
 		node.qualifiedName)
 	if err != nil {
@@ -736,7 +736,7 @@ func (node *defaultNode) Shutdown() {
 	node.logger.Debug("Wait all goroutines")
 	node.waitGroup.Wait()
 	node.logger.Debug("Wait all goroutines...Done")
-	node.logger.Debug("Close XMLRPC lisetner")
+	node.logger.Debug("Close XMLRPC listener")
 	node.xmlrpcListener.Close()
 	node.logger.Debug("Close XMLRPC done")
 	node.logger.Debug("Wait XMLRPC server shutdown")
