@@ -150,6 +150,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			if err != nil {
 				logger.Warn(sub.topic, " : ", err)
 			}
+			sub.shutdownChan <- struct{}{}
 			return
 		}
 	}
@@ -318,6 +319,7 @@ func setDifference(lhs []string, rhs []string) []string {
 
 func (sub *defaultSubscriber) Shutdown() {
 	sub.shutdownChan <- struct{}{}
+	<-sub.shutdownChan
 }
 
 func (sub *defaultSubscriber) GetNumPublishers() int {

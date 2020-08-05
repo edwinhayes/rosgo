@@ -112,6 +112,7 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 				s.quitChan <- struct{}{}
 				delete(pub.sessions, id)
 			}
+			pub.shutdownChan <- struct{}{}
 			return
 		}
 	}
@@ -165,6 +166,7 @@ func (pub *defaultPublisher) GetNumSubscribers() int {
 
 func (pub *defaultPublisher) Shutdown() {
 	pub.shutdownChan <- struct{}{}
+	<-pub.shutdownChan
 }
 
 func (pub *defaultPublisher) hostAndPort() (string, string, error) {
