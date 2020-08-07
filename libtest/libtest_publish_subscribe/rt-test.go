@@ -21,7 +21,7 @@ func callback(msg *std_msgs.String, event ros.MessageEvent) {
 
 //onConnect callback to run on publisher startup
 func onConnect(pub ros.SingleSubscriberPublisher) {
-	if pub.GetTopic() != "/rosgomessage" {
+	if pub.GetTopic() != "/rosgomessage" && pub.GetTopic() != "/ns/rosgomessage" {
 		message = "onConnect"
 	}
 	m.Data = "First Subscriber"
@@ -31,7 +31,7 @@ func onConnect(pub ros.SingleSubscriberPublisher) {
 
 //onDisconnect callback to run on publisher shutdown
 func onDisconnect(pub ros.SingleSubscriberPublisher) {
-	if pub.GetTopic() != "/rosgomessage" {
+	if pub.GetTopic() != "/rosgomessage" && pub.GetTopic() != "/ns/rosgomessage" {
 		message = "onDisconnect"
 	} else {
 		message = ""
@@ -57,6 +57,7 @@ func rTTest_NoNamespace(t *testing.T) {
 	defer node.Shutdown()
 
 	subscription = 1
+	message = ""
 
 	for node.OK() {
 		_ = node.SpinOnce()
@@ -117,6 +118,7 @@ func rTTest_Namespace(t *testing.T) {
 	defer node.Shutdown()
 
 	subscription = 1
+	message = ""
 
 	for node.OK() {
 		_ = node.SpinOnce()
@@ -151,7 +153,7 @@ func rTTest_Namespace(t *testing.T) {
 
 			} else if message == "Second Subscriber" {
 				//Second subscription worked
-				if eventname == "/rosgo" {
+				if eventname == "/ns/rosgo" {
 					return
 				}
 				t.Error("Wrong message event", eventname)
