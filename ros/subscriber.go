@@ -221,6 +221,12 @@ dial:
 		logger.Error("Incompatible message type for ", topic, ": ", resHeaderMap["type"], ":", msgType, " ", resHeaderMap["md5sum"], ":", md5sum)
 		return
 	}
+
+	// Some incomplete TCPROS implementations do not include topic name in response
+	if resHeaderMap["topic"] == "" {
+		resHeaderMap["topic"] = topic
+	}
+
 	logger.Debug(topic, " : Start receiving messages...")
 	event := MessageEvent{ // Event struct to be sent with each message.
 		PublisherName:    resHeaderMap["callerid"],
