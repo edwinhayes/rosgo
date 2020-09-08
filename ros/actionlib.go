@@ -26,7 +26,7 @@ func NewServerGoalHandlerWithGoalId(as ActionServer, goalID ActionGoalID) Server
 
 type ActionClient interface {
 	WaitForServer(timeout Duration) bool
-	SendGoal(goal Message, transitionCallback interface{}, feedbackCallback interface{}) (ClientGoalHandler, error)
+	SendGoal(goal Message, transitionCallback interface{}, feedbackCallback interface{}, goalID string) (ClientGoalHandler, error)
 	CancelAllGoals()
 	CancelAllGoalsBeforeTime(stamp Time)
 }
@@ -42,7 +42,7 @@ type ActionServer interface {
 }
 
 type SimpleActionClient interface {
-	SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) error
+	SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}, goalID string) error
 	SendGoalAndWait(goal Message, executeTimeout, preeptTimeout Duration) (uint8, error)
 	WaitForServer(timeout Duration) bool
 	WaitForResult(timeout Duration) bool
