@@ -93,11 +93,12 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 		goalid.SetStamp(Now())
 		goalid.SetID(goalID)
 	}
-
+	logger.Infof("goalid = %+v", goalid)
 	// set the action goal fields
 	ag.SetGoal(goal)
 	ag.SetGoalId(goalid)
 	ag.SetHeader(NewActionHeader())
+	logger.Infof("ag = %+v", ag)
 
 	// publish the goal to the action server
 	err := ac.PublishActionGoal(ag)
