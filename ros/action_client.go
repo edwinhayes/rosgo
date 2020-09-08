@@ -86,6 +86,7 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
 
 	// If goalID not provided, generate ID using time stamp and node name.
+	logger.Infof("goalID = %+v", goalID)
 	if goalID == "" {
 		goalid.SetStamp(Now())
 		goalid.SetID(ac.goalIDGen.generateID())
