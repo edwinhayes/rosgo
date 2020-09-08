@@ -90,6 +90,7 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 		goalid.SetStamp(Now())
 		goalid.SetID(ac.goalIDGen.generateID())
 	} else {
+		goalid.SetStamp(Now())
 		goalid.SetID(goalID)
 	}
 
