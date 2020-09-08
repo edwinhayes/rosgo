@@ -217,6 +217,11 @@ func (gh *clientGoalHandler) updateStatus(statusArr ActionStatusArray) error {
 		return nil
 	}
 
+	// Log error message if action has been rejected.
+	if status.GetStatus() == 5 {
+		logger.Errorf("action with GoalID: %v, has been rejected - status: %v, %v", status.GetGoalID(), status.GetStatus(), status.GetStatusText())
+	}
+
 	gh.stateMachine.setGoalStatus(status.GetGoalID(), status.GetStatus(), status.GetStatusText())
 	nextStates, err := gh.stateMachine.getTransitions(status)
 	if err != nil {
