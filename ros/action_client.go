@@ -287,11 +287,12 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, eve
 
 	// Interface to status array conversion
 	statusArray := NewActionStatusArrayType().(*DynamicActionStatusArrayType).NewStatusArrayFromInterface(statusArr)
-
+	logger.Errorf("statusArray here = %+v", statusArray)
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
 		if err := h.updateStatus(statusArray); err != nil {
 			logger.Error(err)
 		}
 	}
+	logger.Errorf("statusArray now = %+v", statusArray)
 }
