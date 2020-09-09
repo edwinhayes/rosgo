@@ -84,7 +84,8 @@ func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 	s.newGoalPreemptRequest = false
 
 	// set the status of the current goal to be active
-	s.currentGoal.SetAccepted("This goal has been accepted by the simple action server")
+	//s.currentGoal.SetAccepted("This goal has been accepted by the simple action server")
+	s.currentGoal.Setrejected("Testing rejected functionality")
 
 	return s.currentGoal.GetGoal(), nil
 }
