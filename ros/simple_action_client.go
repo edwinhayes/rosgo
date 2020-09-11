@@ -38,14 +38,14 @@ func newSimpleActionClient(node Node, action string, actionType ActionType) (*si
 	}, nil
 }
 
-func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}) error {
+func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackCb interface{}, goalID string) error {
 	sc.StopTrackingGoal()
 	sc.doneCb = doneCb
 	sc.activeCb = activeCb
 	sc.feedbackCb = feedbackCb
 
 	sc.setSimpleState(SimpleStatePending)
-	gh, err := sc.ac.SendGoal(goal, sc.transitionHandler, sc.feedbackHandler)
+	gh, err := sc.ac.SendGoal(goal, sc.transitionHandler, sc.feedbackHandler, goalID)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (sc *simpleActionClient) SendGoal(goal Message, doneCb, activeCb, feedbackC
 
 func (sc *simpleActionClient) SendGoalAndWait(goal Message, executeTimeout, preeptTimeout Duration) (uint8, error) {
 	logger := *sc.logger
-	sc.SendGoal(goal, nil, nil, nil)
+	sc.SendGoal(goal, nil, nil, nil, "")
 	if !sc.WaitForResult(executeTimeout) {
 		logger.Debug("Cancelling goal")
 		sc.CancelGoal()

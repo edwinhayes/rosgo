@@ -73,7 +73,7 @@ func newDefaultActionClient(node Node, action string, actType ActionType) (*defa
 	return ac, nil
 }
 
-func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb interface{}) (ClientGoalHandler, error) {
+func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb interface{}, goalID string) (ClientGoalHandler, error) {
 	logger := *ac.logger
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to send a goal on an inactive ActionClient")
@@ -84,8 +84,15 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 
 	// make a goalId message with timestamp and generated id
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
-	goalid.SetStamp(Now())
-	goalid.SetID(ac.goalIDGen.generateID())
+
+	// If goalID not provided, generate ID using time stamp and node name.
+	if goalID == "" {
+		goalid.SetStamp(Now())
+		goalid.SetID(ac.goalIDGen.generateID())
+	} else {
+		goalid.SetStamp(Now())
+		goalid.SetID(goalID)
+	}
 
 	// set the action goal fields
 	ag.SetGoal(goal)
@@ -280,7 +287,6 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, eve
 
 	// Interface to status array conversion
 	statusArray := NewActionStatusArrayType().(*DynamicActionStatusArrayType).NewStatusArrayFromInterface(statusArr)
-
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
 		if err := h.updateStatus(statusArray); err != nil {

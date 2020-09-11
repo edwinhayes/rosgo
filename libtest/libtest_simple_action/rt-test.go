@@ -57,7 +57,7 @@ func (fc *ActionClient) doneCb(state uint8, result *ros.DynamicMessage) {
 
 // ActionClient send goal function used to send a goal to simple action server
 func (fc *ActionClient) sendGoal(goal *ros.DynamicMessage) error {
-	err := fc.ac.SendGoal(goal, fc.doneCb, fc.activeCb, fc.feedbackCb)
+	err := fc.ac.SendGoal(goal, fc.doneCb, fc.activeCb, fc.feedbackCb, "")
 	if err != nil {
 		return err
 	}
