@@ -40,7 +40,7 @@ func RTTest(t *testing.T) {
 	exampleMsg := "geometry_msgs/Twist::map[angular:geometry_msgs/Vector3::map[x:1.00000 y:2.00000 z:3.00000] linear:geometry_msgs/Vector3::map[x:1.00000 y:2.00000 z:3.00000]]"
 
 	//Example schema
-	exampleSchema := `{"$id":"/ros/testy","$schema":"https://json-schema.org/draft-07/schema#","properties":{"x":{"title":"/ros/testy/x","type":"number"},"y":{"title":"/ros/testy/y","type":"number"},"z":{"title":"/ros/testy/z","type":"number"}},"title":"/ros/testy","type":"object"}`
+	exampleSchema := `{"$id":"/ros/testy","$schema":"https://json-schema.org/draft-07/schema#","properties":{"x":{"type":"number"},"y":{"type":"number"},"z":{"type":"number"}},"type":"object"}`
 	//Generating a schema for geometry_msgs/Vector3 on topic chatty
 	schema, err := nestedMsgType.GenerateJSONSchema("/ros/", "testy")
 	if err != nil {
