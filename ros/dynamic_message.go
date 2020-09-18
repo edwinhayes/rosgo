@@ -682,8 +682,8 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				return errors.New("Field: " + field.Name + ": No data found.")
 			}
 
-			if reflect.ValueOf(array).Kind() == reflect.Ptr {
-				return errors.New("array is a pointer")
+			if (reflect.ValueOf(array).Kind() != reflect.Array) && (reflect.ValueOf(array).Kind() != reflect.Slice) {
+				return errors.New("Field: " + field.Name + ": expected an array.")
 			}
 
 			// If the array is not a fixed length, it begins with a declaration of the array size.
