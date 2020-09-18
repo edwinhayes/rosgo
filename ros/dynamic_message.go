@@ -210,7 +210,6 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 	properties := make(map[string]interface{})
 	schemaItems := make(map[string]interface{})
 	schemaItems["type"] = "object"
-	schemaItems["title"] = topic
 	schemaItems["properties"] = properties
 
 	// Iterate over each of the fields in the message.
@@ -221,12 +220,10 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 			properties[field.Name] = propertyContent
 
 			if field.GoType == "uint8" {
-				propertyContent["title"] = topic + Sep + field.Name
 				propertyContent["type"] = "string"
 			} else {
 				// Arrays all have a type of 'array', regardless of that the hold, then the 'item' keyword determines what type goes in the array.
 				propertyContent["type"] = "array"
-				propertyContent["title"] = topic + Sep + field.Name
 				arrayItems := make(map[string]interface{})
 				propertyContent["items"] = arrayItems
 
@@ -236,14 +233,14 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 						arrayItems["type"] = "string"
 					} else if field.Type == "time" {
 						timeItems := make(map[string]interface{})
-						timeItems["sec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "sec"}
-						timeItems["nsec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "nsec"}
+						timeItems["sec"] = map[string]string{"type": "integer"}
+						timeItems["nsec"] = map[string]string{"type": "integer"}
 						arrayItems["type"] = "object"
 						arrayItems["properties"] = timeItems
 					} else if field.Type == "duration" {
 						timeItems := make(map[string]interface{})
-						timeItems["sec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "sec"}
-						timeItems["nsec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "nsec"}
+						timeItems["sec"] = map[string]string{"type": "integer"}
+						timeItems["nsec"] = map[string]string{"type": "integer"}
 						arrayItems["type"] = "object"
 						arrayItems["properties"] = timeItems
 					} else {
@@ -285,20 +282,19 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 			if field.IsBuiltin {
 				propertyContent := make(map[string]interface{})
 				properties[field.Name] = propertyContent
-				propertyContent["title"] = topic + Sep + field.Name
 
 				if field.Type == "string" {
 					propertyContent["type"] = "string"
 				} else if field.Type == "time" {
 					timeItems := make(map[string]interface{})
-					timeItems["sec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "sec"}
-					timeItems["nsec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "nsec"}
+					timeItems["sec"] = map[string]string{"type": "integer"}
+					timeItems["nsec"] = map[string]string{"type": "integer"}
 					propertyContent["type"] = "object"
 					propertyContent["properties"] = timeItems
 				} else if field.Type == "duration" {
 					timeItems := make(map[string]interface{})
-					timeItems["sec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "sec"}
-					timeItems["nsec"] = map[string]string{"type": "integer", "title": topic + Sep + field.Name + Sep + "nsec"}
+					timeItems["sec"] = map[string]string{"type": "integer"}
+					timeItems["nsec"] = map[string]string{"type": "integer"}
 					propertyContent["type"] = "object"
 					propertyContent["properties"] = timeItems
 				} else {
