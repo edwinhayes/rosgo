@@ -89,10 +89,15 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
 					sub.connections[pub] = quitChan
+					name, err := sub.msgType.Name()
+					if err != nil {
+						logger.Errorf("error finding ros name, err: %v", err)
+						continue
+					}
 					go startRemotePublisherConn(log,
 						uri, sub.topic,
 						sub.msgType.MD5Sum(),
-						sub.msgType.Name(), nodeID,
+						name, nodeID,
 						sub.msgChan,
 						quitChan,
 						sub.disconnectedChan,

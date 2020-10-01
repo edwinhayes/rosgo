@@ -149,8 +149,11 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 //	DynamicMessageType
 
 // Name returns the full ROS name of the message type; required for ros.MessageType.
-func (t *DynamicMessageType) Name() string {
-	return t.spec.FullName
+func (t *DynamicMessageType) Name() (string, error) {
+	if t.spec == nil {
+		return "", errors.New("DynamicMessageType attiribute spec is a nil pointer")
+	}
+	return t.spec.FullName, nil
 }
 
 // Text returns the full ROS message specification for this message type; required for ros.MessageType.
@@ -173,8 +176,13 @@ func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
 	d := &DynamicMessage{}
 	d.dynamicType = t
-	var err error
-	d.data, err = zeroValueData(t.Name())
+
+	name, err := t.Name()
+	if err != nil {
+		return d
+	}
+
+	d.data, err = zeroValueData(name)
 	if err != nil {
 		return d
 	}
@@ -1344,7 +1352,8 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 func (m *DynamicMessage) String() string {
 	// Just print out the data!
-	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
+	name, _ := m.dynamicType.Name() // ignore error. If there's an error it will return "" for the name. Return this.
+	return fmt.Sprint(name, "::", m.data)
 }
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
