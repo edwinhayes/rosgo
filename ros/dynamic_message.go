@@ -177,8 +177,13 @@ func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	d := &DynamicMessage{}
 	d.dynamicType = t
 
+	name := t.Name()
+	if name == "" {
+		return d
+	}
+
 	var err error
-	d.data, err = zeroValueData(t.Name())
+	d.data, err = zeroValueData(name)
 	if err != nil {
 		return d
 	}
