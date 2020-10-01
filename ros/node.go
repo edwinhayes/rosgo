@@ -342,11 +342,7 @@ func (node *defaultNode) getSubscriptions(callerID string) (interface{}, error) 
 
 	result := []interface{}{}
 	for t, s := range node.subscribers {
-		name, err := s.msgType.Name()
-		if err != nil {
-			return nil, err
-		}
-		pair := []interface{}{t, name}
+		pair := []interface{}{t, s.msgType.Name()}
 		result = append(result, pair)
 	}
 	return buildRosAPIResult(APIStatusSuccess, "Success", result), nil
@@ -437,13 +433,9 @@ func (node *defaultNode) NewPublisherWithCallbacks(topic string, msgType Message
 	name := node.nameResolver.remap(topic)
 	pub, ok := node.publishers[topic]
 	if !ok {
-		msgName, err := msgType.Name()
-		if err != nil {
-			return nil, err
-		}
-		_, err = callRosAPI(node.masterURI, "registerPublisher",
+		_, err := callRosAPI(node.masterURI, "registerPublisher",
 			node.qualifiedName,
-			name, msgName,
+			name, msgType.Name(),
 			node.xmlrpcURI)
 		if err != nil {
 			node.logger.Errorf("Failed to call registerPublisher(): %s", err)
@@ -632,15 +624,11 @@ func (node *defaultNode) NewSubscriber(topic string, msgType MessageType, callba
 	name := node.nameResolver.remap(topic)
 	sub, ok := node.subscribers[name]
 	if !ok {
-		msgName, err := msgType.Name()
-		if err != nil {
-			return nil, err
-		}
 		node.logger.Debug("Call Master API registerSubscriber")
 		result, err := callRosAPI(node.masterURI, "registerSubscriber",
 			node.qualifiedName,
 			name,
-			msgName,
+			msgType.Name(),
 			node.xmlrpcURI)
 		if err != nil {
 			node.logger.Errorf("Failed to call registerSubscriber() for %s.", err)

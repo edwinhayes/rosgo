@@ -9,7 +9,7 @@ import (
 type MessageType interface {
 	Text() string
 	MD5Sum() string
-	Name() (string, error)
+	Name() string
 	NewMessage() Message
 }
 

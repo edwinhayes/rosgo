@@ -207,7 +207,7 @@ func newRemoteSubscriberSession(pub *defaultPublisher, id int, conn net.Conn) *r
 	session.topic = pub.topic
 	session.typeText = pub.msgType.Text()
 	session.md5sum = pub.msgType.MD5Sum()
-	session.typeName, _ = pub.msgType.Name()
+	session.typeName = pub.msgType.Name()
 	session.sizeBytesSent = 0
 	session.msgBytesSent = 0
 	session.numSent = 0
