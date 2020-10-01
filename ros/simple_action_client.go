@@ -216,7 +216,7 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 			result, err := gh.GetResult()
 			if err != nil {
-				logger.Errorf("[SimpleActionClient] Error getting result: %v", err)
+				logger.Errorf("[SimpleActionClient] Error getting result: %v; GoalStatus: %v", err, status)
 				break
 			}
 
