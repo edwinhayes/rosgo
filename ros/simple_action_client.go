@@ -165,7 +165,7 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 		logger.Errorf("Error getting CommState: %v", err)
 		return
 	}
-
+	logger.Infof("in transitionHandler with comm state %s and simple state %s with SimpleActionClient in NS %s", commState, sc.simpleState, sc.ac.node.Name())
 	errMsg := fmt.Errorf("received comm state %s when in simple state %d with SimpleActionClient in NS %s",
 		commState, sc.simpleState, sc.ac.node.Name())
 
