@@ -483,7 +483,13 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
-				m.data[goField.Name] = append(m.data[goField.Name].([]Message), msg)
+
+				if msgArray, ok := m.data[goField.Name].([]Message); !ok {
+					errors.Wrap(errors.New("unable to convert to []Message"), "Field: "+goField.Name)
+				} else {
+					m.data[goField.Name] = append(msgArray, msg)
+				}
+
 				//Store msg type
 				oldMsgType = newMsgType
 				//No error handling in array, see next comment
