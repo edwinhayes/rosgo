@@ -5,6 +5,7 @@ package ros
 import (
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/team-rocos/rosgo/libgengo"
 )
 
@@ -335,13 +336,39 @@ func (a *DynamicAction) GetActionResult() ActionResult { return a.Result }
 // Dynamic Action Goal Interface
 // Get and set functions of DynamicActionGoal interface
 func (m *DynamicActionGoal) SetGoal(goal Message) { m.Data()["goal"] = goal }
-func (m *DynamicActionGoal) GetGoal() Message     { return m.Data()["goal"].(*DynamicMessage) }
-func (m *DynamicActionGoal) GetGoalId() ActionGoalID {
-	return m.Data()["goal_id"].(*DynamicActionGoalID)
+
+func (m *DynamicActionGoal) GetGoal() (Message, error) {
+	if val, ok := m.Data()["goal"]; !ok {
+		return nil, errors.New("no element 'goal' in data map")
+	} else if dm, ok := val.(*DynamicMessage); !ok {
+		return nil, errors.New("unable to convert to *DynamicMessage")
+	} else {
+		return dm, nil
+	}
+}
+
+func (m *DynamicActionGoal) GetGoalId() (ActionGoalID, error) {
+	if val, ok := m.Data()["goal_id"]; !ok {
+		return nil, errors.New("no element 'goal_id' in data map")
+	} else if id, ok := val.(*DynamicActionGoalID); !ok {
+		return nil, errors.New("unable to convert to *DynamicActionGoalID")
+	} else {
+		return id, nil
+	}
 }
 func (m *DynamicActionGoal) SetGoalId(goalid ActionGoalID) { m.Data()["goal_id"] = goalid }
-func (m *DynamicActionGoal) GetHeader() Message            { return m.Data()["header"].(*DynamicMessage) }
-func (m *DynamicActionGoal) SetHeader(header Message)      { m.Data()["header"] = header }
+
+func (m *DynamicActionGoal) GetHeader() (Message, error) {
+	if val, ok := m.Data()["header"]; !ok {
+		return nil, errors.New("no element 'header' in data map")
+	} else if id, ok := val.(*DynamicMessage); !ok {
+		return nil, errors.New("unable to convert to *DynamicMessage")
+	} else {
+		return id, nil
+	}
+}
+
+func (m *DynamicActionGoal) SetHeader(header Message) { m.Data()["header"] = header }
 
 // Get and Set Functions of DynamicActionGoalID
 func (m *DynamicActionGoalID) GetID() string       { return m.Data()["id"].(string) }

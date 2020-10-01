@@ -184,7 +184,12 @@ func RTTest(t *testing.T) {
 
 	// Create a goal message for the client
 	goalMsg := actionType.GoalType().NewGoalMessage()
-	goal := goalMsg.GetGoal().(*ros.DynamicMessage)
+	goalRetrieved, err := goalMsg.GetGoal()
+	if err != nil {
+		t.Fatalf("failed to get goal: %v", err)
+	}
+
+	goal := goalRetrieved.(*ros.DynamicMessage)
 	goal.Data()["order"] = int32(5)
 
 	// Create a client and send the goal to the server

@@ -17,16 +17,23 @@ type clientGoalHandler struct {
 	logger       *modular.ModuleLogger
 }
 
-func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, feedbackCb interface{}) *clientGoalHandler {
-	return &clientGoalHandler{
+func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, feedbackCb interface{}) (*clientGoalHandler, error) {
+	id, err := ag.GetGoalId()
+	if err != nil {
+		return nil, err
+	}
+
+	gh := &clientGoalHandler{
 		actionClient: ac,
 		stateMachine: newClientStateMachine(),
 		actionGoal:   ag,
-		actionGoalID: ag.GetGoalId().GetID(),
+		actionGoalID: id.GetID(),
 		transitionCb: transitionCb,
 		feedbackCb:   feedbackCb,
 		logger:       ac.logger,
 	}
+
+	return gh, nil
 }
 
 func findGoalStatus(statusArr ActionStatusArray, id string) ActionStatus {

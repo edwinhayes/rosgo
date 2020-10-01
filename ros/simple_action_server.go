@@ -86,15 +86,29 @@ func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 	// set the status of the current goal to be active
 	s.currentGoal.SetAccepted("This goal has been accepted by the simple action server")
 
-	return s.currentGoal.GetGoal(), nil
+	return s.currentGoal.GetGoal()
 }
 
 func (s *simpleActionServer) IsActive() bool {
-	if s.currentGoal == nil || s.currentGoal.GetGoalId().GetID() == "" {
+	if s.currentGoal == nil {
+		return false
+	}
+	id, err := s.currentGoal.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting current goal id, err: %v", err)
+		return false
+	}
+	if id.GetID() == "" {
 		return false
 	}
 
-	status := s.currentGoal.GetGoalStatus().GetStatus()
+	st, err := s.currentGoal.GetGoalStatus()
+	if err != nil {
+		logger.Errorf("error getting current goal status, err: %v", err)
+		return false
+	}
+
+	status := st.GetStatus()
 	if status == uint8(1) || status == uint8(6) {
 		return true
 	}
@@ -163,20 +177,37 @@ func (s *simpleActionServer) RegisterPreemptCallback(cb interface{}) {
 func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 
 	logger := *s.logger
-	goalHandler := s.actionServer.getHandler(ag.GetGoalId().GetID())
-	logger.Infof("[SimpleActionServer] Server received new goal with id %s", goalHandler.GetGoalId().GetID())
+	agID, err := ag.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting ActionGoal goal id, err: %v", err)
+	}
+	goalHandler := s.actionServer.getHandler(agID.GetID())
+	ghID, err := goalHandler.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting ActionGoal goal id, err: %v", err)
+	}
+	logger.Infof("[SimpleActionServer] Server received new goal with id %s", ghID.GetID())
 
 	var goalStamp, nextGoalStamp Time
-	goalStamp = goalHandler.GetGoalId().GetStamp()
+	goalStamp = ghID.GetStamp()
 	if s.nextGoal != nil {
-		nextGoalStamp = s.nextGoal.GetGoalId().GetStamp()
+		nextID, err := s.nextGoal.GetGoalId()
+		if err != nil {
+			logger.Errorf("error getting next goal id, err: %v", err)
+		}
+		nextGoalStamp = nextID.GetStamp()
 	}
 
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
-	if (s.currentGoal == nil || goalStamp.Cmp(s.currentGoal.GetGoalId().GetStamp()) >= 0) &&
-		(s.nextGoal == nil || nextGoalStamp.Cmp(s.currentGoal.GetGoalId().GetStamp()) >= 0) {
+	currentID, err := s.currentGoal.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting current goal id, err: %v", err)
+	}
+
+	if (s.currentGoal == nil || goalStamp.Cmp(currentID.GetStamp()) >= 0) &&
+		(s.nextGoal == nil || nextGoalStamp.Cmp(currentID.GetStamp()) >= 0) {
 
 		if (s.nextGoal != nil) &&
 			(s.currentGoal == nil || s.nextGoal.NotEqual(s.currentGoal)) {
@@ -187,7 +218,10 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 		s.nextGoal = goalHandler
 		s.newGoal = true
 		s.newGoalPreemptRequest = false
-		goal := goalHandler.GetGoal()
+		goal, err := goalHandler.GetGoal()
+		if err != nil {
+			logger.Errorf("error getting goal, err: %v", err)
+		}
 		args := []reflect.Value{reflect.ValueOf(goal)}
 
 		if s.IsActive() {
@@ -219,12 +253,22 @@ func (s *simpleActionServer) internalPreemptCallback(gID ActionGoalID) {
 	logger := *s.logger
 
 	goalHandler := s.actionServer.getHandler(gID.GetID())
-	logger.Infof("[SimpleActionServer] Server received preempt call for goal with id %s",
-		goalHandler.GetGoalId().GetID())
+	ghID, err := goalHandler.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting goal id, err: %v", err)
+	}
+	logger.Infof("[SimpleActionServer] Server received preempt call for goal with id %s", ghID.GetID())
 
-	if goalHandler.GetGoalId().GetID() == s.currentGoal.GetGoalId().GetID() {
+	currentID, err := s.currentGoal.GetGoalId()
+	if err != nil {
+		logger.Errorf("error getting current goal id, err: %v", err)
+	}
+	if ghID.GetID() == currentID.GetID() {
 		s.preemptRequest = true
-		goal := goalHandler.GetGoal()
+		goal, err := goalHandler.GetGoal()
+		if err != nil {
+			logger.Errorf("error getting goal, err: %v", err)
+		}
 		args := []reflect.Value{reflect.ValueOf(goal)}
 		if err := s.runCallback("preempt", args); err != nil {
 			logger.Error(err)

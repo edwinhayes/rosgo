@@ -106,7 +106,10 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 	}
 
 	// create an internal handler to track this goal
-	handler := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
+	handler, err := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
+	if err != nil {
+		return nil, err
+	}
 
 	ac.handlersMutex.Lock()
 	ac.handlers = append(ac.handlers, handler)
