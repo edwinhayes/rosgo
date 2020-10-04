@@ -23,6 +23,8 @@ func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, 
 		return nil, err
 	}
 
+	fmt.Printf("newClientGoalHandler: id = %v, setting actionGoalID to: %v\n", id, id.GetID())
+
 	gh := &clientGoalHandler{
 		actionClient: ac,
 		stateMachine: newClientStateMachine(),
@@ -37,19 +39,19 @@ func newClientGoalHandler(ac *defaultActionClient, ag ActionGoal, transitionCb, 
 }
 
 func findGoalStatus(statusArr ActionStatusArray, id string) ActionStatus {
-	fmt.Printf("***** In findGoalStatus with id = %v *******", id)
+	fmt.Printf("***** In findGoalStatus with id = %v *******\n", id)
 	// Create a dynamic message for status message
 	var status ActionStatus
 	// loop through goal status array for matching status message
 	for _, st := range statusArr.GetStatusArray() {
 		goalID := st.GetGoalID()
-		fmt.Printf("goalID = %v", goalID)
+		fmt.Printf("goalID = %v\n", goalID)
 		if goalID.GetID() == id {
 			status = st
 			break
 		}
 	}
-	fmt.Printf("*********************************")
+	fmt.Printf("*********************************\n")
 	return status
 }
 
