@@ -77,7 +77,7 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 		logger.Debug("defaultPublisher.start loop")
 		select {
 		case msg := <-pub.msgChan:
-			logger.Debug("Receive msgChan")
+			logger.Debug("Receive msgChan - publisher.go - (pub *defaultPublisher) start(wg *sync.WaitGroup)")
 			for _, s := range pub.sessions {
 				session := s
 				session.msgChan <- msg
@@ -326,7 +326,7 @@ func (session *remoteSubscriberSession) start() {
 		//logger.Debug("session.remoteSubscriberSession")
 		select {
 		case msg := <-session.msgChan:
-			logger.Debug("Receive msgChan")
+			logger.Debug("Receive msgChan - publisher.go (session *remoteSubscriberSession) start()")
 			if len(queue) == queueMaxSize {
 				<-queue
 			}
