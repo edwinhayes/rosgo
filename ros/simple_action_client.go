@@ -180,12 +180,16 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
+		default:
+			logger.Infof("[SimpleActionClient] default for Active commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Recalling:
 		switch sc.simpleState {
 		case SimpleStateActive, SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
+		default:
+			logger.Infof("[SimpleActionClient] default for Recalling commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Preempting:
@@ -196,6 +200,8 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
+		default:
+			logger.Infof("[SimpleActionClient] default for Preempting commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Done:
@@ -226,7 +232,12 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] received DONE twice")
+		default:
+			logger.Errorf("[SimpleActionClient] defaut for Done commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
+	default:
+		logger.Errorf("[SimpleActionClient] default case checking commState. commState = %v, simpleState = %v", commState, sc.simpleState)
+
 	}
 
 	if len(callbackType) > 0 {
