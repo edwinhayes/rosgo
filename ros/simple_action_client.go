@@ -121,6 +121,7 @@ func (sc *simpleActionClient) GetState() (uint8, error) {
 		return uint8(9), err
 	}
 
+	fmt.Printf("[SIMPLE_ACTION_CLIENT]: GetState() found raw status of %v\n", status)
 	if status == uint8(7) {
 		status = uint8(0)
 	} else if status == uint8(6) {
@@ -155,6 +156,7 @@ func (sc *simpleActionClient) CancelGoal() error {
 }
 
 func (sc *simpleActionClient) StopTrackingGoal() {
+	fmt.Printf("[SIMPLE_ACTION_CLIENT]: StopTrackingGoal is stopping this goal handler: %+v\n", sc.gh)
 	sc.gh = nil
 }
 

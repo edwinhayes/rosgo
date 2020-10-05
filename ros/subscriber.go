@@ -132,7 +132,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					numArgsNeeded := fun.Type().NumIn()
 					logger.Debugf("numArgsNeeded = %+v", numArgsNeeded)
 					if numArgsNeeded <= 2 {
-						logger.Debugf("numArgsNeeded less than 2 so calling callback")
+						logger.Debugf("numArgsNeeded <= 2 so calling callback")
 						fun.Call(args[0:numArgsNeeded])
 					}
 				}
