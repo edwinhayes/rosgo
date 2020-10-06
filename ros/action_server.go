@@ -135,11 +135,10 @@ func (as *defaultActionServer) Start() {
 			as.PublishStatus()
 
 		case <-as.statusPubChan:
-			status, err := as.getStatus()
+			arr, err := as.getStatus()
 			if err != nil {
 				logger.Errorf("failed to get action server status: %v", err)
 			} else {
-				arr := status
 				as.statusPub.Publish(arr)
 			}
 		}
