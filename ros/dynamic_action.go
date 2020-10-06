@@ -3,6 +3,7 @@ package ros
 // IMPORT REQUIRED PACKAGES.
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -74,12 +75,16 @@ func newDynamicActionTypeNested(typeName string, packageName string) (*DynamicAc
 	// Create an empty action type.
 	m := new(DynamicActionType)
 
-	// Create context for our ROS install.
-	c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
-	if err != nil {
-		return nil, err
+	fmt.Printf("[rosgo newDynamicActionTypeNested]: %s %s context = %+v\n", typeName, packageName, context)
+
+	if context == nil {
+		// Create context for our ROS install.
+		c, err := libgengo.NewPkgContext(strings.Split(GetRuntimePackagePath(), ":"))
+		if err != nil {
+			return nil, err
+		}
+		context = c
 	}
-	context = c
 
 	// We need to try to look up the full name, in case we've just been given a short name.
 	fullname := typeName
