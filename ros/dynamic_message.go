@@ -73,6 +73,7 @@ func GetRuntimePackagePath() string {
 	if rosPkgPath == "" {
 		rosPkgPath = os.Getenv("ROS_PACKAGE_PATH")
 	}
+	fmt.Printf("[rosgo GetRuntimePackagePath]: rosPkgPath = %s\n", rosPkgPath)
 	// All done.
 	return rosPkgPath
 }
@@ -102,7 +103,6 @@ func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
 	// Create an empty message type.
 	m := DynamicMessageType{}
-
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
