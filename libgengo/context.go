@@ -22,7 +22,6 @@ func isRosPackage(dir string) bool {
 			return true
 		}
 	}
-	fmt.Printf("[rosgo isRosPackage]: returning dir %s is NOT a ROS Package!\n", dir)
 	return false
 }
 
@@ -55,7 +54,6 @@ func findPackages(pkgType string, rosPkgPaths []string) (map[string]string, erro
 				basename := filepath.Base(p)
 				rootname := basename[:len(basename)-(len(pkgType)+1)] // This is chopping off the file extension.  Horribly.
 				fullname := pkgName + "/" + rootname
-				fmt.Printf("[rosgo findPackages]: adding %s to packages!!!!!!!\n", p)
 				pkgs[fullname] = p
 			}
 
@@ -108,21 +106,18 @@ type PkgContext struct {
 func NewPkgContext(rosPkgPaths []string) (*PkgContext, error) {
 	ctx := new(PkgContext)
 	msgs, err := FindAllMessages(rosPkgPaths)
-	fmt.Printf("[rosgo NewPkgContext]: msgs = %+v\n", msgs)
 	if err != nil {
 		return nil, err
 	}
 	ctx.msgPathMap = msgs
 
 	srvs, err := FindAllServices(rosPkgPaths)
-	fmt.Printf("[rosgo NewPkgContext]: srvs = %+v\n", srvs)
 	if err != nil {
 		return nil, err
 	}
 	ctx.srvPathMap = srvs
 
 	acts, err := FindAllActions(rosPkgPaths)
-	fmt.Printf("[rosgo NewPkgContext]: acts = %+v\n", acts)
 	if err != nil {
 		return nil, err
 	}

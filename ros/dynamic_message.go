@@ -73,7 +73,6 @@ func GetRuntimePackagePath() string {
 	if rosPkgPath == "" {
 		rosPkgPath = os.Getenv("ROS_PACKAGE_PATH")
 	}
-	fmt.Printf("[rosgo GetRuntimePackagePath]: rosPkgPath = %s\n", rosPkgPath)
 	// All done.
 	return rosPkgPath
 }
