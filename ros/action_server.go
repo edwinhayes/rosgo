@@ -273,6 +273,7 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 			st, err := gh.GetGoalStatus()
 			if err != nil {
 				logger.Errorf("failed to get goal status from goal handler, err: %v", err)
+				return err
 			}
 			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.GetID(), st.GetStatus())
 			if st.GetStatus() == uint8(7) {

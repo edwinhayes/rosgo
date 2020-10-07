@@ -185,11 +185,13 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	agID, err := ag.GetGoalId()
 	if err != nil {
 		logger.Errorf("error getting ActionGoal goal id, err: %v", err)
+		return
 	}
 	goalHandler := s.actionServer.getHandler(agID.GetID())
 	ghID, err := goalHandler.GetGoalId()
 	if err != nil {
 		logger.Errorf("error getting ActionGoal goal id, err: %v", err)
+		return
 	}
 	logger.Debugf("[SimpleActionServer] Server received new goal with id %s", ghID.GetID())
 
@@ -199,6 +201,7 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 		nextID, err := s.nextGoal.GetGoalId()
 		if err != nil {
 			logger.Errorf("error getting next goal id, err: %v", err)
+			return
 		}
 		nextGoalStamp = nextID.GetStamp()
 	}
@@ -209,6 +212,7 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	currentID, err := s.currentGoal.GetGoalId()
 	if err != nil {
 		logger.Errorf("error getting current goal id, err: %v", err)
+		return
 	}
 
 	if (s.currentGoal == nil || goalStamp.Cmp(currentID.GetStamp()) >= 0) &&
@@ -226,6 +230,7 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 		goal, err := goalHandler.GetGoal()
 		if err != nil {
 			logger.Errorf("error getting goal, err: %v", err)
+			return
 		}
 		args := []reflect.Value{reflect.ValueOf(goal)}
 
@@ -233,18 +238,20 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 			s.preemptRequest = true
 			if err := s.runCallback("preempt", args); err != nil {
 				logger.Error(err)
+				return
 			}
 		}
 
 		if err := s.runCallback("goal", args); err != nil {
 			logger.Error(err)
+			return
 		}
 
 		// notify executor that a new goal is available
 		select {
 		case s.executorCh <- struct{}{}:
 		default:
-			logger.Error("[SimpleActionServer] Exectuor new goal notification error: Channel full.")
+			logger.Error("[SimpleActionServer] Executor new goal notification error: Channel full.")
 		}
 	} else {
 		goalHandler.SetCancelled(s.GetDefaultResult(),
