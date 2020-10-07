@@ -305,9 +305,10 @@ func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, eve
 		logger.Info("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
 	}
 
+	logger.Infof("statusArr = %+v", statusArr)
 	// Interface to status array conversion
 	statusArray := NewActionStatusArrayType().(*DynamicActionStatusArrayType).NewStatusArrayFromInterface(statusArr)
-	logger.Info("updating statusArray to %+v", statusArray)
+	logger.Infof("updating statusArray to %+v", statusArray)
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
 		if err := h.updateStatus(statusArray); err != nil {
