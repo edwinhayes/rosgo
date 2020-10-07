@@ -124,7 +124,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
 	}
-	logger.Debugf("*************IMPORTANT: [rosgo CancelAllGoals(): cancelling all goals!!!***********************")
+	logger.Info("*************IMPORTANT: [rosgo CancelAllGoals(): cancelling all goals!!!***********************")
 	// Create a goal id message
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	ac.cancelPub.Publish(goalid)
@@ -132,6 +132,8 @@ func (ac *defaultActionClient) CancelAllGoals() {
 
 func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 	logger := *ac.logger
+	logger.Info("*************IMPORTANT: [rosgo CancelAllGoalsBaforeTime(): cancelling all goals before!!!***********************")
+	// Create a goal id message
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
@@ -145,6 +147,9 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 // Shutdown client ends an action client and its pub/subs, but keeps the node alive
 // Takes a set of current active subscription booleans as to not remove any subscribers that the node is consuming
 func (ac *defaultActionClient) ShutdownClient(status bool, feedback bool, result bool) {
+	logger := *ac.logger
+	logger.Info("*************IMPORTANT: [rosgo] ShutdownClient()***********************")
+	// Create a goal id message
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
 
@@ -171,6 +176,8 @@ func (ac *defaultActionClient) ShutdownClient(status bool, feedback bool, result
 
 // Shutdown completely ends a client and its associated node
 func (ac *defaultActionClient) Shutdown() {
+	logger := *ac.logger
+	logger.Info("*************IMPORTANT: [rosgo] Shutdown()***********************")
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
 
@@ -184,19 +191,22 @@ func (ac *defaultActionClient) Shutdown() {
 }
 
 func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) error {
+	logger := *ac.logger
+	logger.Infof("publishing action goal %+v", ag)
 	if ac.started {
 		err := ac.goalPub.TryPublish(ag)
 		if err != nil {
 			return err
 		}
 		return nil
-	} else {
-		return errors.New("action client not started")
 	}
 
+	return errors.New("action client not started")
 }
 
 func (ac *defaultActionClient) PublishCancel(cancel *DynamicMessage) {
+	logger := *ac.logger
+	logger.Info("*************IMPORTANT: [rosgo] PublishCancel()***********************")
 	if ac.started {
 		ac.cancelPub.Publish(cancel)
 	}
@@ -235,6 +245,8 @@ LOOP:
 }
 
 func (ac *defaultActionClient) DeleteGoalHandler(gh *clientGoalHandler) {
+	logger := *ac.logger
+	logger.Info("*************IMPORTANT: [rosgo] DeleteGoalHandler()***********************")
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
 
@@ -250,6 +262,7 @@ func (ac *defaultActionClient) DeleteGoalHandler(gh *clientGoalHandler) {
 // Internal Result Callback for Result subscriber
 func (ac *defaultActionClient) internalResultCallback(result interface{}, event MessageEvent) {
 	logger := *ac.logger
+	logger.Info("internalResultCallback")
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
@@ -265,6 +278,8 @@ func (ac *defaultActionClient) internalResultCallback(result interface{}, event 
 
 // Itnernal Feedback Callback for Feedback subscriber
 func (ac *defaultActionClient) internalFeedbackCallback(feedback interface{}, event MessageEvent) {
+	logger := *ac.logger
+	logger.Info("internalFeedbackCallback")
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
@@ -279,18 +294,20 @@ func (ac *defaultActionClient) internalFeedbackCallback(feedback interface{}, ev
 // Internal Status Callback for status subscriber
 func (ac *defaultActionClient) internalStatusCallback(statusArr interface{}, event MessageEvent) {
 	logger := *ac.logger
+	logger.Info("internalStatusCallback")
 	ac.handlersMutex.RLock()
 	defer ac.handlersMutex.RUnlock()
 
 	if !ac.statusReceived {
 		ac.statusReceived = true
-		logger.Debug("Recieved first status message from action server ")
+		logger.Info("Recieved first status message from action server ")
 	} else if ac.callerID != event.PublisherName {
-		logger.Debug("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
+		logger.Info("Previously received status from %s, now from %s. Did the action server change", ac.callerID, event.PublisherName)
 	}
 
 	// Interface to status array conversion
 	statusArray := NewActionStatusArrayType().(*DynamicActionStatusArrayType).NewStatusArrayFromInterface(statusArr)
+	logger.Info("updating statusArray to %+v", statusArray)
 	ac.callerID = event.PublisherName
 	for _, h := range ac.handlers {
 		if err := h.updateStatus(statusArray); err != nil {
