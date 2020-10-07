@@ -47,9 +47,9 @@ type Action interface {
 
 type ActionGoal interface {
 	Message
-	GetHeader() Message
-	GetGoalId() ActionGoalID
-	GetGoal() Message
+	GetHeader() (Message, error)
+	GetGoalId() (ActionGoalID, error)
+	GetGoal() (Message, error)
 	SetHeader(Message)
 	SetGoalId(ActionGoalID)
 	SetGoal(Message)

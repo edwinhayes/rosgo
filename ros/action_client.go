@@ -104,9 +104,12 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to publish action goal")
 	}
-
+	logger.Debugf("action goal with id: %s published successfully", goalID)
 	// create an internal handler to track this goal
-	handler := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
+	handler, err := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
+	if err != nil {
+		return nil, err
+	}
 
 	ac.handlersMutex.Lock()
 	ac.handlers = append(ac.handlers, handler)
@@ -121,6 +124,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
 	}
+
 	// Create a goal id message
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	ac.cancelPub.Publish(goalid)
@@ -128,6 +132,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 
 func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 	logger := *ac.logger
+	// Create a goal id message
 	if !ac.started {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
@@ -141,6 +146,7 @@ func (ac *defaultActionClient) CancelAllGoalsBeforeTime(stamp Time) {
 // Shutdown client ends an action client and its pub/subs, but keeps the node alive
 // Takes a set of current active subscription booleans as to not remove any subscribers that the node is consuming
 func (ac *defaultActionClient) ShutdownClient(status bool, feedback bool, result bool) {
+	// Create a goal id message
 	ac.handlersMutex.Lock()
 	defer ac.handlersMutex.Unlock()
 
@@ -186,10 +192,9 @@ func (ac *defaultActionClient) PublishActionGoal(ag ActionGoal) error {
 			return err
 		}
 		return nil
-	} else {
-		return errors.New("action client not started")
 	}
 
+	return errors.New("action client not started")
 }
 
 func (ac *defaultActionClient) PublishCancel(cancel *DynamicMessage) {

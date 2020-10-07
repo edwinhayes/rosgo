@@ -16,7 +16,7 @@ func NewSimpleActionServer(node Node, action string, actionType ActionType, exec
 	return newSimpleActionServer(node, action, actionType, executeCb, autoStart)
 }
 
-func NewServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) ServerGoalHandler {
+func NewServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) (ServerGoalHandler, error) {
 	return newServerGoalHandlerWithGoal(as, goal)
 }
 
@@ -90,12 +90,12 @@ type ServerGoalHandler interface {
 	SetSucceeded(Message, string) error
 	SetCancelRequested() bool
 	PublishFeedback(Message)
-	GetGoal() Message
-	GetGoalId() ActionGoalID
-	GetGoalStatus() ActionStatus
+	GetGoal() (Message, error)
+	GetGoalId() (ActionGoalID, error)
+	GetGoalStatus() (ActionStatus, error)
 	Equal(ServerGoalHandler) bool
 	NotEqual(ServerGoalHandler) bool
-	Hash() uint32
+	Hash() (uint32, error)
 	GetHandlerDestructionTime() Time
 	SetHandlerDestructionTime(Time)
 }

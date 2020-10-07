@@ -158,21 +158,22 @@ func RTTest(t *testing.T) {
 	// Create a client node
 	clientNode, err := ros.NewNode("test_fibonacci_client", os.Args)
 	if err != nil {
-		t.Fatalf("could not create client node: %s", err)
+		t.Errorf("could not create client node: %s", err)
+		return
 	}
 	defer clientNode.Shutdown()
 
 	// Create a server node
 	serverNode, err := ros.NewNode("test_fibonacci_server", os.Args)
 	if err != nil {
-		t.Fatalf("could not create server node: %s", err)
+		t.Errorf("could not create server node: %s", err)
 	}
 	defer serverNode.Shutdown()
 
 	// Create a dynamic action type
 	actionType, err := ros.NewDynamicActionType("actionlib_tutorials/Fibonacci")
 	if err != nil {
-		t.Fatalf("could not create action type: %s", err)
+		t.Errorf("could not create action type: %s", err)
 	}
 
 	// Create a new action server
@@ -184,17 +185,22 @@ func RTTest(t *testing.T) {
 
 	// Create a goal message for the client
 	goalMsg := actionType.GoalType().NewGoalMessage()
-	goal := goalMsg.GetGoal().(*ros.DynamicMessage)
+	goalRetrieved, err := goalMsg.GetGoal()
+	if err != nil {
+		t.Errorf("failed to get goal: %v", err)
+	}
+
+	goal := goalRetrieved.(*ros.DynamicMessage)
 	goal.Data()["order"] = int32(5)
 
 	// Create a client and send the goal to the server
 	fc, err := newActionClient(clientNode, "fibonacci", actionType)
 	if err != nil {
-		t.Fatalf("failed to create action client: %v", err)
+		t.Errorf("failed to create action client: %v", err)
 	}
 	err = fc.sendGoal(goal)
 	if err != nil {
-		t.Fatalf("failed to send action goal: %v", err)
+		t.Errorf("failed to send action goal: %v", err)
 	}
 
 	// Spin the client node

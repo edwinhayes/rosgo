@@ -165,7 +165,7 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 		logger.Errorf("Error getting CommState: %v", err)
 		return
 	}
-
+	logger.Debugf("transitionHandler received comm state %s when in simple state %s with SimpleActionClient in NS %s", commState, sc.simpleState, sc.ac.node.Name())
 	errMsg := fmt.Errorf("received comm state %s when in simple state %d with SimpleActionClient in NS %s",
 		commState, sc.simpleState, sc.ac.node.Name())
 
@@ -213,10 +213,9 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 				logger.Errorf("[SimpleActionClient] Error getting status: %v", err)
 				break
 			}
-
 			result, err := gh.GetResult()
 			if err != nil {
-				logger.Errorf("[SimpleActionClient] Error getting result: %v", err)
+				logger.Errorf("[SimpleActionClient] Error getting result: %v; GoalStatus: %v", err, status)
 				break
 			}
 

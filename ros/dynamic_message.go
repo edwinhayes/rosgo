@@ -102,7 +102,6 @@ func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
 	// Create an empty message type.
 	m := DynamicMessageType{}
-
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
@@ -150,6 +149,9 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 
 // Name returns the full ROS name of the message type; required for ros.MessageType.
 func (t *DynamicMessageType) Name() string {
+	if t.spec == nil {
+		return ""
+	}
 	return t.spec.FullName
 }
 
@@ -173,8 +175,14 @@ func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
 	d := &DynamicMessage{}
 	d.dynamicType = t
+
+	name := t.Name()
+	if name == "" {
+		return d
+	}
+
 	var err error
-	d.data, err = zeroValueData(t.Name())
+	d.data, err = zeroValueData(name)
 	if err != nil {
 		return d
 	}
@@ -474,7 +482,13 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
-				m.data[goField.Name] = append(m.data[goField.Name].([]Message), msg)
+
+				if msgArray, ok := m.data[goField.Name].([]Message); !ok {
+					errors.Wrap(errors.New("unable to convert to []Message"), "Field: "+goField.Name)
+				} else {
+					m.data[goField.Name] = append(msgArray, msg)
+				}
+
 				//Store msg type
 				oldMsgType = newMsgType
 				//No error handling in array, see next comment

@@ -1,7 +1,6 @@
 package libtest_param
 
 import (
-	"log"
 	"os"
 	"testing"
 
@@ -64,7 +63,7 @@ func RTTest(t *testing.T) {
 	}
 
 	if err := node.DeleteParam("/test_param"); err != nil {
-		log.Fatalf("DeleteParam failed: %v", err)
+		t.Errorf("DeleteParam failed: %v", err)
 	}
 	return
 }

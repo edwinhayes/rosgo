@@ -77,7 +77,6 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 		logger.Debug("defaultPublisher.start loop")
 		select {
 		case msg := <-pub.msgChan:
-			logger.Debug("Receive msgChan")
 			for _, s := range pub.sessions {
 				session := s
 				session.msgChan <- msg

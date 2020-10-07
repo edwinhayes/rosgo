@@ -135,8 +135,12 @@ func (as *defaultActionServer) Start() {
 			as.PublishStatus()
 
 		case <-as.statusPubChan:
-			arr := as.getStatus()
-			as.statusPub.Publish(arr)
+			arr, err := as.getStatus()
+			if err != nil {
+				logger.Errorf("failed to get action server status: %v", err)
+			} else {
+				as.statusPub.Publish(arr)
+			}
 		}
 	}
 }
@@ -161,7 +165,7 @@ func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback Mes
 	as.feedbackPub.Publish(msg)
 }
 
-func (as *defaultActionServer) getStatus() ActionStatusArray {
+func (as *defaultActionServer) getStatus() (ActionStatusArray, error) {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 	var statusList []ActionStatus
@@ -170,13 +174,16 @@ func (as *defaultActionServer) getStatus() ActionStatusArray {
 		for id, gh := range as.handlers {
 			handlerTime := gh.GetHandlerDestructionTime()
 			destroyTime := handlerTime.Add(as.handlersTimeout)
-
 			if !handlerTime.IsZero() && destroyTime.Cmp(Now()) <= 0 {
 				delete(as.handlers, id)
 				continue
 			}
 
-			statusList = append(statusList, gh.GetGoalStatus())
+			status, err := gh.GetGoalStatus()
+			if err != nil {
+				return nil, err
+			}
+			statusList = append(statusList, status)
 		}
 	}
 	// Create a goal status array message
@@ -185,7 +192,7 @@ func (as *defaultActionServer) getStatus() ActionStatusArray {
 	// Add status list
 	statusArray.SetStatusArray(statusList)
 	statusArray.SetHeader(NewActionHeader())
-	return statusArray
+	return statusArray, nil
 }
 
 func (as *defaultActionServer) PublishStatus() {
@@ -209,7 +216,11 @@ func (as *defaultActionServer) internalCancelCallback(goalid interface{}, event 
 		cancelAll := (goalID.GetID() == "" && idStamp.IsZero())
 		cancelCurrent := (goalID.GetID() == id)
 
-		st := gh.GetGoalStatus()
+		st, err := gh.GetGoalStatus()
+		if err != nil {
+			logger.Errorf("unable to get goal status from goal handler, err: %v", err)
+			continue
+		}
 		statusStamp := st.GetGoalID().GetStamp()
 		cancelBeforeStamp := (!idStamp.IsZero() && statusStamp.Cmp(idStamp) <= 0)
 
@@ -244,7 +255,7 @@ func (as *defaultActionServer) internalCancelCallback(goalid interface{}, event 
 // internalGoalCallback recieves the goals from client and checks if
 // the goalID already exists in the status list. If not, it will call
 // server's goalCallback with goal that was recieved from the client.
-func (as *defaultActionServer) internalGoalCallback(goals interface{}, event MessageEvent) {
+func (as *defaultActionServer) internalGoalCallback(goals interface{}, event MessageEvent) error {
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 
@@ -252,11 +263,18 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 
 	// Convert interface to Message
 	goal := as.actionType.GoalType().(*DynamicActionGoalType).NewGoalMessageFromInterface(goals).(*DynamicActionGoal)
-	goalID := goal.GetGoalId()
+	goalID, err := goal.GetGoalId()
+	if err != nil {
+		return err
+	}
 
 	for id, gh := range as.handlers {
 		if goalID.GetID() == id {
-			st := gh.GetGoalStatus()
+			st, err := gh.GetGoalStatus()
+			if err != nil {
+				logger.Errorf("failed to get goal status from goal handler, err: %v", err)
+				return err
+			}
 			logger.Debugf("Goal %s was already in the status list with status %+v", goalID.GetID(), st.GetStatus())
 			if st.GetStatus() == uint8(7) {
 				st.SetStatus(uint8(8))
@@ -265,7 +283,7 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 			}
 
 			gh.SetHandlerDestructionTime(Now())
-			return
+			return nil
 		}
 	}
 
@@ -280,12 +298,15 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 		goal.SetGoalId(newGoalID)
 	}
 
-	gh := newServerGoalHandlerWithGoal(as, goal)
+	gh, err := newServerGoalHandlerWithGoal(as, goal)
+	if err != nil {
+		return err
+	}
 	as.handlers[id] = gh
 	stamp := goalID.GetStamp()
 	if !stamp.IsZero() && stamp.Cmp(as.lastCancel) <= 0 {
 		gh.SetCancelled(nil, "timestamp older than last goal cancel")
-		return
+		return nil
 	}
 
 	args := []reflect.Value{reflect.ValueOf(goal), reflect.ValueOf(event)}
@@ -295,6 +316,7 @@ func (as *defaultActionServer) internalGoalCallback(goals interface{}, event Mes
 	if numArgsNeeded <= 1 {
 		fun.Call(args[0:numArgsNeeded])
 	}
+	return nil
 }
 
 func (as *defaultActionServer) getHandler(id string) *serverGoalHandler {
