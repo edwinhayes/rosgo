@@ -3,7 +3,6 @@ package ros
 // IMPORT REQUIRED PACKAGES.
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -170,10 +169,8 @@ func (a *DynamicActionStatusArrayType) NewStatusArrayMessage() ActionStatusArray
 // Used where serialization/deserialization removes traces of action interface types from a message
 func (a *DynamicActionStatusArrayType) NewStatusArrayFromInterface(statusArr interface{}) ActionStatusArray {
 	statusArray := statusArr.(*DynamicMessage)
-	fmt.Printf("statusArry as *DynamicMessage = %+v\n", statusArray)
 	status := a.NewStatusArrayMessage().(*DynamicActionStatusArray)
 	statusMsgs := statusArray.Data()["status_list"].([]Message)
-	fmt.Printf("statusMsgs %+v\n", statusMsgs)
 	statusList := make([]ActionStatus, 0)
 	for _, statusMsg := range statusMsgs {
 		buildStatus := NewActionStatusType().NewStatusMessage()
@@ -186,7 +183,6 @@ func (a *DynamicActionStatusArrayType) NewStatusArrayFromInterface(statusArr int
 		buildStatus.SetStatusText(statusMsg.(*DynamicMessage).Data()["text"].(string))
 		statusList = append(statusList, buildStatus)
 	}
-	fmt.Printf("Setting statusList to: %+v\n", statusList)
 	status.SetStatusArray(statusList)
 	status.SetHeader(statusArray.Data()["header"].(Message))
 	return status

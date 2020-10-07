@@ -291,6 +291,7 @@ func (s *simpleActionServer) goalExecutor() {
 
 	for s.actionServer.node.OK() {
 		select {
+			logger.Info("in goalExecutor select loop")
 		case <-s.executorCh:
 			if err := s.execute(); err != nil {
 				logger.Error(err)
@@ -318,7 +319,7 @@ func (s *simpleActionServer) execute() error {
 			logger.Errorf("failed to accept new goal")
 			return err
 		}
-
+		logger.Info("goal accepted by simple action server")
 		if s.executeCb == nil {
 			return fmt.Errorf("execute callback must exist. This is a bug in SimpleActionServer")
 		}

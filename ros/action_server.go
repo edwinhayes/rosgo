@@ -110,6 +110,7 @@ func (as *defaultActionServer) initialize() error {
 
 func (as *defaultActionServer) Start() {
 	logger := *as.node.Logger()
+	logger.Info("defaultActionServer Start()!!!!!!!!!!!!!!!!!!!")
 	defer func() {
 		logger.Debug("defaultActionServer.start exit")
 		as.started = false
@@ -130,8 +131,10 @@ func (as *defaultActionServer) Start() {
 	for {
 		select {
 		case <-as.shutdownChan:
+			logger.Info("*********************** In Start() action_server.go, received on <-as.shutdownChan!!!!!!!!!!!!!!!! *****************")
 			return
 		case <-as.statusTimer.C:
+			logger.Info("*********************** In Start() action_server.go, statusTimer tick *****************")
 			as.PublishStatus()
 
 		case <-as.statusPubChan:
