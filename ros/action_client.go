@@ -104,7 +104,7 @@ func (ac *defaultActionClient) SendGoal(goal Message, transitionCb, feedbackCb i
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to publish action goal")
 	}
-
+	logger.Infof("action goal with id: %s published successfully", goalID)
 	// create an internal handler to track this goal
 	handler, err := newClientGoalHandler(ac, ag, transitionCb, feedbackCb)
 	if err != nil {

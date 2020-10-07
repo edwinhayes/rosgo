@@ -60,7 +60,7 @@ func (s *simpleActionServer) IsPreemptRequested() bool {
 
 func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 	logger := *s.logger
-	logger.Info("[SimpleActionServer] attemping to accept a new goal")
+	logger.Info("[SimpleActionServer] attempting to accept a new goal")
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
