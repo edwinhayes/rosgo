@@ -114,25 +114,17 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			copy(callbacks, sub.callbacks)
 			select {
 			case jobChan <- func() {
-				logger.Debug("jobChan <- func(){...}")
 				m := sub.msgType.NewMessage()
-				logger.Debugf("m = %+v", m)
 				reader := bytes.NewReader(msgEvent.bytes)
 				if err := m.Deserialize(reader); err != nil {
 					logger.Error(sub.topic, " : ", err)
 				}
-				logger.Debugf("reader = %+v", reader)
 				// TODO: Investigate this
 				args := []reflect.Value{reflect.ValueOf(m), reflect.ValueOf(msgEvent.event)}
-				logger.Debugf("args = %+v", args)
 				for _, callback := range callbacks {
-					logger.Debugf("callback = %+v", callback)
 					fun := reflect.ValueOf(callback)
-					logger.Debugf("fun = %+v", fun)
 					numArgsNeeded := fun.Type().NumIn()
-					logger.Debugf("numArgsNeeded = %+v", numArgsNeeded)
 					if numArgsNeeded <= 2 {
-						logger.Debugf("numArgsNeeded <= 2 so calling callback")
 						fun.Call(args[0:numArgsNeeded])
 					}
 				}

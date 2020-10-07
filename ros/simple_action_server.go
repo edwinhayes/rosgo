@@ -60,7 +60,6 @@ func (s *simpleActionServer) IsPreemptRequested() bool {
 
 func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 	logger := *s.logger
-	logger.Info("[SimpleActionServer] attempting to accept a new goal")
 	s.goalMutex.Lock()
 	defer s.goalMutex.Unlock()
 
@@ -90,7 +89,7 @@ func (s *simpleActionServer) AcceptNewGoal() (Message, error) {
 		logger.Errorf("failed to set accepted for action goal")
 		return nil, err
 	}
-	logger.Infof("goal accepted by the simple action server")
+	logger.Debug("goal accepted by the simple action server")
 
 	return s.currentGoal.GetGoal()
 }
@@ -192,7 +191,7 @@ func (s *simpleActionServer) internalGoalCallback(ag ActionGoal) {
 	if err != nil {
 		logger.Errorf("error getting ActionGoal goal id, err: %v", err)
 	}
-	logger.Infof("[SimpleActionServer] Server received new goal with id %s", ghID.GetID())
+	logger.Debugf("[SimpleActionServer] Server received new goal with id %s", ghID.GetID())
 
 	var goalStamp, nextGoalStamp Time
 	goalStamp = ghID.GetStamp()
@@ -318,7 +317,7 @@ func (s *simpleActionServer) execute() error {
 			logger.Errorf("failed to accept new goal")
 			return err
 		}
-		logger.Info("goal accepted by simple action server")
+		logger.Debug("goal accepted by simple action server")
 		if s.executeCb == nil {
 			return fmt.Errorf("execute callback must exist. This is a bug in SimpleActionServer")
 		}

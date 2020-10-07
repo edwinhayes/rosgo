@@ -218,7 +218,7 @@ func (gh *clientGoalHandler) updateStatus(statusArr ActionStatusArray) error {
 
 			logger.Warnf("Transitioning goal with actionGoalID: %v to `Lost`", gh.actionGoalID)
 			gh.stateMachine.setAsLost()
-			gh.stateMachine.transitionTo(Lost, gh, gh.transitionCb)
+			gh.stateMachine.transitionTo(Done, gh, gh.transitionCb)
 		}
 		return nil
 	}

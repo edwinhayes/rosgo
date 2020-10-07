@@ -77,14 +77,13 @@ func (pub *defaultPublisher) start(wg *sync.WaitGroup) {
 		logger.Debug("defaultPublisher.start loop")
 		select {
 		case msg := <-pub.msgChan:
-			logger.Info("Receive msgChan - publisher.go - (pub *defaultPublisher) start(wg *sync.WaitGroup)")
 			for _, s := range pub.sessions {
 				session := s
 				session.msgChan <- msg
 			}
 
 		case err := <-pub.listenerErrorChan:
-			logger.Infof("Listener closed unexpectedly: %s", err)
+			logger.Debugf("Listener closed unexpectedly: %s", err)
 			pub.listener.Close()
 			return
 
@@ -242,7 +241,7 @@ func (ssp *singleSubPub) GetTopic() string {
 
 func (session *remoteSubscriberSession) start() {
 	logger := *session.logger
-	logger.Info("remoteSubscriberSession.start enter")
+	logger.Debug("remoteSubscriberSession.start enter")
 
 	ssp := &singleSubPub{
 		topic:   session.topic,
@@ -251,7 +250,7 @@ func (session *remoteSubscriberSession) start() {
 	}
 
 	defer func() {
-		logger.Info("remoteSubscriberSession.start exit")
+		logger.Debug("remoteSubscriberSession.start exit")
 
 		if session.disconnectCallback != nil {
 			session.disconnectCallback(ssp)
@@ -280,7 +279,7 @@ func (session *remoteSubscriberSession) start() {
 	headerMap := make(map[string]string)
 	for _, h := range headers {
 		headerMap[h.key] = h.value
-		logger.Infof("  `%s` = `%s`", h.key, h.value)
+		logger.Debugf("  `%s` = `%s`", h.key, h.value)
 	}
 
 	if headerMap["type"] != session.typeName && headerMap["type"] != "*" {
@@ -319,31 +318,31 @@ func (session *remoteSubscriberSession) start() {
 	}
 
 	// 3. Start sending message
-	logger.Info("Start sending messages...")
+	logger.Debug("Start sending messages...")
 	queueMaxSize := 100
 	queue := make(chan []byte, queueMaxSize)
 	for {
 		//logger.Debug("session.remoteSubscriberSession")
 		select {
 		case msg := <-session.msgChan:
-			logger.Info("Receive msgChan - publisher.go (session *remoteSubscriberSession) start()")
+			logger.Debug("Receive msgChan")
 			if len(queue) == queueMaxSize {
 				<-queue
 			}
 			queue <- msg
 
 		case <-session.quitChan:
-			logger.Warn("Receive quitChan")
+			logger.Debug("Receive quitChan")
 			return
 
 		case msg := <-queue:
-			logger.Info("writing")
-			logger.Info(hex.EncodeToString(msg))
+			logger.Debug("writing")
+			logger.Debug(hex.EncodeToString(msg))
 			session.conn.SetDeadline(time.Now().Add(30 * time.Millisecond))
 			size := uint32(len(msg))
 			if err := binary.Write(session.conn, binary.LittleEndian, size); err != nil {
 				if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-					logger.Warn("timeout")
+					logger.Debug("timeout")
 					// TODO : Make this trigger a faster reconnect
 					return
 				} else {
@@ -355,14 +354,14 @@ func (session *remoteSubscriberSession) start() {
 			session.conn.SetDeadline(time.Now().Add(30 * time.Millisecond))
 			if _, err := session.conn.Write(msg); err != nil {
 				if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-					logger.Warn("timeout")
+					logger.Debug("timeout")
 					return
 				} else {
 					logger.Error(err)
 					return
 				}
 			}
-			logger.Info(hex.EncodeToString(msg))
+			logger.Debug(hex.EncodeToString(msg))
 		}
 	}
 }

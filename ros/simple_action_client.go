@@ -165,7 +165,7 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 		logger.Errorf("Error getting CommState: %v", err)
 		return
 	}
-	logger.Infof("in transitionHandler with comm state %s and simple state %s with SimpleActionClient in NS %s", commState, sc.simpleState, sc.ac.node.Name())
+	logger.Debugf("transitionHandler received comm state %s when in simple state %s with SimpleActionClient in NS %s", commState, sc.simpleState, sc.ac.node.Name())
 	errMsg := fmt.Errorf("received comm state %s when in simple state %d with SimpleActionClient in NS %s",
 		commState, sc.simpleState, sc.ac.node.Name())
 
@@ -180,16 +180,12 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
-		default:
-			logger.Infof("[SimpleActionClient] default for Active commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Recalling:
 		switch sc.simpleState {
 		case SimpleStateActive, SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
-		default:
-			logger.Infof("[SimpleActionClient] default for Recalling commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Preempting:
@@ -200,8 +196,6 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] %v", errMsg)
-		default:
-			logger.Infof("[SimpleActionClient] default for Preempting commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
 
 	case Done:
@@ -219,7 +213,6 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 				logger.Errorf("[SimpleActionClient] Error getting status: %v", err)
 				break
 			}
-			logger.Infof("[SimpleActionClient] Got goal status: %v", status)
 			result, err := gh.GetResult()
 			if err != nil {
 				logger.Errorf("[SimpleActionClient] Error getting result: %v; GoalStatus: %v", err, status)
@@ -232,12 +225,7 @@ func (sc *simpleActionClient) transitionHandler(gh ClientGoalHandler) {
 
 		case SimpleStateDone:
 			logger.Errorf("[SimpleActionClient] received DONE twice")
-		default:
-			logger.Errorf("[SimpleActionClient] defaut for Done commState: commState: %v, simpleState = %v", commState, sc.simpleState)
 		}
-	default:
-		logger.Errorf("[SimpleActionClient] default case checking commState. commState = %v, simpleState = %v", commState, sc.simpleState)
-
 	}
 
 	if len(callbackType) > 0 {
