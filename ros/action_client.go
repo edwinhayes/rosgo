@@ -124,6 +124,7 @@ func (ac *defaultActionClient) CancelAllGoals() {
 		logger.Error("[ActionClient] Trying to cancel goals on an inactive ActionClient")
 		return
 	}
+	logger.Debugf("*************IMPORTANT: [rosgo CancelAllGoals(): cancelling all goals!!!***********************")
 	// Create a goal id message
 	goalid := NewActionGoalIDType().NewGoalIDMessage()
 	ac.cancelPub.Publish(goalid)
