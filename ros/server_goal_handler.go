@@ -3,8 +3,9 @@ package ros
 import (
 	"fmt"
 	"hash/fnv"
-	"log"
 	"sync"
+
+	modular "github.com/edwinhayes/logrus-modular"
 )
 
 type serverGoalHandler struct {
@@ -13,6 +14,7 @@ type serverGoalHandler struct {
 	goal                   ActionGoal
 	handlerDestructionTime Time
 	handlerMutex           sync.RWMutex
+	logger                 *modular.ModuleLogger
 }
 
 func newServerGoalHandlerWithGoal(as ActionServer, goal ActionGoal) (*serverGoalHandler, error) {
@@ -117,13 +119,14 @@ func (gh *serverGoalHandler) SetAborted(result Message, text string) error {
 }
 
 func (gh *serverGoalHandler) SetSucceeded(result Message, text string) error {
+	logger := *gh.logger
 	if gh.goal == nil {
 		return fmt.Errorf("attempt to set handler on an uninitialized handler handler")
 	}
 
 	status, err := gh.sm.transition(Succeed, text)
 	if err != nil {
-		log.Errorf("to transition to an Succeeded state, the goal must be in a pending"+
+		logger.Errorf("to transition to an Succeeded state, the goal must be in a pending"+
 			"or recalling state, it is currently in state: %d", status.GetStatus())
 		return err
 	}
