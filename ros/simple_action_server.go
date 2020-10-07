@@ -291,7 +291,6 @@ func (s *simpleActionServer) goalExecutor() {
 
 	for s.actionServer.node.OK() {
 		select {
-			logger.Info("in goalExecutor select loop")
 		case <-s.executorCh:
 			if err := s.execute(); err != nil {
 				logger.Error(err)
