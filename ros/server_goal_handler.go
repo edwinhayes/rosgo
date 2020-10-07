@@ -170,6 +170,7 @@ func (gh *serverGoalHandler) GetGoalId() (ActionGoalID, error) {
 
 func (gh *serverGoalHandler) GetGoalStatus() (ActionStatus, error) {
 	status := gh.sm.getStatus()
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>> server_goal_handler >>>>>>>>>>>. status = %+v, gh.goal = %+v\n", status, gh.goal)
 	if status.GetStatus() != 0 && gh.goal != nil {
 		if id, err := gh.goal.GetGoalId(); err != nil {
 			return nil, err

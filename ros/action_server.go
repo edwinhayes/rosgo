@@ -135,7 +135,9 @@ func (as *defaultActionServer) Start() {
 			as.PublishStatus()
 
 		case <-as.statusPubChan:
+			logger.Info("*********************** In Start() action_server.go, received on <-as.statusPubChan *****************")
 			arr, err := as.getStatus()
+			logger.Infof("status array received = %+v", arr)
 			if err != nil {
 				logger.Errorf("failed to get action server status: %v", err)
 			} else {
@@ -166,6 +168,8 @@ func (as *defaultActionServer) PublishFeedback(status ActionStatus, feedback Mes
 }
 
 func (as *defaultActionServer) getStatus() (ActionStatusArray, error) {
+	logger := *as.node.Logger()
+
 	as.handlersMutex.Lock()
 	defer as.handlersMutex.Unlock()
 	var statusList []ActionStatus
@@ -174,8 +178,9 @@ func (as *defaultActionServer) getStatus() (ActionStatusArray, error) {
 		for id, gh := range as.handlers {
 			handlerTime := gh.GetHandlerDestructionTime()
 			destroyTime := handlerTime.Add(as.handlersTimeout)
-
+			logger.Infof("--------------------------------- action_server.go ---- gh id: %s, handlerTime: %+v, destroyTime: %+v", id, handlerTime, destroyTime)
 			if !handlerTime.IsZero() && destroyTime.Cmp(Now()) <= 0 {
+				logger.Warn("=================================== deleting as.handler due to handlerTime and destroyTime ===================================")
 				delete(as.handlers, id)
 				continue
 			}
