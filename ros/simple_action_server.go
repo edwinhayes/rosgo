@@ -317,7 +317,7 @@ func (s *simpleActionServer) execute() error {
 			logger.Errorf("failed to accept new goal")
 			return err
 		}
-		logger.Debug("goal accepted by simple action server")
+
 		if s.executeCb == nil {
 			return fmt.Errorf("execute callback must exist. This is a bug in SimpleActionServer")
 		}
