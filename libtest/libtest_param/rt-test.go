@@ -64,7 +64,7 @@ func RTTest(t *testing.T) {
 	}
 
 	if err := node.DeleteParam("/test_param"); err != nil {
-		log.Fatalf("DeleteParam failed: %v", err)
+		log.Errorf("DeleteParam failed: %v", err)
 	}
 	return
 }

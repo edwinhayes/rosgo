@@ -123,8 +123,9 @@ func (gh *serverGoalHandler) SetSucceeded(result Message, text string) error {
 
 	status, err := gh.sm.transition(Succeed, text)
 	if err != nil {
-		log.Fatalf("to transition to an Succeeded state, the goal must be in a pending"+
+		log.Errorf("to transition to an Succeeded state, the goal must be in a pending"+
 			"or recalling state, it is currently in state: %d", status.GetStatus())
+		return err
 	}
 
 	gh.SetHandlerDestructionTime(Now())
