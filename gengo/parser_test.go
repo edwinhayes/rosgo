@@ -191,7 +191,7 @@ func TestMD5_std_msgs(t *testing.T) {
 
 func TestMD5_sensor_msgs(t *testing.T) {
 	var sensor_msgs = map[string]string{
-		"sensor_msgs/BatteryState":       "476f837fa6771f6e16e3bf4ef96f8770",
+		"sensor_msgs/BatteryState":       "4ddae7f048e32fda22cac764685e3974",
 		"sensor_msgs/CameraInfo":         "c9a58c1b0b154e0e6da7578cb991d214",
 		"sensor_msgs/ChannelFloat32":     "3d40139cdd33dfedcb71ffeeeb42ae7f",
 		"sensor_msgs/CompressedImage":    "8f7a12909da2c9d3332d540a0977563f",
