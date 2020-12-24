@@ -2,6 +2,7 @@ package ros
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -67,7 +68,7 @@ func TestRemoteConnects(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go startRemotePublisherConn(
+	go newStartRemotePublisherConn(
 		&log,
 		pubURI,
 		topic,
@@ -135,6 +136,58 @@ func TestRemoteConnects(t *testing.T) {
 	}
 }
 
+func TestClosesFromSignal(t *testing.T) {
+	logger := modular.NewRootLogger(logrus.New())
+
+	topic := "/test/topic"
+	nodeID := "testNode"
+	msgChan := make(chan messageEvent)
+	quitChan := make(chan struct{})
+	disconnectedChan := make(chan string)
+	msgType := testMessageType{}
+
+	log := logger.GetModuleLogger()
+
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+
+	pubURI := l.Addr().String()
+
+	go newStartRemotePublisherConn(
+		&log,
+		pubURI,
+		topic,
+		msgType.MD5Sum(),
+		msgType.Name(),
+		nodeID,
+		msgChan,
+		quitChan,
+		disconnectedChan,
+		msgType,
+	)
+
+	conn := connectToSubscriber(t, l, topic, msgType)
+	defer conn.Close()
+
+	// Signal to close
+	quitChan <- struct{}{}
+
+	// Check that buffer closed
+	buffer := make([]byte, 1)
+	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
+	_, err = conn.Read(buffer)
+
+	if err != io.EOF {
+		t.Fatalf("Expected subscriber to close connection")
+	}
+
+	conn.Close()
+	l.Close()
+}
+
 func TestRemoteReceivesData(t *testing.T) {
 	logger := modular.NewRootLogger(logrus.New())
 
@@ -155,7 +208,7 @@ func TestRemoteReceivesData(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go startRemotePublisherConn(
+	go newStartRemotePublisherConn(
 		&log,
 		pubURI,
 		topic,
@@ -201,8 +254,8 @@ func TestRemoteReceivesData(t *testing.T) {
 	conn.Close()
 	l.Close()
 	select {
-	case <-disconnectedChan:
-		t.Log(disconnectedChan)
+	case channelName := <-disconnectedChan:
+		t.Log(channelName)
 		return
 	case <-time.After(time.Duration(100) * time.Millisecond):
 		t.Fatalf("Took too long for client to disconnect from publisher")

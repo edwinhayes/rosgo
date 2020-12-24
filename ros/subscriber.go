@@ -189,6 +189,7 @@ dial:
 			logger.Error(topic, " : Failed to connect to ", pubURI, "- error: ", err)
 			return
 		}
+		defer conn.Close()
 	}
 
 	// 1. Write connection header
@@ -306,6 +307,16 @@ dial:
 		}
 	}
 
+}
+
+func newStartRemotePublisherConn(log *modular.ModuleLogger,
+	pubURI string, topic string, md5sum string,
+	msgType string, nodeID string,
+	msgChan chan messageEvent,
+	quitChan chan struct{},
+	disconnectedChan chan string, msgTypeProper MessageType) {
+	sub := newDefaultSubscription(log, pubURI, topic, md5sum, msgType, nodeID, msgChan, quitChan, disconnectedChan, msgTypeProper)
+	sub.start()
 }
 
 func setDifference(lhs []string, rhs []string) []string {

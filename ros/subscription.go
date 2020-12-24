@@ -78,7 +78,14 @@ func (s *defaultSubscription) start() {
 
 	for {
 		// Connect
-		s.connectToPublisher(&conn)
+		if s.connectToPublisher(&conn) == false {
+			if conn != nil {
+				conn.Close()
+			}
+			logger.Debug(s.topic, " : Connection closed, reconnecting with publisher")
+			return
+		}
+		defer conn.Close() // Make sure we close this
 
 		// Reading from publisher
 		connectionState := s.readFromPublisher(conn)
