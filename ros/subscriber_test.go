@@ -48,7 +48,7 @@ func (t testMessage) Deserialize(buf *bytes.Reader) error {
 	return nil
 }
 
-func TestRemoteConnects(t *testing.T) {
+func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 	logger := modular.NewRootLogger(logrus.New())
 
 	topic := "/test/topic"
@@ -136,7 +136,7 @@ func TestRemoteConnects(t *testing.T) {
 	}
 }
 
-func TestClosesFromSignal(t *testing.T) {
+func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 	logger := modular.NewRootLogger(logrus.New())
 
 	topic := "/test/topic"
@@ -188,7 +188,7 @@ func TestClosesFromSignal(t *testing.T) {
 	l.Close()
 }
 
-func TestRemoteReceivesData(t *testing.T) {
+func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 	logger := modular.NewRootLogger(logrus.New())
 
 	topic := "/test/topic"
@@ -224,32 +224,11 @@ func TestRemoteReceivesData(t *testing.T) {
 	conn := connectToSubscriber(t, l, topic, msgType)
 	defer conn.Close()
 
-	// Size = 2 bytes
-	n, err := conn.Write([]byte{0x02, 0x00, 0x00, 0x00})
-	if n != 4 || err != nil {
-		t.Fatalf("Failed to write message size, n: %d : err: %s", n, err)
-	}
-	n, err = conn.Write([]byte{0x34, 0x12}) // payload
-	if n != 2 || err != nil {
-		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
-	}
+	// Send something!
+	sendMessageAndReceiveInChannel(t, conn, msgChan, []byte{0x12, 0x23})
 
-	select {
-	case message := <-msgChan:
-
-		if message.event.PublisherName != "testPublisher" {
-			t.Fatalf("Published with the wrong publisher name: %s", message.event.PublisherName)
-		}
-		if len(message.bytes) != 2 {
-			t.Fatalf("Payload size is incorrect: %d", len(message.bytes))
-		}
-		if message.bytes[0] != 0x34 || message.bytes[1] != 0x12 {
-			t.Fatalf("Published the wrong payload: %x:02 %x:02", message.bytes[0], message.bytes[1])
-		}
-		return
-	case <-time.After(time.Duration(100) * time.Millisecond):
-		t.Fatalf("Took too long for client to disconnect from publisher")
-	}
+	// Send another one!
+	sendMessageAndReceiveInChannel(t, conn, msgChan, []byte{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8})
 
 	conn.Close()
 	l.Close()
@@ -287,4 +266,39 @@ func connectToSubscriber(t *testing.T, l net.Listener, topic string, msgType tes
 	}
 
 	return conn
+}
+
+func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
+	if len(buffer) > 255 {
+		t.Fatalf("sendMessageAndReceiveInChannel helper doesn't support more than 255 bytes!")
+	}
+
+	length := uint8(len(buffer))
+	n, err := conn.Write([]byte{length, 0x00, 0x00, 0x00})
+	if n != 4 || err != nil {
+		t.Fatalf("Failed to write message size, n: %d : err: %s", n, err)
+	}
+	n, err = conn.Write(buffer) // payload
+	if n != len(buffer) || err != nil {
+		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
+	}
+
+	select {
+	case message := <-msgChan:
+
+		if message.event.PublisherName != "testPublisher" {
+			t.Fatalf("Published with the wrong publisher name: %s", message.event.PublisherName)
+		}
+		if len(message.bytes) != len(buffer) {
+			t.Fatalf("Payload size is incorrect: %d, expected: %d", len(message.bytes), len(buffer))
+		}
+		for i := 1; i < len(buffer); i++ {
+			if message.bytes[i] != buffer[i] {
+				t.Fatalf("message.bytes[%d] = %x, expected %x", i, message.bytes[i], buffer[i])
+			}
+		}
+		return
+	case <-time.After(time.Duration(500) * time.Millisecond):
+		t.Fatalf("Did not receive message from channel")
+	}
 }

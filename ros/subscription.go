@@ -82,7 +82,7 @@ func (s *defaultSubscription) start() {
 			if conn != nil {
 				conn.Close()
 			}
-			logger.Debug(s.topic, " : Connection closed, reconnecting with publisher")
+			logger.Info(s.topic, " : Could not connect to publisher, closing connection")
 			return
 		}
 		defer conn.Close() // Make sure we close this
