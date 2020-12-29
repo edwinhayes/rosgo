@@ -15,21 +15,25 @@ type messageEvent struct {
 	event MessageEvent
 }
 
-// The subscriber object runs in own goroutine (start).
+type subscriptionChannels struct {
+	quit           chan struct{}
+	enableMessages chan bool
+}
+
+// The subscription object runs in own goroutine (startSubscription).
 // Do not access any properties from other goroutine.
 type defaultSubscriber struct {
-	topic            string
-	msgType          MessageType
-	pubList          []string
-	pubListChan      chan []string
-	msgChan          chan messageEvent
-	callbacks        []interface{}
-	addCallbackChan  chan interface{}
-	shutdownChan     chan struct{}
-	connections      map[string]chan struct{}
-	uri2pub          map[string]string
-	enableMessages   map[string]chan bool
-	disconnectedChan chan string
+	topic             string
+	msgType           MessageType
+	pubList           []string
+	pubListChan       chan []string
+	msgChan           chan messageEvent
+	callbacks         []interface{}
+	addCallbackChan   chan interface{}
+	shutdownChan      chan struct{}
+	subscriptionChans map[string]subscriptionChannels
+	uri2pub           map[string]string
+	disconnectedChan  chan string
 }
 
 func newDefaultSubscriber(topic string, msgType MessageType, callback interface{}) *defaultSubscriber {
@@ -41,9 +45,8 @@ func newDefaultSubscriber(topic string, msgType MessageType, callback interface{
 	sub.addCallbackChan = make(chan interface{}, 10)
 	sub.shutdownChan = make(chan struct{}, 10)
 	sub.disconnectedChan = make(chan string, 10)
-	sub.connections = make(map[string]chan struct{})
 	sub.uri2pub = make(map[string]string)
-	sub.enableMessages = make(map[string]chan bool)
+	sub.subscriptionChans = make(map[string]subscriptionChannels)
 	sub.callbacks = []interface{}{callback}
 	return sub
 }
@@ -65,11 +68,9 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			sub.pubList = list
 
 			for _, pub := range deadPubs {
-				quitChan := sub.connections[pub]
-				quitChan <- struct{}{}
-				// TODO: this cleanup is repeated... let's collect this somewhere
-				delete(sub.connections, pub)
-				delete(sub.enableMessages, pub)
+				deadSubscription := sub.subscriptionChans[pub]
+				deadSubscription.quit <- struct{}{}
+				delete(sub.subscriptionChans, pub)
 			}
 
 			for _, pub := range newPubs {
@@ -92,9 +93,8 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
 					enableMessagesChan := make(chan bool, 10)
-					sub.connections[pub] = quitChan
 					sub.uri2pub[uri] = pub
-					sub.enableMessages[pub] = enableMessagesChan
+					sub.subscriptionChans[pub] = subscriptionChannels{quit: quitChan, enableMessages: enableMessagesChan}
 					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, enableMessagesChan, quitChan, sub.disconnectedChan)
 				} else {
 					logger.Warn(sub.topic, " : rosgo does not support protocol: ", name)
@@ -137,16 +137,15 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 		// TODO: Pretty sus on this implementation - need to check this in tests
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
-			delete(sub.connections, sub.uri2pub[pubURI])
+			delete(sub.subscriptionChans, sub.uri2pub[pubURI])
 			delete(sub.uri2pub, pubURI)
-			delete(sub.enableMessages, pubURI)
 
 		case <-sub.shutdownChan:
 			// Shutdown subscription goroutine
 			logger.Debug(sub.topic, " : Receive shutdownChan")
-			for _, closeChan := range sub.connections {
-				closeChan <- struct{}{}
-				close(closeChan)
+			for _, closeChan := range sub.subscriptionChans {
+				closeChan.quit <- struct{}{}
+				close(closeChan.quit)
 			}
 			_, err := callRosAPI(masterURI, "unregisterSubscriber", nodeID, sub.topic, nodeAPIURI)
 			if err != nil {
@@ -156,8 +155,8 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			return
 
 		case enabled := <-enableChan:
-			for _, ch := range sub.enableMessages {
-				ch <- enabled
+			for _, subscription := range sub.subscriptionChans {
+				subscription.enableMessages <- enabled
 			}
 		}
 	}
