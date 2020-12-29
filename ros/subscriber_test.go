@@ -13,31 +13,11 @@ import (
 // `subscriber_test.go` uses `testMessageType` and `testMessage` defined in `subscription_test.go`.
 
 func TestRemotePublisherConn_DoesConnect(t *testing.T) {
-	logger := modular.NewRootLogger(logrus.New())
-
 	topic := "/test/topic"
-	nodeID := "testNode"
-	msgChan := make(chan messageEvent)
-	quitChan := make(chan struct{})
-	disconnectedChan := make(chan string)
 	msgType := testMessageType{}
 
-	log := logger.GetModuleLogger()
-
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	l, conn, _, _, _, disconnectedChan := setupRemotePublisherConnTest(t)
 	defer l.Close()
-
-	pubURI := l.Addr().String()
-
-	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
-
-	conn, err := l.Accept()
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer conn.Close()
 
 	readAndVerifySubscriberHeader(t, conn, topic, msgType) // Test helper from subscription_test.go.
@@ -49,7 +29,7 @@ func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 		{"callerid", "testPublisher"},
 	}
 
-	err = writeConnectionHeader(replyHeader, conn)
+	err := writeConnectionHeader(replyHeader, conn)
 	if err != nil {
 		t.Fatalf("Failed to write header: %s", replyHeader)
 	}
@@ -65,29 +45,11 @@ func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 }
 
 func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
-	logger := modular.NewRootLogger(logrus.New())
 
-	topic := "/test/topic"
-	nodeID := "testNode"
-	msgChan := make(chan messageEvent)
-	quitChan := make(chan struct{})
-	disconnectedChan := make(chan string)
-	msgType := testMessageType{}
-
-	log := logger.GetModuleLogger()
-
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	l, conn, _, _, quitChan, _ := setupRemotePublisherConnTest(t)
 	defer l.Close()
 
-	pubURI := l.Addr().String()
-
-	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
-
-	conn := connectToSubscriber(t, l, topic, msgType)
-	defer conn.Close()
+	connectToSubscriber(t, conn)
 
 	// Signal to close.
 	quitChan <- struct{}{}
@@ -95,7 +57,7 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 	// Check that buffer closed.
 	buffer := make([]byte, 1)
 	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
-	_, err = conn.Read(buffer)
+	_, err := conn.Read(buffer)
 
 	if err != io.EOF {
 		t.Fatalf("Expected subscriber to close connection")
@@ -106,29 +68,12 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 }
 
 func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
-	logger := modular.NewRootLogger(logrus.New())
 
-	topic := "/test/topic"
-	nodeID := "testNode"
-	msgChan := make(chan messageEvent)
-	quitChan := make(chan struct{})
-	disconnectedChan := make(chan string)
-	msgType := testMessageType{}
-
-	log := logger.GetModuleLogger()
-
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	l, conn, msgChan, _, _, disconnectedChan := setupRemotePublisherConnTest(t)
 	defer l.Close()
-
-	pubURI := l.Addr().String()
-
-	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
-
-	conn := connectToSubscriber(t, l, topic, msgType)
 	defer conn.Close()
+
+	connectToSubscriber(t, conn)
 
 	// Send something!
 	sendMessageAndReceiveInChannel(t, conn, msgChan, []byte{0x12, 0x23})
@@ -147,13 +92,45 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 	}
 }
 
-func connectToSubscriber(t *testing.T, l net.Listener, topic string, msgType MessageType) net.Conn {
+//
+// Setup, establishes all init values and kicks off the start function
+//
+func setupRemotePublisherConnTest(t *testing.T) (net.Listener, net.Conn, chan messageEvent, chan bool,
+	chan struct{}, chan string) {
+	logger := modular.NewRootLogger(logrus.New())
+	topic := "/test/topic"
+	nodeID := "testNode"
+	msgChan := make(chan messageEvent, 1)
+	enableChan := make(chan bool, 1)
+	quitChan := make(chan struct{}, 1)
+	disconnectedChan := make(chan string, 1)
+	msgType := testMessageType{}
+
+	log := logger.GetModuleLogger()
+	log.SetLevel(logrus.InfoLevel)
+
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubURI := l.Addr().String()
+
+	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, enableChan, quitChan, disconnectedChan)
+
 	conn, err := l.Accept()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = readConnectionHeader(conn)
+	return l, conn, msgChan, enableChan, quitChan, disconnectedChan
+}
+
+func connectToSubscriber(t *testing.T, conn net.Conn) {
+	msgType := testMessageType{}
+	topic := "/test/topic"
+
+	_, err := readConnectionHeader(conn)
 
 	if err != nil {
 		t.Fatal("Failed to read header:", err)
@@ -170,8 +147,6 @@ func connectToSubscriber(t *testing.T, l net.Listener, topic string, msgType Mes
 	if err != nil {
 		t.Fatalf("Failed to write header: %s", replyHeader)
 	}
-
-	return conn
 }
 
 func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {

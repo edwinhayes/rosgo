@@ -345,13 +345,13 @@ func TestSubscription_RemoteReceivesData(t *testing.T) {
 
 	subscription.start(&log)
 
-	// conn, err := l.Accept()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	conn := connectToSubscriber(t, l, "topic", subscription.msgType)
+	conn, err := l.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer conn.Close()
+
+	connectToSubscriber(t, conn)
 
 	// Send something!
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
@@ -385,8 +385,13 @@ func TestSubscription_FlowControl(t *testing.T) {
 
 	subscription.start(&log)
 
-	conn := connectToSubscriber(t, l, subscription.topic, subscription.msgType)
+	conn, err := l.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer conn.Close()
+
+	connectToSubscriber(t, conn)
 
 	// Send something - channel enabled
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})

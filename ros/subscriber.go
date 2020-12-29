@@ -28,6 +28,7 @@ type defaultSubscriber struct {
 	shutdownChan     chan struct{}
 	connections      map[string]chan struct{}
 	uri2pub          map[string]string
+	enableMessages   map[string]chan bool
 	disconnectedChan chan string
 }
 
@@ -42,11 +43,12 @@ func newDefaultSubscriber(topic string, msgType MessageType, callback interface{
 	sub.disconnectedChan = make(chan string, 10)
 	sub.connections = make(map[string]chan struct{})
 	sub.uri2pub = make(map[string]string)
+	sub.enableMessages = make(map[string]chan bool)
 	sub.callbacks = []interface{}{callback}
 	return sub
 }
 
-func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIURI string, masterURI string, jobChan chan func(), log *modular.ModuleLogger) {
+func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIURI string, masterURI string, jobChan chan func(), enableChan chan bool, log *modular.ModuleLogger) {
 	logger := *log
 	logger.Debugf("Subscriber goroutine for %s started.", sub.topic)
 	wg.Add(1)
@@ -65,7 +67,9 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			for _, pub := range deadPubs {
 				quitChan := sub.connections[pub]
 				quitChan <- struct{}{}
+				// TODO: this cleanup is repeated... let's collect this somewhere
 				delete(sub.connections, pub)
+				delete(sub.enableMessages, pub)
 			}
 
 			for _, pub := range newPubs {
@@ -87,9 +91,11 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					port := protocolParams[2].(int32)
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
+					enableMessagesChan := make(chan bool, 10)
 					sub.connections[pub] = quitChan
 					sub.uri2pub[uri] = pub
-					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, quitChan, sub.disconnectedChan)
+					sub.enableMessages[pub] = enableMessagesChan
+					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, enableMessagesChan, quitChan, sub.disconnectedChan)
 				} else {
 					logger.Warn(sub.topic, " : rosgo does not support protocol: ", name)
 				}
@@ -128,10 +134,12 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			}
 			logger.Debug("Callback job enqueued.")
 
+		// TODO: Pretty sus on this implementation - need to check this in tests
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
 			delete(sub.connections, sub.uri2pub[pubURI])
 			delete(sub.uri2pub, pubURI)
+			delete(sub.enableMessages, pubURI)
 
 		case <-sub.shutdownChan:
 			// Shutdown subscription goroutine
@@ -146,6 +154,11 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			}
 			sub.shutdownChan <- struct{}{}
 			return
+
+		case enabled := <-enableChan:
+			for _, ch := range sub.enableMessages {
+				ch <- enabled
+			}
 		}
 	}
 }
@@ -154,10 +167,10 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 func startRemotePublisherConn(log *modular.ModuleLogger,
 	pubURI string, topic string, msgType MessageType, nodeID string,
 	msgChan chan messageEvent,
+	enableMessagesChan chan bool,
 	quitChan chan struct{},
 	disconnectedChan chan string) {
-	enableChan := make(chan bool)
-	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, enableChan, quitChan, disconnectedChan)
+	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, enableMessagesChan, quitChan, disconnectedChan)
 	sub.start(log)
 }
 
