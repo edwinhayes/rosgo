@@ -156,7 +156,8 @@ func startRemotePublisherConn(log *modular.ModuleLogger,
 	msgChan chan messageEvent,
 	quitChan chan struct{},
 	disconnectedChan chan string) {
-	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
+	enableChan := make(chan bool)
+	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, enableChan, quitChan, disconnectedChan)
 	sub.start(log)
 }
 

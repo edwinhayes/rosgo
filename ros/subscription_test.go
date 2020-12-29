@@ -330,7 +330,91 @@ func TestSubscription_NewSubscription_InvalidResponseHeader(t *testing.T) {
 	l.Close()
 }
 
-// Note: Subscription send/receive messages is tested in the RemotePublisherConn tests in `subscriber_test.go`.
+func TestSubscription_RemoteReceivesData(t *testing.T) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	pubURI := l.Addr().String()
+
+	subscription := getTestSubscription(pubURI)
+
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
+
+	// conn, err := l.Accept()
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	conn := connectToSubscriber(t, l, "topic", subscription.msgType)
+	defer conn.Close()
+
+	// Send something!
+	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
+
+	// Send another one!
+	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8})
+
+	conn.Close()
+	l.Close()
+	select {
+	case channelName := <-subscription.remoteDisconnectedChan:
+		t.Log(channelName)
+		return
+	case <-time.After(time.Duration(100) * time.Millisecond):
+		t.Fatalf("Took too long for client to disconnect from publisher")
+	}
+}
+
+func TestSubscription_FlowControl(t *testing.T) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	pubURI := l.Addr().String()
+
+	subscription := getTestSubscription(pubURI)
+
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
+
+	conn := connectToSubscriber(t, l, subscription.topic, subscription.msgType)
+	defer conn.Close()
+
+	// Send something - channel enabled
+	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
+
+	// Send something - channel disabled
+	subscription.enableChan <- false
+	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23})
+
+	// Send something - channel enabled
+	subscription.enableChan <- true
+	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
+	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23, 0x43})
+
+	// Send something - channel disabled
+	subscription.enableChan <- false
+	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23})
+	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23, 0x43})
+
+	conn.Close()
+	l.Close()
+	select {
+	case channelName := <-subscription.remoteDisconnectedChan:
+		t.Log(channelName)
+		return
+	case <-time.After(time.Duration(100) * time.Millisecond):
+		t.Fatalf("Took too long for client to disconnect from publisher")
+	}
+}
 
 // Private Helper functions.
 
@@ -342,11 +426,13 @@ func getTestSubscription(pubURI string) *defaultSubscription {
 	messageChan := make(chan messageEvent)
 	requestStopChan := make(chan struct{})
 	remoteDisconnectedChan := make(chan string)
+	enableChan := make(chan bool)
 	msgType := testMessageType{}
 
 	return newDefaultSubscription(
 		pubURI, topic, msgType, nodeID,
 		messageChan,
+		enableChan,
 		requestStopChan,
 		remoteDisconnectedChan)
 }
@@ -399,5 +485,30 @@ func writeAndVerifyPublisherHeader(t *testing.T, conn net.Conn, subscription *de
 		} else {
 			t.Fatalf("subscription did not store header data for %s", expected.key)
 		}
+	}
+}
+
+// Helpers
+
+func sendMessageNoReceive(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
+	if len(buffer) > 255 {
+		t.Fatalf("sendMessageAndReceiveInChannel helper doesn't support more than 255 bytes!")
+	}
+
+	length := uint8(len(buffer))
+	n, err := conn.Write([]byte{length, 0x00, 0x00, 0x00})
+	if n != 4 || err != nil {
+		t.Fatalf("Failed to write message size, n: %d : err: %s", n, err)
+	}
+	n, err = conn.Write(buffer) // payload
+	if n != len(buffer) || err != nil {
+		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
+	}
+
+	select {
+	case _ = <-msgChan:
+		t.Fatalf("Message channel sent bytes; should be disabled!")
+	case <-time.After(time.Duration(50) * time.Millisecond):
+		return
 	}
 }

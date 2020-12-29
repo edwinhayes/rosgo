@@ -147,7 +147,7 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 	}
 }
 
-func connectToSubscriber(t *testing.T, l net.Listener, topic string, msgType testMessageType) net.Conn {
+func connectToSubscriber(t *testing.T, l net.Listener, topic string, msgType MessageType) net.Conn {
 	conn, err := l.Accept()
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan me
 			}
 		}
 		return
-	case <-time.After(time.Duration(500) * time.Millisecond):
+	case <-time.After(time.Duration(10) * time.Millisecond):
 		t.Fatalf("Did not receive message from channel")
 	}
 }

@@ -17,6 +17,7 @@ type defaultSubscription struct {
 	msgType                MessageType
 	nodeID                 string
 	messageChan            chan messageEvent
+	enableChan             chan bool
 	requestStopChan        chan struct{} // Inbound signal for subscription to disconnect.
 	remoteDisconnectedChan chan string   // Outbound signal to indicate a disconnected channel.
 	event                  MessageEvent
@@ -27,6 +28,7 @@ type defaultSubscription struct {
 func newDefaultSubscription(
 	pubURI string, topic string, msgType MessageType, nodeID string,
 	messageChan chan messageEvent,
+	enableChan chan bool,
 	requestStopChan chan struct{},
 	remoteDisconnectedChan chan string) *defaultSubscription {
 
@@ -36,6 +38,7 @@ func newDefaultSubscription(
 		msgType:                msgType,
 		nodeID:                 nodeID,
 		messageChan:            messageChan,
+		enableChan:             enableChan,
 		requestStopChan:        requestStopChan,
 		remoteDisconnectedChan: remoteDisconnectedChan,
 		event:                  MessageEvent{"", time.Time{}, nil},
@@ -200,6 +203,7 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 
 // readFromPublisher maintains a connection with a publisher. When a connection is stable, it will loop until either the publisher or subscriber disconnects.
 func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailureMode {
+	enabled := true
 	readingSize := true
 	var msgSize int
 	var buffer []byte
@@ -210,6 +214,8 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 	// - Packages the tcp serial stream into messages and passes them through the message channel.
 	for {
 		select {
+		case enabled = <-s.enableChan:
+			continue
 		case <-s.requestStopChan:
 			return stopRequested
 		default:
@@ -230,11 +236,13 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 				buffer, result = s.readRawMessage(conn, msgSize)
 
 				if result == readOk {
-					s.event.ReceiptTime = time.Now()
-					select {
-					case s.messageChan <- messageEvent{bytes: buffer, event: s.event}:
-					case <-time.After(time.Duration(30) * time.Millisecond):
-						// Dropping message.
+					if enabled { // flow control!
+						s.event.ReceiptTime = time.Now()
+						select {
+						case s.messageChan <- messageEvent{bytes: buffer, event: s.event}:
+						case <-time.After(time.Duration(30) * time.Millisecond):
+							// Dropping message.
+						}
 					}
 					readingSize = true
 				}
