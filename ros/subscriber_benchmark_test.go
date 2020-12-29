@@ -33,39 +33,9 @@ func BenchmarkRemotePublisherConn_Throughput1Kb(b *testing.B) {
 	teardownRemotePublisherConnBenchmark(b, l, conn, disconnectedChan)
 }
 
-func BenchmarkRemotePublisherConn_NewThroughput1Kb(b *testing.B) {
-	l, conn, msgChan, disconnectedChan := setupRemotePublisherConnBenchmark(b, newStartRemotePublisherConn)
-	defer l.Close()
-	defer conn.Close()
-
-	buffer := make([]byte, 1000) // 1 kB of data
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		sendMessageAndReceiveInChannelWithB(b, conn, msgChan, buffer)
-	}
-
-	teardownRemotePublisherConnBenchmark(b, l, conn, disconnectedChan)
-}
-
 func BenchmarkRemotePublisherConn_Throughput1Mb(b *testing.B) {
 
 	l, conn, msgChan, disconnectedChan := setupRemotePublisherConnBenchmark(b, startRemotePublisherConn)
-	defer l.Close()
-	defer conn.Close()
-
-	buffer := make([]byte, 1000000) // 1 MB of data
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		sendMessageAndReceiveInChannelWithB(b, conn, msgChan, buffer)
-	}
-
-	teardownRemotePublisherConnBenchmark(b, l, conn, disconnectedChan)
-}
-
-func BenchmarkRemotePublisherConn_NewThroughput1Mb(b *testing.B) {
-	l, conn, msgChan, disconnectedChan := setupRemotePublisherConnBenchmark(b, newStartRemotePublisherConn)
 	defer l.Close()
 	defer conn.Close()
 

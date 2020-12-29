@@ -2,10 +2,7 @@ package ros
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
-	"net"
 	"reflect"
 	"sync"
 	"time"
@@ -160,156 +157,10 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 	}
 }
 
+//
+// Creates a subscription to a remote publisher and runs it
+//
 func startRemotePublisherConn(log *modular.ModuleLogger,
-	pubURI string, topic string, md5sum string,
-	msgType string, nodeID string,
-	msgChan chan messageEvent,
-	quitChan chan struct{},
-	disconnectedChan chan string, msgTypeProper MessageType) {
-
-	logger := *log
-	logger.Debug(topic, " : startRemotePublisherConn()")
-
-	defer func() {
-		logger.Debug(topic, " : startRemotePublisherConn() exit")
-	}()
-
-	// Dial loop for a subscriber
-dial:
-	var conn net.Conn
-	var err error
-
-	select {
-	case <-time.After(time.Duration(3000) * time.Millisecond):
-		logger.Error(topic, " : Failed to connect to ", pubURI, "timed out")
-		return
-	default:
-		conn, err = net.Dial("tcp", pubURI)
-		if err != nil {
-			logger.Error(topic, " : Failed to connect to ", pubURI, "- error: ", err)
-			return
-		}
-		defer conn.Close()
-	}
-
-	// 1. Write connection header
-	var headers []header
-	headers = append(headers, header{"topic", topic})
-	headers = append(headers, header{"md5sum", md5sum})
-	headers = append(headers, header{"type", msgType})
-	headers = append(headers, header{"callerid", nodeID})
-	logger.Debug(topic, " : TCPROS Connection Header")
-	for _, h := range headers {
-		logger.Debugf("          `%s` = `%s`", h.key, h.value)
-	}
-	err = writeConnectionHeader(headers, conn)
-	if err != nil {
-		logger.Error(topic, " : Failed to write connection header.")
-		return
-	}
-
-	// 2. Read reponse header
-	var resHeaders []header
-	resHeaders, err = readConnectionHeader(conn)
-	if err != nil {
-		logger.Error(topic, " : Failed to read response header.")
-		return
-	}
-	logger.Debug(topic, " : TCPROS Response Header:")
-	resHeaderMap := make(map[string]string)
-	for _, h := range resHeaders {
-		resHeaderMap[h.key] = h.value
-		logger.Debugf("          `%s` = `%s`", h.key, h.value)
-	}
-
-	if resHeaderMap["type"] != msgType || resHeaderMap["md5sum"] != md5sum {
-		logger.Error("Incompatible message type for ", topic, ": ", resHeaderMap["type"], ":", msgType, " ", resHeaderMap["md5sum"], ":", md5sum)
-		return
-	}
-
-	// Some incomplete TCPROS implementations do not include topic name in response
-	if resHeaderMap["topic"] == "" {
-		resHeaderMap["topic"] = topic
-	}
-
-	logger.Debug(topic, " : Start receiving messages...")
-	event := MessageEvent{ // Event struct to be sent with each message.
-		PublisherName:    resHeaderMap["callerid"],
-		ConnectionHeader: resHeaderMap,
-	}
-
-	// 3. Start reading messages
-	readingSize := true
-	var msgSize uint32
-	var buffer []byte
-	for {
-		select {
-		case <-quitChan:
-			return
-		default:
-			conn.SetDeadline(time.Now().Add(1000 * time.Millisecond))
-			if readingSize {
-				//logger.Debug("Reading message size...")
-				err := binary.Read(conn, binary.LittleEndian, &msgSize)
-				if err != nil {
-					if err == io.EOF {
-						logger.Infof("Publisher %s on topic %s disconnected", pubURI, topic)
-						disconnectedChan <- pubURI
-						return
-					}
-					if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-						// Timed out
-						//logger.Debug(neterr)
-						continue
-					} else {
-						logger.Error(topic, " : Failed to read a message size")
-						disconnectedChan <- pubURI
-						return
-					}
-				}
-				// Taking out the trash
-				if int(msgSize) < 256000000 {
-					buffer = make([]byte, int(msgSize))
-					readingSize = false
-				} else {
-					//logger.Debug("tcp cluttered - reconnecting")
-					conn.Close()
-					goto dial
-				}
-			} else {
-				//logger.Debug("Reading message body...")
-				_, err = io.ReadFull(conn, buffer)
-				if err != nil {
-					if err == io.EOF {
-						logger.Info("Publisher disconnected")
-						disconnectedChan <- pubURI
-						return
-					}
-					if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-						// Timed out
-						//logger.Debug(neterr)
-						conn.Close()
-						goto dial
-					} else {
-						logger.Error(topic, " : Failed to read a message body")
-						disconnectedChan <- pubURI
-						return
-					}
-				}
-				event.ReceiptTime = time.Now()
-				select {
-				case msgChan <- messageEvent{bytes: buffer, event: event}:
-				case <-time.After(time.Duration(30) * time.Millisecond):
-					//logger.Debug("dropping message")
-				}
-				readingSize = true
-			}
-		}
-	}
-
-}
-
-func newStartRemotePublisherConn(log *modular.ModuleLogger,
 	pubURI string, topic string, md5sum string,
 	msgType string, nodeID string,
 	msgChan chan messageEvent,

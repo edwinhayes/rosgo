@@ -68,7 +68,7 @@ func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go newStartRemotePublisherConn(
+	go startRemotePublisherConn(
 		&log,
 		pubURI,
 		topic,
@@ -156,7 +156,7 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go newStartRemotePublisherConn(
+	go startRemotePublisherConn(
 		&log,
 		pubURI,
 		topic,
@@ -208,7 +208,7 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go newStartRemotePublisherConn(
+	go startRemotePublisherConn(
 		&log,
 		pubURI,
 		topic,
