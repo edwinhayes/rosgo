@@ -1380,6 +1380,264 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 	return err
 }
 
+// Deserialize parses a byte stream into a DynamicMessage, thus reconstructing the fields of a received ROS message; required for ros.Message.
+func (m *DynamicMessage) DeserializeNew(buf *bytes.Reader) error {
+	// THIS METHOD IS BASICALLY AN UNTEMPLATED COPY OF THE TEMPLATE IN LIBGENGO.
+
+	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
+	var err error = nil
+	tmpData := make(map[string]interface{})
+	m.data = nil
+
+	// Iterate over each of the fields in the message.
+	for _, field := range m.dynamicType.spec.Fields {
+
+		if field.IsArray {
+			// It's an array.
+
+			// The array may be a fixed length, or it may be dynamic.
+			var size uint32 = uint32(field.ArrayLen)
+			if field.ArrayLen < 0 {
+				// The array is dynamic, so it starts with a declaration of the number of array elements.
+				if err = binary.Read(buf, binary.LittleEndian, &size); err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+			}
+			// Create an array of the target type.
+			switch field.GoType {
+			case "bool":
+				tmpData[field.Name] = make([]bool, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]bool)[i])
+				}
+			case "int8":
+				tmpData[field.Name] = make([]int8, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]int8)[i])
+				}
+			case "int16":
+				tmpData[field.Name] = make([]int16, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]int16)[i])
+				}
+			case "int32":
+				tmpData[field.Name] = make([]int32, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]int32)[i])
+				}
+			case "int64":
+				tmpData[field.Name] = make([]int64, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]int64)[i])
+				}
+			case "uint8":
+				tmpData[field.Name] = make([]uint8, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]uint8)[i])
+				}
+			case "uint16":
+				tmpData[field.Name] = make([]uint16, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]uint16)[i])
+				}
+			case "uint32":
+				tmpData[field.Name] = make([]uint32, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]uint32)[i])
+				}
+			case "uint64":
+				tmpData[field.Name] = make([]uint64, size)
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &tmpData[field.Name].([]uint64)[i])
+				}
+			case "float32":
+				tmpData[field.Name] = make([]JsonFloat32, size)
+				var data float32
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &data)
+					tmpData[field.Name].([]JsonFloat32)[i] = JsonFloat32{F: data}
+				}
+			case "float64":
+				tmpData[field.Name] = make([]JsonFloat64, size)
+				var data float64
+				for i := 0; i < int(size); i++ {
+					binary.Read(buf, binary.LittleEndian, &data)
+					tmpData[field.Name].([]JsonFloat64)[i] = JsonFloat64{F: data}
+				}
+			case "string":
+				tmpData[field.Name] = make([]string, size)
+				var strSize uint32
+				for i := 0; i < int(size); i++ {
+					// The string will start with a declaration of the number of characters.
+					if err = binary.Read(buf, binary.LittleEndian, &strSize); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					data := make([]byte, int(strSize))
+					if err = binary.Read(buf, binary.LittleEndian, &data); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name].([]string)[i] = string(data)
+				}
+			case "ros.Time":
+				tmpData[field.Name] = make([]Time, size)
+				var data Time
+				for i := 0; i < int(size); i++ {
+					// Time/duration types have two fields, so consume into these in two reads.
+					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name].([]Time)[i] = data
+				}
+			case "ros.Duration":
+				tmpData[field.Name] = make([]Duration, size)
+				var data Duration
+				for i := 0; i < int(size); i++ {
+					// Time/duration types have two fields, so consume into these in two reads.
+					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name].([]Duration)[i] = data
+				}
+			default:
+				if field.IsBuiltin {
+					// Something went wrong.
+					return errors.New("we haven't implemented this primitive yet")
+				}
+
+				// In this case, it will probably be because the go_type is describing another ROS message, so we need to replace that with a nested DynamicMessage.
+				tmpData[field.Name] = make([]Message, size)
+				for i := 0; i < int(size); i++ {
+					// Else it's not a builtin.
+					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					msg := msgType.NewMessage()
+					if err = msg.Deserialize(buf); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name].([]Message)[i] = msg
+				}
+			}
+			if err != nil {
+				return errors.Wrap(err, "Field: "+field.Name)
+			}
+
+		} else {
+			// Else it's a scalar.  This is just the same as above, with the '[i]' bits removed.
+
+			if field.IsBuiltin {
+				if field.Type == "string" {
+					// The string will start with a declaration of the number of characters.
+					var strSize uint32
+					if err = binary.Read(buf, binary.LittleEndian, &strSize); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					data := make([]byte, int(strSize))
+					if err = binary.Read(buf, binary.LittleEndian, data); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name] = string(data)
+				} else if field.Type == "time" {
+					var data Time
+					// Time/duration types have two fields, so consume into these in two reads.
+					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name] = data
+				} else if field.Type == "duration" {
+					var data Duration
+					// Time/duration types have two fields, so consume into these in two reads.
+					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+					tmpData[field.Name] = data
+				} else {
+					// It's a regular primitive element.
+					switch field.GoType {
+					case "bool":
+						var data bool
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "int8":
+						var data int8
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "int16":
+						var data int16
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "int32":
+						var data int32
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "int64":
+						var data int64
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "uint8":
+						var data uint8
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "uint16":
+						var data uint16
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "uint32":
+						var data uint32
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "uint64":
+						var data uint64
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = data
+					case "float32":
+						var data float32
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = JsonFloat32{F: data}
+					case "float64":
+						var data float64
+						err = binary.Read(buf, binary.LittleEndian, &data)
+						tmpData[field.Name] = JsonFloat64{F: data}
+					default:
+						// Something went wrong.
+						return errors.New("we haven't implemented this primitive yet")
+					}
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+				}
+			} else {
+				// Else it's not a builtin.
+				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+				tmpData[field.Name] = msgType.NewMessage()
+				if err = tmpData[field.Name].(Message).Deserialize(buf); err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+			}
+		}
+	}
+
+	// All done.
+	m.data = tmpData
+	return err
+}
+
 func (m *DynamicMessage) String() string {
 	// Just print out the data!
 	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
