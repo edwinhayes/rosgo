@@ -570,3 +570,163 @@ func BenchmarkDynamicMessage_Deserialize_float64BigArray_New(b *testing.B) {
 		}
 	}
 }
+
+// string Big array defintions
+var stringBigArraySerialized []byte = bytes.Repeat([]byte{0x04, 0x00, 0x00, 0x00, 'J', 'o', 'J', 'o'}, 125_000)
+
+var stringBigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "string", "s", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_stringBigArray(b *testing.B) {
+
+	testMessage := stringBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(stringBigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_stringBigArray_New(b *testing.B) {
+
+	testMessage := stringBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(stringBigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// time Big array defintions
+var timeBigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "time", "t", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_timeBigArray(b *testing.B) {
+	testMessage := timeBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_timeBigArray_New(b *testing.B) {
+	testMessage := timeBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// duration Big array defintions
+var durationBigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "duration", "d", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_durationBigArray(b *testing.B) {
+	testMessage := durationBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_durationBigArray_New(b *testing.B) {
+	testMessage := durationBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// Benchmarks on NewDynamicMessage
+
+func BenchmarkDynamicMessage_NewMessage_Singular(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := singularMessageType.NewDynamicMessage()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_Singular_New(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := singularMessageType.NewDynamicMessageNew()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_FixedArray(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := fixedArrayMessageType.NewDynamicMessage()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_FixedArray_New(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := fixedArrayMessageType.NewDynamicMessageNew()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_DynamicArray(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := dynamicArrayMessageType.NewDynamicMessage()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_DynamicArray_New(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := dynamicArrayMessageType.NewDynamicMessageNew()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_BigArray(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := uint16BigArrayMessageType.NewDynamicMessage()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_BigArray_New(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := uint16BigArrayMessageType.NewDynamicMessageNew()
+		_ = testMessage.data
+	}
+}
