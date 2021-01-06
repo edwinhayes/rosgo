@@ -25,7 +25,8 @@ import (
 // ROS Message definition files.  DynamicMessageType implements the rosgo MessageType interface, allowing it to be used throughout rosgo in the same manner as message schemas generated
 // at compiletime by gengo.
 type DynamicMessageType struct {
-	spec *libgengo.MsgSpec
+	spec   *libgengo.MsgSpec
+	nested map[string]*DynamicMessageType
 }
 
 // DynamicMessage abstracts an instance of a ROS Message whose type is only known at runtime.  The schema of the message is denoted by the referenced DynamicMessageType, while the
@@ -139,6 +140,18 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 
 	// Now we know all about the message!
 	m.spec = spec
+
+	// Generate the spec for the nested messages
+	m.nested = make(map[string]*DynamicMessageType)
+	for _, field := range spec.Fields {
+		if field.IsBuiltin == false {
+			newType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+			if err != nil {
+				return m, err
+			}
+			m.nested[field.Name] = &newType
+		}
+	}
 
 	// We've successfully made a new message type matching the requested ROS type.
 	return m, nil
@@ -1453,7 +1466,11 @@ func (m *DynamicMessage) DeserializeNew(buf *bytes.Reader) error {
 				}
 
 				// In this case, it will probably be because the go_type is describing another ROS message type
-				tmpData[field.Name], err = decodeMessageArray(buf, int(size), field)
+				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+					tmpData[field.Name], err = decodeMessageArray(buf, int(size), msgType)
+				} else {
+					err = errors.New("Nested message type not known!")
+				}
 			}
 			if err != nil {
 				return errors.Wrap(err, "Field: "+field.Name)
@@ -1503,9 +1520,13 @@ func (m *DynamicMessage) DeserializeNew(buf *bytes.Reader) error {
 
 			} else {
 				// Else it's not a builtin.
-				tmpData[field.Name], err = decodeMessage(buf, field)
-				if err != nil {
-					return err
+				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+					tmpData[field.Name], err = decodeMessage(buf, msgType)
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+				} else {
+					return errors.Wrap(errors.New("Nested message type not known!"), "Field: "+field.Name)
 				}
 			}
 		}
@@ -1569,17 +1590,22 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 			case "ros.Duration":
 				d[field.Name] = make([]Duration, size)
 			default:
-				// In this case, it will probably be because the go_type is describing another ROS message, so we need to replace that with a nested DynamicMessage.
-				d[field.Name] = make([]Message, size)
-				// Create a nested message type for values inside
-				t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-				if err != nil {
-					return d, errors.Wrap(err, "Failed to create newDynamicMessageTypeNested "+field.Type)
+				if field.IsBuiltin {
+					// Something went wrong.
+					return d, errors.New("we haven't implemented this primitive yet")
 				}
-				// Fill out our new messages
-				for i := 0; i < int(size); i++ {
-					d[field.Name].([]Message)[i] = t2.NewMessage()
+
+				// In this case, the go_type is describing another ROS message, so we nest a DynamicMessage.
+				messages := make([]Message, size)
+				if msgType, ok := t.nested[field.Name]; ok {
+					// Fill out our new messages
+					for i := 0; i < int(size); i++ {
+						messages[i] = msgType.NewMessage()
+					}
+				} else {
+					return d, errors.Wrap(errors.New("Nested message type not known!"), "Type: "+field.Type)
 				}
+				d[field.Name] = messages
 			}
 		} else { // mot array
 			if field.IsBuiltin {
@@ -1619,12 +1645,11 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				//Else its a ros message type
 			} else {
 				//Create new dynamic message type nested
-				t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-				if err != nil {
-					return d, errors.Wrap(err, "Failed to create dewDynamicMessageTypeNested "+field.Type)
+				if msgType, ok := t.nested[field.Name]; ok {
+					d[field.Name] = msgType.NewMessage()
+				} else {
+					return d, errors.Wrap(errors.New("Nested message type not known!"), "Field: "+field.Name)
 				}
-				//Append message as a map item
-				d[field.Name] = t2.NewMessage()
 			}
 		}
 	}
@@ -1907,7 +1932,7 @@ func (t *DynamicMessageType) zeroValueDataNew() (map[string]interface{}, error) 
 			//Create new dynamic message type nested
 			t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
 			if err != nil {
-				return d, errors.Wrap(err, "Failed to create dewDynamicMessageTypeNested "+field.Type)
+				return d, errors.Wrap(err, "Failed to create newDynamicMessageTypeNested "+field.Type)
 			}
 			//Append message as a map item
 			d[field.Name] = t2.NewMessage()
@@ -2131,18 +2156,15 @@ func decodeDurationArray(buf *bytes.Reader, size int) ([]Duration, error) {
 	return slice, nil
 }
 
-func decodeMessageArray(buf *bytes.Reader, size int, field libgengo.Field) ([]Message, error) {
+func decodeMessageArray(buf *bytes.Reader, size int, msgType *DynamicMessageType) ([]Message, error) {
 	slice := make([]Message, size)
 
-	msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
-	if err != nil {
-		return slice, errors.Wrap(err, "Field: "+field.Name)
-	}
-
 	for i := 0; i < int(size); i++ {
-		msg := msgType.NewMessage()
-		if err = msg.Deserialize(buf); err != nil {
-			return slice, errors.Wrap(err, "Field: "+field.Name)
+		// note: this skips the zero value initialization, this would just get discarded anyway
+		msg := &DynamicMessage{}
+		msg.dynamicType = msgType
+		if err := msg.DeserializeNew(buf); err != nil {
+			return slice, err
 		}
 		slice[i] = msg
 	}
@@ -2268,15 +2290,12 @@ func decodeDuration(buf *bytes.Reader) (Duration, error) {
 	return value, nil
 }
 
-func decodeMessage(buf *bytes.Reader, field libgengo.Field) (Message, error) {
-	msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
-	if err != nil {
-		return nil, errors.Wrap(err, "Field: "+field.Name)
-	}
-
-	msg := msgType.NewMessage()
-	if err = msg.Deserialize(buf); err != nil {
-		return nil, errors.Wrap(err, "Field: "+field.Name)
+func decodeMessage(buf *bytes.Reader, msgType *DynamicMessageType) (Message, error) {
+	// note: this skips the zero value initialization, this would just get discarded anyway
+	msg := &DynamicMessage{}
+	msg.dynamicType = msgType
+	if err := msg.DeserializeNew(buf); err != nil {
+		return nil, err
 	}
 
 	return msg, nil

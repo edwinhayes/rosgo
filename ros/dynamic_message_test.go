@@ -28,7 +28,10 @@ func TestDynamicMessage_TypeGetters(t *testing.T) {
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "float32", "x", false, 0),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	if testMessageType.Name() != "TestMessage" {
 		t.Fatalf("DynamicMessageType has undexpected Name %s", testMessageType.Name())
@@ -43,7 +46,10 @@ func TestDynamicMessage_Deserialize_Simple(t *testing.T) {
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "float32", "x", false, 0),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
 	// 1234.5678 = 0x449a522b
@@ -108,7 +114,10 @@ func TestDynamicMessage_Deserialize_Unknown(t *testing.T) {
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "Unknown", "x", false, 0),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	// The unknown type isn't real, so just give it some junk bytes
 	byteReader := bytes.NewReader([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -137,7 +146,10 @@ func TestDynamicMessage_Deserialize_SingularMedley(t *testing.T) {
 		*gengo.NewField("Testing", "time", "t", false, 0),
 		*gengo.NewField("Testing", "duration", "d", false, 0),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
 	// 1234.5678 = 0x449a522b
@@ -213,7 +225,10 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 		*gengo.NewField("Testing", "time", "t", true, 2),
 		*gengo.NewField("Testing", "duration", "d", true, 2),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
 	// 1234.5678 = 0x449a522b
@@ -294,7 +309,10 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 		*gengo.NewField("Testing", "time", "t", true, -1),
 		*gengo.NewField("Testing", "duration", "d", true, -1),
 	}
-	testMessageType := DynamicMessageType{generateTestSpec(fields)}
+	testMessageType := DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
 	// 1234.5678 = 0x449a522b

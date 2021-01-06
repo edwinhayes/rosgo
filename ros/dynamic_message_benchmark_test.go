@@ -24,7 +24,9 @@ var singularMessageType DynamicMessageType = DynamicMessageType{
 		*gengo.NewField("Testing", "string", "s", false, 0),
 		*gengo.NewField("Testing", "time", "t", false, 0),
 		*gengo.NewField("Testing", "duration", "d", false, 0),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 var singularSerialized []byte = []byte{
 	0x12,       // u8
@@ -86,7 +88,9 @@ var fixedArrayMessageType DynamicMessageType = DynamicMessageType{
 		*gengo.NewField("Testing", "string", "s", true, 3),
 		*gengo.NewField("Testing", "time", "t", true, 2),
 		*gengo.NewField("Testing", "duration", "d", true, 2),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 var fixedArraySerialized []byte = []byte{
 	0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, // u8
@@ -136,22 +140,25 @@ func BenchmarkDynamicMessage_Deserialize_FixedArrayMedley_New(b *testing.B) {
 }
 
 // Negative array sizes = dynamic arrays!
-var dynamicArrayMessageType DynamicMessageType = DynamicMessageType{generateTestSpec([]gengo.Field{
-	*gengo.NewField("Testing", "uint8", "u8", true, -1),
-	*gengo.NewField("Testing", "uint16", "u16", true, -1),
-	*gengo.NewField("Testing", "uint32", "u32", true, -1),
-	*gengo.NewField("Testing", "uint64", "u64", true, -1),
-	*gengo.NewField("Testing", "int8", "i8", true, -1),
-	*gengo.NewField("Testing", "int16", "i16", true, -1),
-	*gengo.NewField("Testing", "int32", "i32", true, -1),
-	*gengo.NewField("Testing", "int64", "i64", true, -1),
-	*gengo.NewField("Testing", "bool", "b", true, -1),
-	*gengo.NewField("Testing", "float32", "f32", true, -1),
-	*gengo.NewField("Testing", "float64", "f64", true, -1),
-	*gengo.NewField("Testing", "string", "s", true, -1),
-	*gengo.NewField("Testing", "time", "t", true, -1),
-	*gengo.NewField("Testing", "duration", "d", true, -1),
-})}
+var dynamicArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "uint8", "u8", true, -1),
+		*gengo.NewField("Testing", "uint16", "u16", true, -1),
+		*gengo.NewField("Testing", "uint32", "u32", true, -1),
+		*gengo.NewField("Testing", "uint64", "u64", true, -1),
+		*gengo.NewField("Testing", "int8", "i8", true, -1),
+		*gengo.NewField("Testing", "int16", "i16", true, -1),
+		*gengo.NewField("Testing", "int32", "i32", true, -1),
+		*gengo.NewField("Testing", "int64", "i64", true, -1),
+		*gengo.NewField("Testing", "bool", "b", true, -1),
+		*gengo.NewField("Testing", "float32", "f32", true, -1),
+		*gengo.NewField("Testing", "float64", "f64", true, -1),
+		*gengo.NewField("Testing", "string", "s", true, -1),
+		*gengo.NewField("Testing", "time", "t", true, -1),
+		*gengo.NewField("Testing", "duration", "d", true, -1),
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 var dynamicArraySerialized []byte = []byte{
 	0x08, 0x00, 0x00, 0x00, // array size
@@ -223,7 +230,9 @@ var bigArraySerialized []byte = make([]byte, 1_000_000)
 var boolBigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "bool", "b", true, 1_000_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_boolBigArray(b *testing.B) {
 
@@ -255,7 +264,9 @@ func BenchmarkDynamicMessage_Deserialize_boolBigArray_New(b *testing.B) {
 var int8BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "int8", "i8", true, 1_000_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_int8BigArray(b *testing.B) {
 
@@ -287,7 +298,9 @@ func BenchmarkDynamicMessage_Deserialize_int8BigArray_New(b *testing.B) {
 var int16BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "int16", "i16", true, 500_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_int16BigArray(b *testing.B) {
 
@@ -319,7 +332,9 @@ func BenchmarkDynamicMessage_Deserialize_int16BigArray_New(b *testing.B) {
 var int32BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "int32", "i32", true, 250_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_int32BigArray(b *testing.B) {
 
@@ -351,7 +366,9 @@ func BenchmarkDynamicMessage_Deserialize_int32BigArray_New(b *testing.B) {
 var int64BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "int64", "i64", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_int64BigArray(b *testing.B) {
 
@@ -383,7 +400,9 @@ func BenchmarkDynamicMessage_Deserialize_int64BigArray_New(b *testing.B) {
 var uint8BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint8", "u8", true, 1_000_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_uint8BigArray(b *testing.B) {
 
@@ -415,7 +434,9 @@ func BenchmarkDynamicMessage_Deserialize_uint8BigArray_New(b *testing.B) {
 var uint16BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint16", "u16", true, 500_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_uint16BigArray(b *testing.B) {
 
@@ -447,7 +468,9 @@ func BenchmarkDynamicMessage_Deserialize_uint16BigArray_New(b *testing.B) {
 var uint32BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint32", "u32", true, 250_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_uint32BigArray(b *testing.B) {
 
@@ -479,7 +502,9 @@ func BenchmarkDynamicMessage_Deserialize_uint32BigArray_New(b *testing.B) {
 var uint64BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint64", "u64", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_uint64BigArray(b *testing.B) {
 
@@ -511,7 +536,9 @@ func BenchmarkDynamicMessage_Deserialize_uint64BigArray_New(b *testing.B) {
 var float32BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "float32", "f32", true, 250_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_float32BigArray(b *testing.B) {
 
@@ -543,7 +570,9 @@ func BenchmarkDynamicMessage_Deserialize_float32BigArray_New(b *testing.B) {
 var float64BigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "float64", "f64", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_float64BigArray(b *testing.B) {
 
@@ -577,7 +606,9 @@ var stringBigArraySerialized []byte = bytes.Repeat([]byte{0x04, 0x00, 0x00, 0x00
 var stringBigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "string", "s", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_stringBigArray(b *testing.B) {
 
@@ -609,7 +640,9 @@ func BenchmarkDynamicMessage_Deserialize_stringBigArray_New(b *testing.B) {
 var timeBigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "time", "t", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_timeBigArray(b *testing.B) {
 	testMessage := timeBigArrayMessageType.NewDynamicMessage()
@@ -639,7 +672,9 @@ func BenchmarkDynamicMessage_Deserialize_timeBigArray_New(b *testing.B) {
 var durationBigArrayMessageType DynamicMessageType = DynamicMessageType{
 	generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "duration", "d", true, 125_000),
-	})}
+	}),
+	make(map[string]*DynamicMessageType),
+}
 
 func BenchmarkDynamicMessage_Deserialize_durationBigArray(b *testing.B) {
 	testMessage := durationBigArrayMessageType.NewDynamicMessage()
@@ -715,6 +750,34 @@ func BenchmarkDynamicMessage_NewMessage_DynamicArray_New(b *testing.B) {
 	}
 }
 
+func BenchmarkDynamicMessage_NewMessage_dynamicType(b *testing.B) {
+	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := poseMessageType.NewDynamicMessage()
+		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_NewMessage_dynamicType_New(b *testing.B) {
+	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testMessage := poseMessageType.NewDynamicMessageNew()
+		_ = testMessage.data
+	}
+}
+
 func BenchmarkDynamicMessage_NewMessage_BigArray(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -728,5 +791,104 @@ func BenchmarkDynamicMessage_NewMessage_BigArray_New(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testMessage := uint16BigArrayMessageType.NewDynamicMessageNew()
 		_ = testMessage.data
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_dynamicType(b *testing.B) {
+	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+
+	if len(poseMessageType.spec.Fields) != 2 {
+		b.Fatalf("Expected 2 pose fields!")
+	}
+
+	// Pose has 7 float64 values, so 56 bytes
+	slice := make([]byte, 56)
+
+	testMessage := poseMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(slice)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize pose failed!")
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_dynamicTypeNew(b *testing.B) {
+	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+
+	if len(poseMessageType.spec.Fields) != 2 {
+		b.Fatalf("Expected 2 pose fields!")
+	}
+
+	// Pose has 7 float64 values, so 56 bytes
+	slice := make([]byte, 56)
+
+	testMessage := poseMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(slice)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize pose failed!")
+		}
+	}
+}
+
+// Singular value defintions
+// Rip out 1_000_000 / 56 bytes ~= 17857
+var dynamicTypeBigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("geometry_msgs", "Pose", "pose", true, 17857),
+	}),
+	make(map[string]*DynamicMessageType),
+}
+
+func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArray(b *testing.B) {
+	msgType, err := newDynamicMessageTypeNested("Pose", "geometry_msgs")
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+	dynamicTypeBigArrayMessageType.nested["pose"] = &msgType
+
+	testMessage := dynamicTypeBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArrayNew(b *testing.B) {
+	msgType, err := newDynamicMessageTypeNested("Pose", "geometry_msgs")
+	if err != nil {
+		b.Logf("Benchmark skipped because ROS environment not set up")
+		return
+	}
+	dynamicTypeBigArrayMessageType.nested["pose"] = &msgType
+
+	testMessage := dynamicTypeBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
 	}
 }
