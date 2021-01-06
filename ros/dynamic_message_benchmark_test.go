@@ -214,17 +214,20 @@ func BenchmarkDynamicMessage_Deserialize_DynamicArrayMedley_New(b *testing.B) {
 	}
 }
 
-// Fixed array defintions
-var bigArrayMessageType DynamicMessageType = DynamicMessageType{
-	generateTestSpec([]gengo.Field{
-		*gengo.NewField("Testing", "uint8", "u8", true, 1_000_000),
-	})}
-
+//
+// Biiig array benchmarks!
+//
 var bigArraySerialized []byte = make([]byte, 1_000_000)
 
-func BenchmarkDynamicMessage_Deserialize_BigArray(b *testing.B) {
+// bool Big array defintions
+var boolBigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "bool", "b", true, 1_000_000),
+	})}
 
-	testMessage := bigArrayMessageType.NewDynamicMessage()
+func BenchmarkDynamicMessage_Deserialize_boolBigArray(b *testing.B) {
+
+	testMessage := boolBigArrayMessageType.NewDynamicMessage()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -235,9 +238,329 @@ func BenchmarkDynamicMessage_Deserialize_BigArray(b *testing.B) {
 	}
 }
 
-func BenchmarkDynamicMessage_Deserialize_BigArray_New(b *testing.B) {
+func BenchmarkDynamicMessage_Deserialize_boolBigArray_New(b *testing.B) {
 
-	testMessage := bigArrayMessageType.NewDynamicMessage()
+	testMessage := boolBigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// int8 Big array defintions
+var int8BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "int8", "i8", true, 1_000_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_int8BigArray(b *testing.B) {
+
+	testMessage := int8BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_int8BigArray_New(b *testing.B) {
+
+	testMessage := int8BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// int16 Big array defintions
+var int16BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "int16", "i16", true, 500_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_int16BigArray(b *testing.B) {
+
+	testMessage := int16BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_int16BigArray_New(b *testing.B) {
+
+	testMessage := int16BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// int32 Big array defintions
+var int32BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "int32", "i32", true, 250_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_int32BigArray(b *testing.B) {
+
+	testMessage := int32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_int32BigArray_New(b *testing.B) {
+
+	testMessage := int32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// int64 Big array defintions
+var int64BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "int64", "i64", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_int64BigArray(b *testing.B) {
+
+	testMessage := int64BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_int64BigArray_New(b *testing.B) {
+
+	testMessage := int64BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// uint8 Big array defintions
+var uint8BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "uint8", "u8", true, 1_000_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_uint8BigArray(b *testing.B) {
+
+	testMessage := uint8BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_uint8BigArray_New(b *testing.B) {
+
+	testMessage := uint8BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// uint16 Big array defintions
+var uint16BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "uint16", "u16", true, 500_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_uint16BigArray(b *testing.B) {
+
+	testMessage := uint16BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_uint16BigArray_New(b *testing.B) {
+
+	testMessage := uint16BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// uint32 Big array defintions
+var uint32BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "uint32", "u32", true, 250_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_uint32BigArray(b *testing.B) {
+
+	testMessage := uint32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_uint32BigArray_New(b *testing.B) {
+
+	testMessage := uint32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// uint64 Big array defintions
+var uint64BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "uint64", "u64", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_uint64BigArray(b *testing.B) {
+
+	testMessage := uint64BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_uint64BigArray_New(b *testing.B) {
+
+	testMessage := uint64BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// float32 Big array defintions
+var float32BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "float32", "f32", true, 250_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_float32BigArray(b *testing.B) {
+
+	testMessage := float32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_float32BigArray_New(b *testing.B) {
+
+	testMessage := float32BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.DeserializeNew(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+// float64 Big array defintions
+var float64BigArrayMessageType DynamicMessageType = DynamicMessageType{
+	generateTestSpec([]gengo.Field{
+		*gengo.NewField("Testing", "float64", "f64", true, 125_000),
+	})}
+
+func BenchmarkDynamicMessage_Deserialize_float64BigArray(b *testing.B) {
+
+	testMessage := float64BigArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteReader := bytes.NewReader(bigArraySerialized)
+		if err := testMessage.Deserialize(byteReader); err != nil {
+			b.Fatalf("Deserialize failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_Deserialize_float64BigArray_New(b *testing.B) {
+
+	testMessage := float64BigArrayMessageType.NewDynamicMessage()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
