@@ -72,6 +72,38 @@ func TestDynamicMessage_Deserialize_Simple(t *testing.T) {
 	}
 }
 
+func TestDynamicMessage_DynamicType_Load(t *testing.T) {
+	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Logf("Test skipped because ROS environment not set up")
+		return
+	}
+
+	if len(poseMessageType.spec.Fields) != 2 {
+		t.Fatalf("Expected 2 pose fields!")
+	}
+
+	// Pose has 7 float64 values, so 56 bytes
+	slice := make([]byte, 56)
+	byteReader := bytes.NewReader(slice)
+
+	testMessage := poseMessageType.NewDynamicMessage()
+
+	if err := testMessage.Deserialize(byteReader); err != nil {
+		t.Fatalf("Deserialize pose failed!")
+	}
+
+	pos, ok := testMessage.Data()["position"]
+	if !ok {
+		t.Fatalf("Failed to get position from pose message!")
+	}
+
+	if _, ok = pos.(*DynamicMessage).Data()["x"]; !ok {
+		t.Fatalf("Failed to get position.x from pose message!")
+	}
+}
+
 func TestDynamicMessage_Deserialize_Unknown(t *testing.T) {
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "Unknown", "x", false, 0),

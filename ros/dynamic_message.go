@@ -193,7 +193,7 @@ func (t *DynamicMessageType) NewDynamicMessageNew() *DynamicMessage {
 	var err error
 	d.data, err = t.zeroValueDataNew()
 	if err != nil {
-		return d
+		return d // TODO: May need to log we have an issue here?
 	}
 	return d
 }
@@ -1503,13 +1503,9 @@ func (m *DynamicMessage) DeserializeNew(buf *bytes.Reader) error {
 
 			} else {
 				// Else it's not a builtin.
-				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+				tmpData[field.Name], err = decodeMessage(buf, field)
 				if err != nil {
-					return errors.Wrap(err, "Field: "+field.Name)
-				}
-				tmpData[field.Name] = msgType.NewMessage()
-				if err = tmpData[field.Name].(Message).Deserialize(buf); err != nil {
-					return errors.Wrap(err, "Field: "+field.Name)
+					return err
 				}
 			}
 		}
@@ -1537,135 +1533,99 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 	//Range fields in the dynamic message type
 	for _, field := range t.spec.Fields {
 		if field.IsArray {
-			//It's an array. Create empty Slices
+			// If the array length is static set the size, for dynamic arrays, use 0
+			var size uint32 = 0
+			if field.ArrayLen > 0 {
+				size = uint32(field.ArrayLen)
+			}
+
 			switch field.GoType {
 			case "bool":
-				d[field.Name] = make([]bool, 0)
+				d[field.Name] = make([]bool, size)
 			case "int8":
-				d[field.Name] = make([]int8, 0)
+				d[field.Name] = make([]int8, size)
 			case "int16":
-				d[field.Name] = make([]int16, 0)
+				d[field.Name] = make([]int16, size)
 			case "int32":
-				d[field.Name] = make([]int32, 0)
+				d[field.Name] = make([]int32, size)
 			case "int64":
-				d[field.Name] = make([]int64, 0)
+				d[field.Name] = make([]int64, size)
 			case "uint8":
-				d[field.Name] = make([]uint8, 0)
+				d[field.Name] = make([]uint8, size)
 			case "uint16":
-				d[field.Name] = make([]uint16, 0)
+				d[field.Name] = make([]uint16, size)
 			case "uint32":
-				d[field.Name] = make([]uint32, 0)
+				d[field.Name] = make([]uint32, size)
 			case "uint64":
-				d[field.Name] = make([]uint64, 0)
+				d[field.Name] = make([]uint64, size)
 			case "float32":
-				d[field.Name] = make([]JsonFloat32, 0)
+				d[field.Name] = make([]JsonFloat32, size)
 			case "float64":
-				d[field.Name] = make([]JsonFloat64, 0)
+				d[field.Name] = make([]JsonFloat64, size)
 			case "string":
-				d[field.Name] = make([]string, 0)
+				d[field.Name] = make([]string, size)
 			case "ros.Time":
-				d[field.Name] = make([]Time, 0)
+				d[field.Name] = make([]Time, size)
 			case "ros.Duration":
-				d[field.Name] = make([]Duration, 0)
+				d[field.Name] = make([]Duration, size)
 			default:
 				// In this case, it will probably be because the go_type is describing another ROS message, so we need to replace that with a nested DynamicMessage.
-				d[field.Name] = make([]Message, 0)
-			}
-			var size uint32 = uint32(field.ArrayLen)
-			//In the case the array length is static, we iterated through array items
-			if field.ArrayLen != -1 {
+				d[field.Name] = make([]Message, size)
+				// Create a nested message type for values inside
+				t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
+				if err != nil {
+					return d, errors.Wrap(err, "Failed to create newDynamicMessageTypeNested "+field.Type)
+				}
+				// Fill out our new messages
 				for i := 0; i < int(size); i++ {
-					if field.IsBuiltin {
-						//Append the goType zeroValues to their arrays
-						switch field.GoType {
-						case "bool":
-							d[field.Name] = append(d[field.Name].([]bool), false)
-						case "int8":
-							d[field.Name] = append(d[field.Name].([]int8), 0)
-						case "int16":
-							d[field.Name] = append(d[field.Name].([]int16), 0)
-						case "int32":
-							d[field.Name] = append(d[field.Name].([]int32), 0)
-						case "int64":
-							d[field.Name] = append(d[field.Name].([]int64), 0)
-						case "uint8":
-							d[field.Name] = append(d[field.Name].([]uint8), 0)
-						case "uint16":
-							d[field.Name] = append(d[field.Name].([]uint16), 0)
-						case "uint32":
-							d[field.Name] = append(d[field.Name].([]uint32), 0)
-						case "uint64":
-							d[field.Name] = append(d[field.Name].([]uint64), 0)
-						case "float32":
-							d[field.Name] = append(d[field.Name].([]JsonFloat32), JsonFloat32{F: 0.0})
-						case "float64":
-							d[field.Name] = append(d[field.Name].([]JsonFloat64), JsonFloat64{F: 0.0})
-						case "string":
-							d[field.Name] = append(d[field.Name].([]string), "")
-						case "ros.Time":
-							d[field.Name] = append(d[field.Name].([]Time), Time{})
-						case "ros.Duration":
-							d[field.Name] = append(d[field.Name].([]Duration), Duration{})
-						default:
-							// Something went wrong.
-							return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
-						}
-					} else {
-						// Else it's not a builtin. Create a nested message type for values inside
-						t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-						if err != nil {
-							return d, errors.Wrap(err, "Failed to create newDynamicMessageTypeNested "+field.Type)
-						}
-						msg := t2.NewMessage()
-						//Append nested message map to message type array in main map
-						d[field.Name] = append(d[field.Name].([]Message), msg)
-					}
-					//Else array is dynamic, by default we do not initialize any values in it
+					d[field.Name].([]Message)[i] = t2.NewMessage()
 				}
 			}
-		} else if field.IsBuiltin {
-			//If its a built in type
-			switch field.GoType {
-			case "string":
-				d[field.Name] = ""
-			case "bool":
-				d[field.Name] = bool(false)
-			case "int8":
-				d[field.Name] = int8(0)
-			case "int16":
-				d[field.Name] = int16(0)
-			case "int32":
-				d[field.Name] = int32(0)
-			case "int64":
-				d[field.Name] = int64(0)
-			case "uint8":
-				d[field.Name] = uint8(0)
-			case "uint16":
-				d[field.Name] = uint16(0)
-			case "uint32":
-				d[field.Name] = uint32(0)
-			case "uint64":
-				d[field.Name] = uint64(0)
-			case "float32":
-				d[field.Name] = JsonFloat32{F: float32(0.0)}
-			case "float64":
-				d[field.Name] = JsonFloat64{F: float64(0.0)}
-			case "ros.Time":
-				d[field.Name] = Time{}
-			case "ros.Duration":
-				d[field.Name] = Duration{}
-			default:
-				return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
+		} else { // mot array
+			if field.IsBuiltin {
+				//If its a built in type
+				switch field.GoType {
+				case "string":
+					d[field.Name] = ""
+				case "bool":
+					d[field.Name] = bool(false)
+				case "int8":
+					d[field.Name] = int8(0)
+				case "int16":
+					d[field.Name] = int16(0)
+				case "int32":
+					d[field.Name] = int32(0)
+				case "int64":
+					d[field.Name] = int64(0)
+				case "uint8":
+					d[field.Name] = uint8(0)
+				case "uint16":
+					d[field.Name] = uint16(0)
+				case "uint32":
+					d[field.Name] = uint32(0)
+				case "uint64":
+					d[field.Name] = uint64(0)
+				case "float32":
+					d[field.Name] = JsonFloat32{F: float32(0.0)}
+				case "float64":
+					d[field.Name] = JsonFloat64{F: float64(0.0)}
+				case "ros.Time":
+					d[field.Name] = Time{}
+				case "ros.Duration":
+					d[field.Name] = Duration{}
+				default:
+					return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
+				}
+				//Else its a ros message type
+			} else {
+				//Create new dynamic message type nested
+				t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
+				if err != nil {
+					return d, errors.Wrap(err, "Failed to create dewDynamicMessageTypeNested "+field.Type)
+				}
+				//Append message as a map item
+				d[field.Name] = t2.NewMessage()
 			}
-			//Else its a ros message type
-		} else {
-			//Create new dynamic message type nested
-			t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-			if err != nil {
-				return d, errors.Wrap(err, "Failed to create dewDynamicMessageTypeNested "+field.Type)
-			}
-			//Append message as a map item
-			d[field.Name] = t2.NewMessage()
 		}
 	}
 	return d, err
@@ -2306,6 +2266,20 @@ func decodeDuration(buf *bytes.Reader) (Duration, error) {
 	}
 
 	return value, nil
+}
+
+func decodeMessage(buf *bytes.Reader, field libgengo.Field) (Message, error) {
+	msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+	if err != nil {
+		return nil, errors.Wrap(err, "Field: "+field.Name)
+	}
+
+	msg := msgType.NewMessage()
+	if err = msg.Deserialize(buf); err != nil {
+		return nil, errors.Wrap(err, "Field: "+field.Name)
+	}
+
+	return msg, nil
 }
 
 // DEFINE PRIVATE RECEIVER FUNCTIONS.
