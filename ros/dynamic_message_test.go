@@ -9,20 +9,6 @@ import (
 	gengo "github.com/team-rocos/rosgo/libgengo"
 )
 
-func Float32Near(expected float32, actual float32, tol float32) bool {
-	return math.Abs(float64(expected-actual)) < float64(tol)
-}
-
-func generateTestSpec(fields []gengo.Field) *gengo.MsgSpec {
-	msgSpec := &gengo.MsgSpec{}
-	msgSpec.FullName = "TestMessage"
-	msgSpec.Package = "Testing"
-	msgSpec.MD5Sum = "1337beeffeed1337"
-	msgSpec.ShortName = "Test"
-	msgSpec.Fields = fields
-	return msgSpec
-}
-
 // Simple test to prove that we have a test spec that we can start scrutinizing
 func TestDynamicMessage_TypeGetters(t *testing.T) {
 	fields := []gengo.Field{
@@ -387,4 +373,22 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 			t.Fatalf("%s: expected %d(0x%x) != result %d(0x%x)", key, expectedValue, expectedValue, value, value)
 		}
 	}
+}
+
+// Testing helpers
+
+// Checks that two float32s are within a tolerance
+func Float32Near(expected float32, actual float32, tol float32) bool {
+	return math.Abs(float64(expected-actual)) < float64(tol)
+}
+
+// generate a message spec for a ficticious message type
+func generateTestSpec(fields []gengo.Field) *gengo.MsgSpec {
+	msgSpec := &gengo.MsgSpec{}
+	msgSpec.FullName = "TestMessage"
+	msgSpec.Package = "Testing"
+	msgSpec.MD5Sum = "1337beeffeed1337"
+	msgSpec.ShortName = "Test"
+	msgSpec.Fields = fields
+	return msgSpec
 }

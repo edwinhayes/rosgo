@@ -1119,9 +1119,10 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 	return err
 }
 
+//
 // Deserialize parses a byte stream into a DynamicMessage, thus reconstructing the fields of a received ROS message; required for ros.Message.
+//
 func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
-	// THIS METHOD IS BASICALLY AN UNTEMPLATED COPY OF THE TEMPLATE IN LIBGENGO.
 
 	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
 	var err error = nil
@@ -1234,7 +1235,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 				}
 
 			} else {
-				// Else it's not a builtin.
+				// Else it's not a built-in
 				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
 					tmpData[field.Name], err = decodeMessage(buf, msgType)
 					if err != nil {
@@ -1259,6 +1260,20 @@ func (m *DynamicMessage) String() string {
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
 
+//
+// Decode helpers
+// The core goal of these decode functions are to improve efficiency, for this reason
+// reuse between functions is only used when it won't impact efficiency
+//
+
+//
+// Array decodes
+// Arrays typically don't use the singular decodes since additional efficiencies can be made
+// by reusing allocated resources inline
+//
+
+// Benchmarking suggested that reading a buffer one-by-one was more efficient for a 1Mbyte array
+// than allocating a byte array which is read instantly and then iterated through
 func decodeBoolArray(buf *bytes.Reader, size int) ([]bool, error) {
 	var arr [1]byte
 	var n int
@@ -1424,13 +1439,13 @@ func decodeFloat64Array(buf *bytes.Reader, size int) ([]JsonFloat64, error) {
 	return slice, nil
 }
 
+// String format is: [size|string] where size is a u32
 func decodeStringArray(buf *bytes.Reader, size int) ([]string, error) {
 	var strSize uint32
 	var err error
 
 	slice := make([]string, size)
 	for i := 0; i < size; i++ {
-		// String format is: [size|string] where size is a u32
 		if strSize, err = decodeUint32(buf); err != nil {
 			return slice, err
 		}
@@ -1444,6 +1459,7 @@ func decodeStringArray(buf *bytes.Reader, size int) ([]string, error) {
 	return slice, nil
 }
 
+// Time format is: [sec|nanosec] where sec and nanosec are unsigned integers
 func decodeTimeArray(buf *bytes.Reader, size int) ([]Time, error) {
 	var err error
 
@@ -1459,6 +1475,7 @@ func decodeTimeArray(buf *bytes.Reader, size int) ([]Time, error) {
 	return slice, nil
 }
 
+// Duration format is: [sec|nanosec] where sec and nanosec are unsigned integers
 func decodeDurationArray(buf *bytes.Reader, size int) ([]Duration, error) {
 	var err error
 
@@ -1489,7 +1506,9 @@ func decodeMessageArray(buf *bytes.Reader, size int, msgType *DynamicMessageType
 	return slice, nil
 }
 
+//
 // singular decodes
+//
 
 func decodeBool(buf *bytes.Reader) (bool, error) {
 	raw, err := decodeUint8(buf)
@@ -1580,6 +1599,7 @@ func decodeString(buf *bytes.Reader) (string, error) {
 	return string(value), nil
 }
 
+// Time format is: [sec|nanosec] where sec and nanosec are unsigned integers
 func decodeTime(buf *bytes.Reader) (Time, error) {
 	var err error
 	var value Time
@@ -1594,6 +1614,7 @@ func decodeTime(buf *bytes.Reader) (Time, error) {
 	return value, nil
 }
 
+// Duration format is: [sec|nanosec] where sec and nanosec are unsigned integers
 func decodeDuration(buf *bytes.Reader) (Duration, error) {
 	var err error
 	var value Duration
