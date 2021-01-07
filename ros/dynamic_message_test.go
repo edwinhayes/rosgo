@@ -76,6 +76,34 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 		t.Fatalf("Expected 2 pose fields!")
 	}
 
+	// test that we have embedded additional DynamicMessageTypes for
+	// Point and Quaternion
+	if len(poseMessageType.nested) != 2 {
+		t.Fatalf("Expected 2 nested message types")
+	}
+
+	if pointType, ok := poseMessageType.nested["position"]; ok {
+		if pointType.spec.FullName != "geometry_msgs/Point" {
+			t.Fatalf("Expected nexted Point, got %s", pointType.spec.FullName)
+		}
+		if len(pointType.spec.Fields) != 3 {
+			t.Fatalf("Expected 3 fields for nested Point type")
+		}
+	} else {
+		t.Fatalf("Expected point type under nested[\"position\"]")
+	}
+
+	if quatType, ok := poseMessageType.nested["orientation"]; ok {
+		if quatType.spec.FullName != "geometry_msgs/Quaternion" {
+			t.Fatalf("Expected nested Quaternion, got %s", quatType.spec.FullName)
+		}
+		if len(quatType.spec.Fields) != 4 {
+			t.Fatalf("Expected 4 fields for nested Quaternion type")
+		}
+	} else {
+		t.Fatalf("Expected quaternion type under nested[\"orientation\"]")
+	}
+
 	// Pose has 7 float64 values, so 56 bytes
 	slice := make([]byte, 56)
 	byteReader := bytes.NewReader(slice)
