@@ -30,6 +30,7 @@ type defaultSubscriber struct {
 	addCallbackChan  chan interface{}
 	shutdownChan     chan struct{}
 	connections      map[string]chan struct{}
+	uri2pub          map[string]string
 	disconnectedChan chan string
 }
 
@@ -43,6 +44,7 @@ func newDefaultSubscriber(topic string, msgType MessageType, callback interface{
 	sub.shutdownChan = make(chan struct{}, 10)
 	sub.disconnectedChan = make(chan string, 10)
 	sub.connections = make(map[string]chan struct{})
+	sub.uri2pub = make(map[string]string)
 	sub.callbacks = []interface{}{callback}
 	return sub
 }
@@ -89,6 +91,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
 					sub.connections[pub] = quitChan
+					sub.uri2pub[uri] = pub
 					go startRemotePublisherConn(log,
 						uri, sub.topic,
 						sub.msgType.MD5Sum(),
@@ -137,7 +140,8 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
-			delete(sub.connections, pubURI)
+			delete(sub.connections, sub.uri2pub[pubURI])
+			delete(sub.uri2pub, pubURI)
 
 		case <-sub.shutdownChan:
 			// Shutdown subscription goroutine
