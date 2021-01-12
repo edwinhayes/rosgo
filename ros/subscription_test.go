@@ -11,14 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//
-// Uses `testMessageType` and `testMessage` defined in `subscriber_test.go`
-// Integration of subscriptions is tested in the RemotePublisherConn tests in `subscriber_test.go`
-//
+// `subscription_test.go` uses `testMessageType` and `testMessage` defined in `subscriber_test.go`.
+// Integration of subscriptions is tested in the RemotePublisherConn tests in `subscriber_test.go`.
 
-//
-// testReader
-//
+// Helper structs
+
+// testReader provides the io.Reader interface.
 type testReader struct {
 	buffer []byte
 	n      int
@@ -32,10 +30,14 @@ func (r *testReader) Read(buf []byte) (n int, err error) {
 	return
 }
 
+// testLogger provides the modular.ModuleLogger interface
+
+type testLogger struct {
+}
+
 var _ io.Reader = &testReader{} // verify that testReader satisfies the reader interface
 
 func getTestSubscription(pubURI string) *defaultSubscription {
-	logger := modular.NewRootLogger(logrus.New())
 
 	topic := "/test/topic"
 	nodeID := "testNode"
@@ -44,14 +46,11 @@ func getTestSubscription(pubURI string) *defaultSubscription {
 	remoteDisconnectedChan := make(chan string)
 	msgType := testMessageType{}
 
-	log := logger.GetModuleLogger()
-
-	return newDefaultSubscription(&log,
-		pubURI, topic, msgType.MD5Sum(),
-		msgType.Name(), nodeID,
+	return newDefaultSubscription(
+		pubURI, topic, msgType, nodeID,
 		messageChan,
 		requestStopChan,
-		remoteDisconnectedChan, msgType)
+		remoteDisconnectedChan)
 }
 
 //
@@ -188,7 +187,10 @@ func TestSubscription_NewSubscription(t *testing.T) {
 
 	subscription := getTestSubscription(pubURI)
 
-	go subscription.start()
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
 
 	conn, err := l.Accept()
 	if err != nil {
@@ -207,7 +209,7 @@ func TestSubscription_NewSubscription(t *testing.T) {
 		resHeaderMap[h.key] = h.value
 	}
 
-	if resHeaderMap["md5sum"] != subscription.msgTypeProper.MD5Sum() {
+	if resHeaderMap["md5sum"] != subscription.msgType.MD5Sum() {
 		t.Fatalf("Incorrect MD5 sum %s", resHeaderMap["md5sum"])
 	}
 
@@ -215,7 +217,7 @@ func TestSubscription_NewSubscription(t *testing.T) {
 		t.Fatalf("Incorrect topic: %s", subscription.topic)
 	}
 
-	if resHeaderMap["type"] != subscription.msgTypeProper.Name() {
+	if resHeaderMap["type"] != subscription.msgType.Name() {
 		t.Fatalf("Incorrect type: %s", resHeaderMap["type"])
 	}
 
@@ -225,8 +227,8 @@ func TestSubscription_NewSubscription(t *testing.T) {
 
 	replyHeader := []header{
 		{"topic", subscription.topic},
-		{"md5sum", subscription.msgTypeProper.MD5Sum()},
-		{"type", subscription.msgTypeProper.Name()},
+		{"md5sum", subscription.msgType.MD5Sum()},
+		{"type", subscription.msgType.Name()},
 		{"callerid", "testPublisher"},
 	}
 

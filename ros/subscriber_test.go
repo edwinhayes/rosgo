@@ -68,18 +68,7 @@ func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go startRemotePublisherConn(
-		&log,
-		pubURI,
-		topic,
-		msgType.MD5Sum(),
-		msgType.Name(),
-		nodeID,
-		msgChan,
-		quitChan,
-		disconnectedChan,
-		msgType,
-	)
+	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
 
 	conn, err := l.Accept()
 	if err != nil {
@@ -156,18 +145,7 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go startRemotePublisherConn(
-		&log,
-		pubURI,
-		topic,
-		msgType.MD5Sum(),
-		msgType.Name(),
-		nodeID,
-		msgChan,
-		quitChan,
-		disconnectedChan,
-		msgType,
-	)
+	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
 
 	conn := connectToSubscriber(t, l, topic, msgType)
 	defer conn.Close()
@@ -208,18 +186,7 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 
 	pubURI := l.Addr().String()
 
-	go startRemotePublisherConn(
-		&log,
-		pubURI,
-		topic,
-		msgType.MD5Sum(),
-		msgType.Name(),
-		nodeID,
-		msgChan,
-		quitChan,
-		disconnectedChan,
-		msgType,
-	)
+	startRemotePublisherConn(&log, pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
 
 	conn := connectToSubscriber(t, l, topic, msgType)
 	defer conn.Close()

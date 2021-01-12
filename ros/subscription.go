@@ -9,56 +9,50 @@ import (
 	modular "github.com/edwinhayes/logrus-modular"
 )
 
-//
-// The subscription object runs in own go routine (start()).
-// Basically handles the subscription logic and provides raw byte messages
-// through the `messageChan` channel
-//
+// defaultSubscription connects to a publisher and runs a go routine to maintain its connection and packetize messages from the tcp stream. Messages are passed through the messageChan channel.
 type defaultSubscription struct {
-	logger                 *modular.ModuleLogger
 	pubURI                 string
 	topic                  string
-	md5sum                 string
-	msgType                string
+	msgType                MessageType
 	nodeID                 string
 	messageChan            chan messageEvent
 	requestStopChan        chan struct{} // tell the subscription to disconnect
 	remoteDisconnectedChan chan string   // tell the subscriber that the remote has disconnected
-	msgTypeProper          MessageType
 	event                  MessageEvent
 	pool                   []byte
 }
 
-func newDefaultSubscription(logger *modular.ModuleLogger,
-	pubURI string, topic string, md5sum string,
-	msgType string, nodeID string,
+// newDefaultSubscription populates a subscription struct from the instantiation fields and fills in default data for the operational fields.
+func newDefaultSubscription(
+	pubURI string, topic string, msgType MessageType, nodeID string,
 	messageChan chan messageEvent,
 	requestStopChan chan struct{},
-	remoteDisconnectedChan chan string, msgTypeProper MessageType) *defaultSubscription {
+	remoteDisconnectedChan chan string) *defaultSubscription {
 
 	return &defaultSubscription{
-		logger:                 logger,
 		pubURI:                 pubURI,
 		topic:                  topic,
-		md5sum:                 md5sum,
 		msgType:                msgType,
 		nodeID:                 nodeID,
 		messageChan:            messageChan,
 		requestStopChan:        requestStopChan,
 		remoteDisconnectedChan: remoteDisconnectedChan,
-		msgTypeProper:          msgTypeProper,
+		event:                  MessageEvent{"", time.Time{}, nil},
+		pool:                   nil,
 	}
 }
 
-type connectionState int
+// connectionFailureMode indicates a connection failure mode
+type connectionFailureMode int
 
 const (
-	publisherDisconnected connectionState = iota
+	publisherDisconnected connectionFailureMode = iota
 	tcpOutOfSync
-	connectionFailure
+	readFailure
 	stopRequested
 )
 
+// readResult determines the result of a subscription read operation.
 type readResult int
 
 const (
@@ -69,12 +63,14 @@ const (
 	readOutOfSync
 )
 
-//
-// Start executing a subscription object, this is blocking and is expected to
-// be run as a go routine
-//
-func (s *defaultSubscription) start() {
-	logger := *s.logger
+// start spawns a go routine which connects a subscription to a publisher.
+func (s *defaultSubscription) start(log *modular.ModuleLogger) {
+	go s.run(log)
+}
+
+// run connects to a publisher and attempts to maintain a connection until either a stop is requested or the publisher disconnects.
+func (s *defaultSubscription) run(log *modular.ModuleLogger) {
+	logger := *log
 	logger.Debug(s.topic, " : defaultSubscription.start()")
 
 	defer func() {
@@ -88,7 +84,7 @@ func (s *defaultSubscription) start() {
 	// attempt to start again with a new subscription.
 	for {
 		// Connect
-		if s.connectToPublisher(&conn) == false {
+		if s.connectToPublisher(&conn, log) == false {
 			if conn != nil {
 				conn.Close()
 			}
@@ -98,48 +94,45 @@ func (s *defaultSubscription) start() {
 		defer conn.Close() // Make sure we close this
 
 		// Reading from publisher
-		connectionState := s.readFromPublisher(conn)
+		connectionFailureMode := s.readFromPublisher(conn)
 
 		// Under healthy conditions, we don't get here
 		// handle the returned connection state
 
 		// TCP out of sync; we will attempt to resync by closing the connection and trying again
-		if connectionState == tcpOutOfSync {
+		if connectionFailureMode == tcpOutOfSync {
 			conn.Close()
 			logger.Debug(s.topic, " : Connection closed, reconnecting with publisher")
 		}
 
 		// A stop was externally requested - easy one!
-		if connectionState == stopRequested {
+		if connectionFailureMode == stopRequested {
 			return
 		}
 
 		// Publisher disconnected - not much we can do here, the subscription has ended
-		if connectionState == publisherDisconnected {
+		if connectionFailureMode == publisherDisconnected {
 			logger.Infof("Publisher %s on topic %s disconnected", s.pubURI, s.topic)
 			s.remoteDisconnectedChan <- s.pubURI
 			return
 		}
 
-		// Connection Failure is caused by read failures; the reason is uncertain, so we will give up
-		if connectionState == connectionFailure {
-			logger.Error(s.topic, " : Failed to read a message size")
+		// read failure; the reason is uncertain, so we will give up
+		if connectionFailureMode == readFailure {
+			logger.Error(s.topic, " : Failed to read a message correctly")
 			s.remoteDisconnectedChan <- s.pubURI
 			return
 		}
 	}
-
 }
 
-//
-// Estabilishes a TCPROS connection with a publishing node
+// ConnectToPublisher Estabilishes a TCPROS connection with a publishing node
 // Connects via TCP and then exchanges headers to ensure
 // both nodes are using the same message type
-//
-func (s *defaultSubscription) connectToPublisher(conn *net.Conn) bool {
+func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.ModuleLogger) bool {
 	var err error
 
-	logger := *s.logger
+	logger := *log
 
 	// 1. Connnect to tcp
 	select {
@@ -157,8 +150,8 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn) bool {
 	// 2. Write connection header
 	var headers []header
 	headers = append(headers, header{"topic", s.topic})
-	headers = append(headers, header{"md5sum", s.md5sum})
-	headers = append(headers, header{"type", s.msgType})
+	headers = append(headers, header{"md5sum", s.msgType.MD5Sum()})
+	headers = append(headers, header{"type", s.msgType.Name()})
 	headers = append(headers, header{"callerid", s.nodeID})
 	logger.Debug(s.topic, " : TCPROS Connection Header")
 	for _, h := range headers {
@@ -185,8 +178,8 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn) bool {
 	}
 
 	// 4. Verify response header
-	if resHeaderMap["type"] != s.msgType || resHeaderMap["md5sum"] != s.md5sum {
-		logger.Error("Incompatible message type for ", s.topic, ": ", resHeaderMap["type"], ":", s.msgType, " ", resHeaderMap["md5sum"], ":", s.md5sum)
+	if resHeaderMap["type"] != s.msgType.Name() || resHeaderMap["md5sum"] != s.msgType.MD5Sum() {
+		logger.Error("Incompatible message type for ", s.topic, ": ", resHeaderMap["type"], ":", s.msgType.Name(), " ", resHeaderMap["md5sum"], ":", s.msgType.MD5Sum())
 		return false
 	}
 
@@ -202,20 +195,16 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn) bool {
 	return true
 }
 
-//
-// This function will maintain a connection with a publisher, and should normally be
-// expected to loop until either the publisher or subscriber disconnects
-//
-func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionState {
+// readFromPublisher maintains a connection with a publisher. When a connection is stable, it will loop until either the publisher or subscriber disconnects.
+func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailureMode {
 	readingSize := true
 	var msgSize int
 	var buffer []byte
 	var result readResult
-	//
-	// Subscriber loop
-	// - Checks for external events
-	// - Breaks the tcp serial stream into messages passed through the message channel
-	//
+
+	// Subscriber loop:
+	// - Checks for external stop requests.
+	// - Packages the tcp serial stream into messages and passes them through the message channel.
 	for {
 		select {
 		case <-s.requestStopChan:
@@ -226,14 +215,11 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionState {
 				msgSize, result = readSize(conn)
 
 				if result == readOk {
-					// TODO - what if msgSize == 0?
 					readingSize = false
 					continue
 				}
 
 				if result == readTimeout {
-					// TODO: This is pretty shaky... what if we only got a portion of the size bytes?
-					//       I think we can do better
 					continue // try again!
 				}
 
@@ -251,7 +237,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionState {
 				}
 
 				if result == readTimeout {
-					// We just failed to read a message; it is likely that we are now out of sync
+					// We just failed to read a message; it is likely that we are now out of sync.
 					return tcpOutOfSync
 				}
 			}
@@ -261,7 +247,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionState {
 				return tcpOutOfSync
 			}
 			if result == readFailed {
-				return connectionFailure
+				return readFailure
 			}
 			if result == remoteDisconnected {
 				return publisherDisconnected
@@ -270,12 +256,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionState {
 	}
 }
 
-//
-// Read the number of bytes to expect in a ROS message payload
-//
-// The structure of a ROS message is: [SIZE|PAYLOAD]
-// This function reads the 4-byte size of a message
-//
+// readSize reads the number of bytes to expect in the message payload. The structure of a ROS message is: [SIZE|PAYLOAD] where size is a uint32.
 func readSize(r io.Reader) (int, readResult) {
 	var msgSize uint32
 
@@ -283,27 +264,23 @@ func readSize(r io.Reader) (int, readResult) {
 	if err != nil {
 		return 0, errorToReadResult(err)
 	}
-	// Check reasonable buffer size
+	// Check that our message size is in a range of possible sizes for a ros message.
 	if msgSize < 256000000 {
 		return int(msgSize), readOk
-	} else {
-		// We assume that this many bytes means we are out of sync
-		return 0, readOutOfSync
 	}
+	// A large number of bytes is an indication of a transport error - we assume we are out of sync.
+	return 0, readOutOfSync
 }
 
-//
-// Read the raw ROS message payload
-//
+// readRawMessage reads ROS message bytes from the io.Reader
 func (s *defaultSubscription) readRawMessage(r io.Reader, size int) ([]byte, readResult) {
-	// first assign a buffer from our pool
-	// The pool is reallocated if it is too small
+	// First, ensure our pool is large enough to receive the bytes. It is reallocated if it is too small.
 	if len(s.pool) < size {
 		s.pool = make([]byte, size)
 	}
 	buffer := s.pool[:size]
 
-	// Read the full buffer; we expect this call to timeout if it takes too long
+	// Read the full buffer; we expect this call to timeout if the read takes too long.
 	_, err := io.ReadFull(r, buffer)
 	if err != nil {
 		return buffer, errorToReadResult(err)
@@ -324,5 +301,4 @@ func errorToReadResult(err error) readResult {
 	}
 	// Not sure what the cause was - return failure at this point
 	return readFailed
-
 }

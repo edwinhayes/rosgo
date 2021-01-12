@@ -89,14 +89,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					quitChan := make(chan struct{}, 10)
 					sub.connections[pub] = quitChan
 					sub.uri2pub[uri] = pub
-					go startRemotePublisherConn(log,
-						uri, sub.topic,
-						sub.msgType.MD5Sum(),
-						sub.msgType.Name(), nodeID,
-						sub.msgChan,
-						quitChan,
-						sub.disconnectedChan,
-						sub.msgType)
+					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, quitChan, sub.disconnectedChan)
 				} else {
 					logger.Warn(sub.topic, " : rosgo does not support protocol: ", name)
 				}
@@ -161,13 +154,12 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 // Creates a subscription to a remote publisher and runs it
 //
 func startRemotePublisherConn(log *modular.ModuleLogger,
-	pubURI string, topic string, md5sum string,
-	msgType string, nodeID string,
+	pubURI string, topic string, msgType MessageType, nodeID string,
 	msgChan chan messageEvent,
 	quitChan chan struct{},
-	disconnectedChan chan string, msgTypeProper MessageType) {
-	sub := newDefaultSubscription(log, pubURI, topic, md5sum, msgType, nodeID, msgChan, quitChan, disconnectedChan, msgTypeProper)
-	sub.start()
+	disconnectedChan chan string) {
+	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
+	sub.start(log)
 }
 
 func setDifference(lhs []string, rhs []string) []string {
