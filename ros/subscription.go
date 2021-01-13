@@ -7,6 +7,7 @@ import (
 	"time"
 
 	modular "github.com/edwinhayes/logrus-modular"
+	"github.com/sirupsen/logrus"
 )
 
 // defaultSubscription connects to a publisher and runs a go routine to maintain its connection and packetize messages from the tcp stream. Messages are passed through the messageChan channel.
@@ -71,10 +72,10 @@ func (s *defaultSubscription) start(log *modular.ModuleLogger) {
 // run connects to a publisher and attempts to maintain a connection until either a stop is requested or the publisher disconnects.
 func (s *defaultSubscription) run(log *modular.ModuleLogger) {
 	logger := *log
-	logger.Debug(s.topic, " : defaultSubscription.start()")
+	logger.WithFields(logrus.Fields{"topic": s.topic}).Debug("defaultSubscription.run() has started")
 
 	defer func() {
-		logger.Debug(s.topic, " : defaultSubscription.start() exit")
+		logger.WithFields(logrus.Fields{"topic": s.topic}).Debug("defaultSubscription.run() has exited")
 	}()
 
 	var conn net.Conn
@@ -86,7 +87,7 @@ func (s *defaultSubscription) run(log *modular.ModuleLogger) {
 			if conn != nil {
 				conn.Close()
 			}
-			logger.Info(s.topic, " : Could not connect to publisher, closing connection")
+			logger.WithFields(logrus.Fields{"topic": s.topic}).Info("could not connect to publisher, closing connection")
 			return
 		}
 
@@ -99,20 +100,20 @@ func (s *defaultSubscription) run(log *modular.ModuleLogger) {
 
 		switch connectionFailureMode {
 		case tcpOutOfSync: // TCP out of sync; we will attempt to resync by closing the connection and trying again.
-			logger.Debug(s.topic, " : connection closed - attempting to reconnect with publisher")
+			logger.WithFields(logrus.Fields{"topic": s.topic}).Debug("connection closed - attempting to reconnect with publisher")
 			continue
 		case stopRequested: // A stop was externally requested - easy, just return!
 			return
 		case publisherDisconnected: // Publisher disconnected - not much we can do here, the subscription has ended.
-			logger.Infof(s.topic, " : connection closed - publisher %s has disconnected", s.pubURI)
+			logger.WithFields(logrus.Fields{"topic": s.topic, "pubURI": s.pubURI}).Info("connection closed - publisher has disconnected")
 			s.remoteDisconnectedChan <- s.pubURI
 			return
-		case readFailure: // read failure; the reason is uncertain, maybe the bus is polluted? We give up.
-			logger.Error(s.topic, " : connection closed - failed to read a message correctly")
+		case readFailure: // Read failure; the reason is uncertain, maybe the bus is polluted? We give up.
+			logger.WithFields(logrus.Fields{"topic": s.topic}).Error("connection closed - failed to read a message correctly")
 			s.remoteDisconnectedChan <- s.pubURI
 			return
-		default: // read failure; the reason is uncertain, maybe the bus is polluted? We give up.
-			logger.Errorf(s.topic, " : connection closed - unknown failure mode %d", connectionFailureMode)
+		default: // Unknown failure - this is a bug, log the connectionFailureMode to help determine cause.
+			logger.WithFields(logrus.Fields{"topic": s.topic, "failureMode": connectionFailureMode}).Error("connection closed - unknown failure mode")
 			return
 		}
 	}
@@ -127,29 +128,32 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 	// 1. Connnect to tcp.
 	select {
 	case <-time.After(time.Duration(3000) * time.Millisecond):
-		logger.Error(s.topic, " : Failed to connect to ", s.pubURI, "timed out")
+		logger.WithFields(logrus.Fields{"topic": s.topic, "pubURI": s.pubURI}).Error("failed to connect: timed out")
 		return false
 	default:
 		*conn, err = net.Dial("tcp", s.pubURI)
 		if err != nil {
-			logger.Error(s.topic, " : Failed to connect to ", s.pubURI, "- error: ", err)
+			logger.WithFields(logrus.Fields{"topic": s.topic, "pubURI": s.pubURI, "error": err}).Error("failed to connect: connection error")
 			return false
 		}
 	}
 
 	// 2. Write connection header to the publisher.
-	var headers []header
-	headers = append(headers, header{"topic", s.topic})
-	headers = append(headers, header{"md5sum", s.msgType.MD5Sum()})
-	headers = append(headers, header{"type", s.msgType.Name()})
-	headers = append(headers, header{"callerid", s.nodeID})
-	logger.Debug(s.topic, " : TCPROS Connection Header")
-	for _, h := range headers {
-		logger.Debugf("          `%s` = `%s`", h.key, h.value)
+	var subscriberHeaders []header
+	subscriberHeaders = append(subscriberHeaders, header{"topic", s.topic})
+	subscriberHeaders = append(subscriberHeaders, header{"md5sum", s.msgType.MD5Sum()})
+	subscriberHeaders = append(subscriberHeaders, header{"type", s.msgType.Name()})
+	subscriberHeaders = append(subscriberHeaders, header{"callerid", s.nodeID})
+
+	logFields := make(logrus.Fields)
+	for _, h := range subscriberHeaders {
+		logFields[h.key] = h.value
 	}
-	err = writeConnectionHeader(headers, *conn)
+	logger.WithFields(logFields).Debug("writing TCPROS connection header")
+
+	err = writeConnectionHeader(subscriberHeaders, *conn)
 	if err != nil {
-		logger.Error(s.topic, " : Failed to write connection header.")
+		logger.WithFields(logrus.Fields{"topic": s.topic, "error": err}).Error("failed to write connection header")
 		return false
 	}
 
@@ -157,19 +161,27 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 	var resHeaders []header
 	resHeaders, err = readConnectionHeader(*conn)
 	if err != nil {
-		logger.Error(s.topic, " : Failed to read response header.")
+		logger.WithFields(logrus.Fields{"topic": s.topic, "error": err}).Error("failed to read response header")
 		return false
 	}
-	logger.Debug(s.topic, " : TCPROS Response Header:")
+	logFields = logrus.Fields{"topic": s.topic}
 	resHeaderMap := make(map[string]string)
 	for _, h := range resHeaders {
 		resHeaderMap[h.key] = h.value
-		logger.Debugf("          `%s` = `%s`", h.key, h.value)
+		logFields["pub["+h.key+"]"] = h.value
 	}
+	logger.WithFields(logFields).Debug("received TCPROS response header")
 
 	// 4. Verify the publisher's response header.
 	if resHeaderMap["type"] != s.msgType.Name() || resHeaderMap["md5sum"] != s.msgType.MD5Sum() {
-		logger.Error("Incompatible message type for ", s.topic, ": ", resHeaderMap["type"], ":", s.msgType.Name(), " ", resHeaderMap["md5sum"], ":", s.msgType.MD5Sum())
+		logFields = make(logrus.Fields)
+		for key, value := range resHeaderMap {
+			logFields["pub["+key+"]"] = value
+		}
+		for _, h := range subscriberHeaders {
+			logFields["sub["+h.key+"]"] = h.value
+		}
+		logger.WithFields(logFields).Error("publisher provided incompatable message header")
 		return false
 	}
 
