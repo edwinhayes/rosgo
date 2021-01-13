@@ -1,6 +1,7 @@
 package ros
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
@@ -11,10 +12,43 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// `subscription_test.go` uses `testMessageType` and `testMessage` defined in `subscriber_test.go`.
-// Integration of subscriptions is tested in the RemotePublisherConn tests in `subscriber_test.go`.
-
 // Helper structs
+
+// Set up testMessage fakes.
+type testMessageType struct{}
+type testMessage struct{}
+
+// Ensure we satisfy the required interfaces.
+var _ MessageType = testMessageType{}
+var _ Message = testMessage{}
+
+func (t testMessageType) Text() string {
+	return "test_message_type"
+}
+
+func (t testMessageType) MD5Sum() string {
+	return "0123456789abcdeffedcba9876543210"
+}
+
+func (t testMessageType) Name() string {
+	return "test_message"
+}
+
+func (t testMessageType) NewMessage() Message {
+	return &testMessage{}
+}
+
+func (t testMessage) Type() MessageType {
+	return &testMessageType{}
+}
+
+func (t testMessage) Serialize(buf *bytes.Buffer) error {
+	return nil
+}
+
+func (t testMessage) Deserialize(buf *bytes.Reader) error {
+	return nil
+}
 
 // testReader provides the io.Reader interface.
 type testReader struct {
@@ -23,6 +57,9 @@ type testReader struct {
 	err    error
 }
 
+// Ensure we satisfy the required interfaces.
+var _ io.Reader = &testReader{}
+
 func (r *testReader) Read(buf []byte) (n int, err error) {
 	_ = copy(buf, r.buffer)
 	n = r.n
@@ -30,32 +67,9 @@ func (r *testReader) Read(buf []byte) (n int, err error) {
 	return
 }
 
-// testLogger provides the modular.ModuleLogger interface
+// Testing starts here.
 
-type testLogger struct {
-}
-
-var _ io.Reader = &testReader{} // verify that testReader satisfies the reader interface
-
-func getTestSubscription(pubURI string) *defaultSubscription {
-
-	topic := "/test/topic"
-	nodeID := "testNode"
-	messageChan := make(chan messageEvent)
-	requestStopChan := make(chan struct{})
-	remoteDisconnectedChan := make(chan string)
-	msgType := testMessageType{}
-
-	return newDefaultSubscription(
-		pubURI, topic, msgType, nodeID,
-		messageChan,
-		requestStopChan,
-		remoteDisconnectedChan)
-}
-
-//
-// Read Size tests
-//
+// Read size tests.
 
 func TestSubscription_ReadSize(t *testing.T) {
 	type testCase struct {
@@ -84,7 +98,7 @@ func TestSubscription_ReadSize(t *testing.T) {
 	}
 }
 
-// Error cases
+// Error cases.
 func TestSubscription_ReadSize_TooLarge(t *testing.T) {
 	reader := testReader{[]byte{0x00, 0x00, 0x00, 0x80}, 4, nil}
 	_, res := readSize(&reader)
@@ -109,11 +123,9 @@ func TestSubscription_ReadSize_otherError(t *testing.T) {
 	}
 }
 
-//
-// Read Raw Data tests
-//
+// Read Raw Data tests.
 
-// Checks pool buffer resizing logic
+// Verify pool buffer resizing logic.
 func TestSubscription_ReadRawData_PoolBuffer(t *testing.T) {
 	subscription := getTestSubscription("testUri")
 	if len(subscription.pool) != 0 {
@@ -122,21 +134,21 @@ func TestSubscription_ReadRawData_PoolBuffer(t *testing.T) {
 
 	reader := testReader{[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 4, nil}
 
-	// Test 1, read 4 bytes, pool size goes to 4 bytes
+	// Test 1, read 4 bytes, pool size goes to 4 bytes.
 	reader.n = 4
 	_, _ = subscription.readRawMessage(&reader, 4)
 	if len(subscription.pool) != 4 {
 		t.Fatalf("Expected pool size of 4, but got %d", len(subscription.pool))
 	}
 
-	// Test 2, read 2 bytes, pool size stays at 4 bytes
+	// Test 2, read 2 bytes, pool size stays at 4 bytes.
 	reader.n = 2
 	_, _ = subscription.readRawMessage(&reader, 2)
 	if len(subscription.pool) != 4 {
 		t.Fatalf("Expected pool size of 4, but got %d", len(subscription.pool))
 	}
 
-	// Test 3, read 10 bytes, pool size goes to 10 bytes
+	// Test 3, read 10 bytes, pool size goes to 10 bytes.
 	reader.n = 10
 	_, _ = subscription.readRawMessage(&reader, 10)
 	if len(subscription.pool) != 10 {
@@ -144,7 +156,7 @@ func TestSubscription_ReadRawData_PoolBuffer(t *testing.T) {
 	}
 }
 
-// checks basic buffer reading works correctly
+// Verify basic buffer reading works correctly.
 func TestSubscription_ReadRawData_ReadData(t *testing.T) {
 	subscription := getTestSubscription("testUri")
 
@@ -162,7 +174,7 @@ func TestSubscription_ReadRawData_ReadData(t *testing.T) {
 	}
 }
 
-// checks handling disconnections
+// Verify disconnection handling.
 func TestSubscription_ReadRawData_disconnected(t *testing.T) {
 	subscription := getTestSubscription("testUri")
 
@@ -217,7 +229,7 @@ func TestSubscription_NewSubscription(t *testing.T) {
 	}
 }
 
-// Create a new subscription and pass headers correctly.
+// Create a new subscription and pass headers still works when topic isn't provided by the publisher.
 func TestSubscription_NewSubscription_NoTopicInHeader(t *testing.T) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -268,7 +280,7 @@ func TestSubscription_NewSubscription_NoTopicInHeader(t *testing.T) {
 	}
 }
 
-// Subscription closes when it receives invalid response header.
+// Subscription closes the connection when it receives an invalid response header.
 func TestSubscription_NewSubscription_InvalidResponseHeader(t *testing.T) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -318,9 +330,28 @@ func TestSubscription_NewSubscription_InvalidResponseHeader(t *testing.T) {
 	l.Close()
 }
 
-// Private Helper functions/
+// Note: Subscription send/receive messages is tested in the RemotePublisherConn tests in `subscriber_test.go`.
 
-//
+// Private Helper functions.
+
+// Create a test subscription object.
+func getTestSubscription(pubURI string) *defaultSubscription {
+
+	topic := "/test/topic"
+	nodeID := "testNode"
+	messageChan := make(chan messageEvent)
+	requestStopChan := make(chan struct{})
+	remoteDisconnectedChan := make(chan string)
+	msgType := testMessageType{}
+
+	return newDefaultSubscription(
+		pubURI, topic, msgType, nodeID,
+		messageChan,
+		requestStopChan,
+		remoteDisconnectedChan)
+}
+
+// readAndVerifySubscriberHeader reads the incoming header from the subscriber, and verifies header contents.
 func readAndVerifySubscriberHeader(t *testing.T, conn net.Conn, topic string, msgType MessageType) {
 	resHeaders, err := readConnectionHeader(conn)
 
@@ -350,6 +381,7 @@ func readAndVerifySubscriberHeader(t *testing.T, conn net.Conn, topic string, ms
 	}
 }
 
+// writeAndVerifyPublisherHeader writes a header to the subscriber; verifies the subscriber captures the header correctly.
 func writeAndVerifyPublisherHeader(t *testing.T, conn net.Conn, subscription *defaultSubscription, replyHeader []header) {
 
 	if err := writeConnectionHeader(replyHeader, conn); err != nil {

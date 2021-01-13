@@ -15,7 +15,7 @@ type messageEvent struct {
 	event MessageEvent
 }
 
-// The subscription object runs in own goroutine (startSubscription).
+// The subscriber object runs in own goroutine (start).
 // Do not access any properties from other goroutine.
 type defaultSubscriber struct {
 	topic            string
@@ -150,9 +150,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 	}
 }
 
-//
-// Creates a subscription to a remote publisher and runs it
-//
+// startRemotePublisherConn creates a subscription to a remote publisher and runs it
 func startRemotePublisherConn(log *modular.ModuleLogger,
 	pubURI string, topic string, msgType MessageType, nodeID string,
 	msgChan chan messageEvent,

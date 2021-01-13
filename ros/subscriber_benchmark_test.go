@@ -18,7 +18,7 @@ func BenchmarkRemotePublisherConn_Throughput1Kb(b *testing.B) {
 	defer l.Close()
 	defer conn.Close()
 
-	buffer := make([]byte, 1000) // 1 kB of data
+	buffer := make([]byte, 1000) // 1 kB of data.
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -34,7 +34,7 @@ func BenchmarkRemotePublisherConn_Throughput1Mb(b *testing.B) {
 	defer l.Close()
 	defer conn.Close()
 
-	buffer := make([]byte, 1000000) // 1 MB of data
+	buffer := make([]byte, 1000000) // 1 MB of data.
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -46,9 +46,7 @@ func BenchmarkRemotePublisherConn_Throughput1Mb(b *testing.B) {
 
 // Benchmark helpers
 
-//
-// Setup, establishes all init values and kicks off the start function
-//
+// setupRemotePublisherConnBenchmark establishes all init values and kicks off the subscriber.
 func setupRemotePublisherConnBenchmark(b *testing.B, start startRemotePublisher) (net.Listener, net.Conn, chan messageEvent, chan string) {
 	logger := modular.NewRootLogger(logrus.New())
 	topic := "/test/topic"
@@ -72,9 +70,7 @@ func setupRemotePublisherConnBenchmark(b *testing.B, start startRemotePublisher)
 	return l, conn, msgChan, disconnectedChan
 }
 
-//
-// Teardown, take down TCP connections and ensures the remotePublisherConn disconnects as expected
-//
+// teardownRemotePublisherConnBenchmark, safely bring down TCP connections and ensure the remotePublisherConn disconnects as expected.
 func teardownRemotePublisherConnBenchmark(b *testing.B, l net.Listener, conn net.Conn, disconnectedChan chan string) {
 	conn.Close()
 	l.Close()
@@ -86,9 +82,7 @@ func teardownRemotePublisherConnBenchmark(b *testing.B, l net.Listener, conn net
 	}
 }
 
-//
-// Connects the test "publisher" to the subscriber, exectutes a header exchange
-//
+// connectToSubscriberWithB connects the test "publisher" to the subscriber under test so that it is ready to receive messages.
 func connectToSubscriberWithB(t *testing.B, l net.Listener, topic string, msgType testMessageType) net.Conn {
 	conn, err := l.Accept()
 	if err != nil {
@@ -116,9 +110,7 @@ func connectToSubscriberWithB(t *testing.B, l net.Listener, topic string, msgTyp
 	return conn
 }
 
-//
-// Sends a message to the subscriber with a set number of bytes
-//
+// sendMessageAndReceiveInChannelWithB publishes a message to the subscriber through the tcp stream.
 func sendMessageAndReceiveInChannelWithB(t *testing.B, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
 
 	err := binary.Write(conn, binary.LittleEndian, uint32(len(buffer)))
@@ -132,7 +124,7 @@ func sendMessageAndReceiveInChannelWithB(t *testing.B, conn net.Conn, msgChan ch
 
 	select {
 	case <-msgChan:
-		// Assume the message is fine - we have unit tests for that!
+		// Assume the message is fine - we have unit tests to verify this.
 		return
 	case <-time.After(time.Duration(100) * time.Millisecond):
 		t.Fatalf("Did not receive message from channel")

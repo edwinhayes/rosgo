@@ -1,7 +1,6 @@
 package ros
 
 import (
-	"bytes"
 	"io"
 	"net"
 	"testing"
@@ -11,42 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//
-// Set up testMessage fakes
-//
-type testMessageType struct{}
-type testMessage struct{}
-
-var _ MessageType = testMessageType{}
-var _ Message = testMessage{}
-
-func (t testMessageType) Text() string {
-	return "test_message_type"
-}
-
-func (t testMessageType) MD5Sum() string {
-	return "0123456789abcdeffedcba9876543210"
-}
-
-func (t testMessageType) Name() string {
-	return "test_message"
-}
-
-func (t testMessageType) NewMessage() Message {
-	return &testMessage{}
-}
-
-func (t testMessage) Type() MessageType {
-	return &testMessageType{}
-}
-
-func (t testMessage) Serialize(buf *bytes.Buffer) error {
-	return nil
-}
-
-func (t testMessage) Deserialize(buf *bytes.Reader) error {
-	return nil
-}
+// `subscriber_test.go` uses `testMessageType` and `testMessage` defined in `subscription_test.go`.
 
 func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 	logger := modular.NewRootLogger(logrus.New())
@@ -76,32 +40,7 @@ func TestRemotePublisherConn_DoesConnect(t *testing.T) {
 	}
 	defer conn.Close()
 
-	resHeaders, err := readConnectionHeader(conn)
-
-	if err != nil {
-		t.Fatal("Failed to read header:", err)
-	}
-
-	resHeaderMap := make(map[string]string)
-	for _, h := range resHeaders {
-		resHeaderMap[h.key] = h.value
-	}
-
-	if resHeaderMap["md5sum"] != msgType.MD5Sum() {
-		t.Fatalf("Incorrect MD5 sum %s", resHeaderMap["md5sum"])
-	}
-
-	if resHeaderMap["topic"] != topic {
-		t.Fatalf("Incorrect topic: %s", topic)
-	}
-
-	if resHeaderMap["type"] != msgType.Name() {
-		t.Fatalf("Incorrect type: %s", resHeaderMap["type"])
-	}
-
-	if resHeaderMap["callerid"] != "testNode" {
-		t.Fatalf("Incorrect caller ID: %s", resHeaderMap["testNode"])
-	}
+	readAndVerifySubscriberHeader(t, conn, topic, msgType) // Test helper from subscription_test.go.
 
 	replyHeader := []header{
 		{"topic", topic},
@@ -240,12 +179,13 @@ func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan me
 		t.Fatalf("sendMessageAndReceiveInChannel helper doesn't support more than 255 bytes!")
 	}
 
+	// Packet structure is [ LENGTH<uint32> | PAYLOAD<bytes[LENGTH]> ]
 	length := uint8(len(buffer))
 	n, err := conn.Write([]byte{length, 0x00, 0x00, 0x00})
-	if n != 4 || err != nil {
+	if n != 4 || err != nil { // Send length.
 		t.Fatalf("Failed to write message size, n: %d : err: %s", n, err)
 	}
-	n, err = conn.Write(buffer) // payload
+	n, err = conn.Write(buffer) // Send payload.
 	if n != len(buffer) || err != nil {
 		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
 	}

@@ -211,7 +211,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 				}
 
 				if result == readTimeout {
-					continue // try again!
+					continue // Try again!
 				}
 
 			} else {
@@ -263,7 +263,7 @@ func readSize(r io.Reader) (int, readResult) {
 	return 0, readOutOfSync
 }
 
-// readRawMessage reads ROS message bytes from the io.Reader
+// readRawMessage reads ROS message bytes from the io.Reader.
 func (s *defaultSubscription) readRawMessage(r io.Reader, size int) ([]byte, readResult) {
 	// First, ensure our pool is large enough to receive the bytes. It is reallocated if it is too small.
 	if len(s.pool) < size {
@@ -280,9 +280,7 @@ func (s *defaultSubscription) readRawMessage(r io.Reader, size int) ([]byte, rea
 	return buffer, readOk
 }
 
-//
-// Convert errors to readResult to be handled up the callstack
-//
+// errorToReadResult converts errors to readResult to be handled further up the callstack.
 func errorToReadResult(err error) readResult {
 	if err == io.EOF {
 		return remoteDisconnected
@@ -290,6 +288,6 @@ func errorToReadResult(err error) readResult {
 	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 		return readTimeout
 	}
-	// Not sure what the cause was - return failure at this point
+	// Not sure what the cause was - it is just a generic readFailure.
 	return readFailed
 }
