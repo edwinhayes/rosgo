@@ -148,39 +148,3 @@ func connectToSubscriber(t *testing.T, conn net.Conn) {
 		t.Fatalf("Failed to write header: %s", replyHeader)
 	}
 }
-
-func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
-	if len(buffer) > 255 {
-		t.Fatalf("sendMessageAndReceiveInChannel helper doesn't support more than 255 bytes!")
-	}
-
-	// Packet structure is [ LENGTH<uint32> | PAYLOAD<bytes[LENGTH]> ]
-	length := uint8(len(buffer))
-	n, err := conn.Write([]byte{length, 0x00, 0x00, 0x00})
-	if n != 4 || err != nil { // Send length.
-		t.Fatalf("Failed to write message size, n: %d : err: %s", n, err)
-	}
-	n, err = conn.Write(buffer) // Send payload.
-	if n != len(buffer) || err != nil {
-		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
-	}
-
-	select {
-	case message := <-msgChan:
-
-		if message.event.PublisherName != "testPublisher" {
-			t.Fatalf("Published with the wrong publisher name: %s", message.event.PublisherName)
-		}
-		if len(message.bytes) != len(buffer) {
-			t.Fatalf("Payload size is incorrect: %d, expected: %d", len(message.bytes), len(buffer))
-		}
-		for i := 1; i < len(buffer); i++ {
-			if message.bytes[i] != buffer[i] {
-				t.Fatalf("message.bytes[%d] = %x, expected %x", i, message.bytes[i], buffer[i])
-			}
-		}
-		return
-	case <-time.After(time.Duration(10) * time.Millisecond):
-		t.Fatalf("Did not receive message from channel")
-	}
-}

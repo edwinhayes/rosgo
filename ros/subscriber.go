@@ -20,8 +20,7 @@ type subscriptionChannels struct {
 	enableMessages chan bool
 }
 
-// The subscription object runs in own goroutine (startSubscription).
-// Do not access any properties from other goroutine.
+// The subscriber object runs in own goroutine (start).
 type defaultSubscriber struct {
 	topic             string
 	msgType           MessageType
@@ -106,7 +105,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			sub.callbacks = append(sub.callbacks, callback)
 
 		case msgEvent := <-sub.msgChan:
-			// Pop received message then bind callbacks and enqueue to the job channle.
+			// Pop received message then bind callbacks and enqueue to the job channel.
 			logger.Debug(sub.topic, " : Receive msgChan")
 
 			callbacks := make([]interface{}, len(sub.callbacks))
@@ -134,14 +133,13 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			}
 			logger.Debug("Callback job enqueued.")
 
-		// TODO: Pretty sus on this implementation - need to check this in tests
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
 			delete(sub.subscriptionChans, sub.uri2pub[pubURI])
 			delete(sub.uri2pub, pubURI)
 
 		case <-sub.shutdownChan:
-			// Shutdown subscription goroutine
+			// Shutdown subscription goroutine.
 			logger.Debug(sub.topic, " : Receive shutdownChan")
 			for _, closeChan := range sub.subscriptionChans {
 				closeChan.quit <- struct{}{}
@@ -162,7 +160,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 	}
 }
 
-// startRemotePublisherConn creates a subscription to a remote publisher and runs it
+// startRemotePublisherConn creates a subscription to a remote publisher and runs it.
 func startRemotePublisherConn(log *modular.ModuleLogger,
 	pubURI string, topic string, msgType MessageType, nodeID string,
 	msgChan chan messageEvent,

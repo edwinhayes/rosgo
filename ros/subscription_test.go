@@ -330,28 +330,11 @@ func TestSubscription_NewSubscription_InvalidResponseHeader(t *testing.T) {
 	l.Close()
 }
 
-func TestSubscription_RemoteReceivesData(t *testing.T) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+// Valid messages are forwarded from the publisher TCP stream by the subscription.
+func TestSubscription_SubscriptionForwardsMessages(t *testing.T) {
+	l, conn, subscription := createAndConnectToSubscription(t)
 	defer l.Close()
-	pubURI := l.Addr().String()
-
-	subscription := getTestSubscription(pubURI)
-
-	logger := modular.NewRootLogger(logrus.New())
-	log := logger.GetModuleLogger()
-
-	subscription.start(&log)
-
-	conn, err := l.Accept()
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer conn.Close()
-
-	connectToSubscriber(t, conn)
 
 	// Send something!
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
@@ -370,42 +353,25 @@ func TestSubscription_RemoteReceivesData(t *testing.T) {
 	}
 }
 
+// The subscription adheres to the flow control policy.
 func TestSubscription_FlowControl(t *testing.T) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer l.Close()
-	pubURI := l.Addr().String()
-
-	subscription := getTestSubscription(pubURI)
-
-	logger := modular.NewRootLogger(logrus.New())
-	log := logger.GetModuleLogger()
-
-	subscription.start(&log)
-
-	conn, err := l.Accept()
-	if err != nil {
-		t.Fatal(err)
-	}
+	l, conn, subscription := createAndConnectToSubscription(t)
 	defer conn.Close()
+	defer l.Close()
 
-	connectToSubscriber(t, conn)
-
-	// Send something - channel enabled
+	// Send something - channel enabled.
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
 
-	// Send something - channel disabled
+	// Send something - channel disabled.
 	subscription.enableChan <- false
 	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23})
 
-	// Send something - channel enabled
+	// Send something - channel enabled.
 	subscription.enableChan <- true
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23})
 	sendMessageAndReceiveInChannel(t, conn, subscription.messageChan, []byte{0x12, 0x23, 0x43})
 
-	// Send something - channel disabled
+	// Send something - channel disabled.
 	subscription.enableChan <- false
 	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23})
 	sendMessageNoReceive(t, conn, subscription.messageChan, []byte{0x12, 0x23, 0x43})
@@ -493,13 +459,49 @@ func writeAndVerifyPublisherHeader(t *testing.T, conn net.Conn, subscription *de
 	}
 }
 
-// Helpers
+// sendMessageAndReceiveInChannel sends a message which we expect is passed on by the subscription.
+func sendMessageAndReceiveInChannel(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
+	sendMessageBytes(t, conn, buffer)
 
+	select {
+	case message := <-msgChan:
+
+		if message.event.PublisherName != "testPublisher" {
+			t.Fatalf("Published with the wrong publisher name: %s", message.event.PublisherName)
+		}
+		if len(message.bytes) != len(buffer) {
+			t.Fatalf("Payload size is incorrect: %d, expected: %d", len(message.bytes), len(buffer))
+		}
+		for i := 1; i < len(buffer); i++ {
+			if message.bytes[i] != buffer[i] {
+				t.Fatalf("message.bytes[%d] = %x, expected %x", i, message.bytes[i], buffer[i])
+			}
+		}
+		return
+	case <-time.After(time.Duration(10) * time.Millisecond):
+		t.Fatalf("Did not receive message from channel")
+	}
+}
+
+// sendMessageNoReceive sends a message which we expect is dropped by the subscription.
 func sendMessageNoReceive(t *testing.T, conn net.Conn, msgChan chan messageEvent, buffer []byte) {
+	sendMessageBytes(t, conn, buffer)
+
+	select {
+	case _ = <-msgChan:
+		t.Fatalf("Message channel sent bytes; should be disabled!")
+	case <-time.After(time.Duration(50) * time.Millisecond):
+		return
+	}
+}
+
+// sendMessageBytes sends a message payload as per TCPROS spec.
+func sendMessageBytes(t *testing.T, conn net.Conn, buffer []byte) {
 	if len(buffer) > 255 {
 		t.Fatalf("sendMessageAndReceiveInChannel helper doesn't support more than 255 bytes!")
 	}
 
+	// Packet structure is [ LENGTH<uint32> | PAYLOAD<bytes[LENGTH]> ].
 	length := uint8(len(buffer))
 	n, err := conn.Write([]byte{length, 0x00, 0x00, 0x00})
 	if n != 4 || err != nil {
@@ -509,11 +511,40 @@ func sendMessageNoReceive(t *testing.T, conn net.Conn, msgChan chan messageEvent
 	if n != len(buffer) || err != nil {
 		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
 	}
+}
 
-	select {
-	case _ = <-msgChan:
-		t.Fatalf("Message channel sent bytes; should be disabled!")
-	case <-time.After(time.Duration(50) * time.Millisecond):
-		return
+// createAndConnectToSubscription creates a new subscription struct and prepares a TCPROS session where we are ready to exchange messages.
+func createAndConnectToSubscription(t *testing.T) (net.Listener, net.Conn, *defaultSubscription) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
 	}
+	pubURI := l.Addr().String()
+
+	subscription := getTestSubscription(pubURI)
+
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
+
+	conn, err := l.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	readAndVerifySubscriberHeader(t, conn, subscription.topic, subscription.msgType)
+
+	replyHeader := []header{
+		{"topic", subscription.topic},
+		{"md5sum", subscription.msgType.MD5Sum()},
+		{"type", subscription.msgType.Name()},
+		{"callerid", "testPublisher"},
+	}
+
+	if err := writeConnectionHeader(replyHeader, conn); err != nil {
+		t.Fatalf("Failed to write header: %s, error: %s", replyHeader, err)
+	}
+
+	return l, conn, subscription
 }

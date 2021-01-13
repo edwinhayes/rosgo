@@ -236,7 +236,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 				buffer, result = s.readRawMessage(conn, msgSize)
 
 				if result == readOk {
-					if enabled { // flow control!
+					if enabled { // Apply flow control - only read when enabled!
 						s.event.ReceiptTime = time.Now()
 						select {
 						case s.messageChan <- messageEvent{bytes: buffer, event: s.event}:
