@@ -91,7 +91,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					port := protocolParams[2].(int32)
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
-					enableMessagesChan := make(chan bool, 10)
+					enableMessagesChan := make(chan bool)
 					sub.uri2pub[uri] = pub
 					sub.subscriptionChans[pub] = subscriptionChannels{quit: quitChan, enableMessages: enableMessagesChan}
 					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, enableMessagesChan, quitChan, sub.disconnectedChan)
@@ -135,7 +135,8 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
-			delete(sub.subscriptionChans, sub.uri2pub[pubURI])
+			pub := sub.uri2pub[pubURI]
+			delete(sub.subscriptionChans, pub)
 			delete(sub.uri2pub, pubURI)
 
 		case <-sub.shutdownChan:
