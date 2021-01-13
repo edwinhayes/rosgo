@@ -174,9 +174,7 @@ func TestSubscription_ReadRawData_disconnected(t *testing.T) {
 	}
 }
 
-//
-// Basic integration stuff - TODO: figure out how to tidy this up...
-//
+// Create a new subscription and pass headers correctly.
 func TestSubscription_NewSubscription(t *testing.T) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -198,6 +196,132 @@ func TestSubscription_NewSubscription(t *testing.T) {
 	}
 	defer conn.Close()
 
+	readAndVerifySubscriberHeader(t, conn, subscription.topic, subscription.msgType)
+
+	replyHeader := []header{
+		{"topic", subscription.topic},
+		{"md5sum", subscription.msgType.MD5Sum()},
+		{"type", subscription.msgType.Name()},
+		{"callerid", "testPublisher"},
+	}
+
+	writeAndVerifyPublisherHeader(t, conn, subscription, replyHeader)
+
+	conn.Close()
+	l.Close()
+	select {
+	case <-subscription.remoteDisconnectedChan:
+		return
+	case <-time.After(time.Duration(100) * time.Millisecond):
+		t.Fatalf("Took too long for client to disconnect from publisher")
+	}
+}
+
+// Create a new subscription and pass headers correctly.
+func TestSubscription_NewSubscription_NoTopicInHeader(t *testing.T) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	pubURI := l.Addr().String()
+
+	subscription := getTestSubscription(pubURI)
+
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
+
+	conn, err := l.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	readAndVerifySubscriberHeader(t, conn, subscription.topic, subscription.msgType)
+
+	replyHeader := []header{
+		{"md5sum", subscription.msgType.MD5Sum()},
+		{"type", subscription.msgType.Name()},
+		{"callerid", "testPublisher"},
+	}
+
+	writeAndVerifyPublisherHeader(t, conn, subscription, replyHeader)
+
+	// Expect that we store the topic anyway!
+	if result, ok := subscription.event.ConnectionHeader["topic"]; ok {
+		if subscription.topic != result {
+			t.Fatalf("expected header[topic] = %s, but got %s", subscription.topic, result)
+		}
+	} else {
+		t.Fatalf("subscription did not store header data for topic")
+	}
+
+	conn.Close()
+	l.Close()
+	select {
+	case <-subscription.remoteDisconnectedChan:
+		return
+	case <-time.After(time.Duration(100) * time.Millisecond):
+		t.Fatalf("Took too long for client to disconnect from publisher")
+	}
+}
+
+// Subscription closes when it receives invalid response header.
+func TestSubscription_NewSubscription_InvalidResponseHeader(t *testing.T) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	pubURI := l.Addr().String()
+
+	subscription := getTestSubscription(pubURI)
+
+	logger := modular.NewRootLogger(logrus.New())
+	log := logger.GetModuleLogger()
+
+	subscription.start(&log)
+
+	conn, err := l.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	readAndVerifySubscriberHeader(t, conn, subscription.topic, subscription.msgType)
+
+	invalidMD5 := "00112233445566778899aabbccddeeff"
+	replyHeader := []header{
+		{"topic", subscription.topic},
+		{"md5sum", invalidMD5},
+		{"type", subscription.msgType.Name()},
+		{"callerid", "testPublisher"},
+	}
+
+	if err := writeConnectionHeader(replyHeader, conn); err != nil {
+		t.Fatalf("failed to write header: %s", replyHeader)
+	}
+
+	// Wait for the subscription to receive the data.
+	<-time.After(time.Millisecond)
+
+	// Expect the Subscription has closed the channel.
+	dummySlice := make([]byte, 1)
+	if _, err := conn.Read(dummySlice); err != io.EOF {
+		t.Fatalf("expected subscription to close connection when receiving invalid header")
+
+	}
+
+	conn.Close()
+	l.Close()
+}
+
+// Private Helper functions/
+
+//
+func readAndVerifySubscriberHeader(t *testing.T, conn net.Conn, topic string, msgType MessageType) {
 	resHeaders, err := readConnectionHeader(conn)
 
 	if err != nil {
@@ -209,40 +333,39 @@ func TestSubscription_NewSubscription(t *testing.T) {
 		resHeaderMap[h.key] = h.value
 	}
 
-	if resHeaderMap["md5sum"] != subscription.msgType.MD5Sum() {
-		t.Fatalf("Incorrect MD5 sum %s", resHeaderMap["md5sum"])
+	if resHeaderMap["md5sum"] != msgType.MD5Sum() {
+		t.Fatalf("incorrect MD5 sum %s", resHeaderMap["md5sum"])
 	}
 
-	if resHeaderMap["topic"] != subscription.topic {
-		t.Fatalf("Incorrect topic: %s", subscription.topic)
+	if resHeaderMap["topic"] != topic {
+		t.Fatalf("incorrect topic: %s", topic)
 	}
 
-	if resHeaderMap["type"] != subscription.msgType.Name() {
-		t.Fatalf("Incorrect type: %s", resHeaderMap["type"])
+	if resHeaderMap["type"] != msgType.Name() {
+		t.Fatalf("incorrect type: %s", resHeaderMap["type"])
 	}
 
 	if resHeaderMap["callerid"] != "testNode" {
-		t.Fatalf("Incorrect caller ID: %s", resHeaderMap["testNode"])
+		t.Fatalf("incorrect caller ID: %s", resHeaderMap["testNode"])
 	}
+}
 
-	replyHeader := []header{
-		{"topic", subscription.topic},
-		{"md5sum", subscription.msgType.MD5Sum()},
-		{"type", subscription.msgType.Name()},
-		{"callerid", "testPublisher"},
-	}
+func writeAndVerifyPublisherHeader(t *testing.T, conn net.Conn, subscription *defaultSubscription, replyHeader []header) {
 
-	err = writeConnectionHeader(replyHeader, conn)
-	if err != nil {
+	if err := writeConnectionHeader(replyHeader, conn); err != nil {
 		t.Fatalf("Failed to write header: %s", replyHeader)
 	}
 
-	conn.Close()
-	l.Close()
-	select {
-	case <-subscription.remoteDisconnectedChan:
-		return
-	case <-time.After(time.Duration(100) * time.Millisecond):
-		t.Fatalf("Took too long for client to disconnect from publisher")
+	// wait for the subscription to receive the data
+	<-time.After(time.Millisecond)
+
+	for _, expected := range replyHeader {
+		if result, ok := subscription.event.ConnectionHeader[expected.key]; ok {
+			if expected.value != result {
+				t.Fatalf("expected header[%s] = %s, but got %s", expected.key, expected.value, result)
+			}
+		} else {
+			t.Fatalf("subscription did not store header data for %s", expected.key)
+		}
 	}
 }

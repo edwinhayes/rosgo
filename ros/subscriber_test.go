@@ -25,7 +25,7 @@ func (t testMessageType) Text() string {
 }
 
 func (t testMessageType) MD5Sum() string {
-	return "fakeMD5"
+	return "0123456789abcdeffedcba9876543210"
 }
 
 func (t testMessageType) Name() string {

@@ -42,7 +42,7 @@ func newDefaultSubscription(
 	}
 }
 
-// connectionFailureMode indicates a connection failure mode
+// connectionFailureMode specifies a connection failure mode.
 type connectionFailureMode int
 
 const (
@@ -79,11 +79,9 @@ func (s *defaultSubscription) run(log *modular.ModuleLogger) {
 
 	var conn net.Conn
 
-	// The recovery loop
-	// If a connection to the publisher fails or goes out of sync, this loop allows us to
-	// attempt to start again with a new subscription.
+	// The recovery loop: if a connection to the publisher fails or goes out of sync, this loop allows us to attempt to start again with a new subscription.
 	for {
-		// Connect
+		// Establish a connection with our publisher.
 		if s.connectToPublisher(&conn, log) == false {
 			if conn != nil {
 				conn.Close()
@@ -91,50 +89,42 @@ func (s *defaultSubscription) run(log *modular.ModuleLogger) {
 			logger.Info(s.topic, " : Could not connect to publisher, closing connection")
 			return
 		}
-		defer conn.Close() // Make sure we close this
 
-		// Reading from publisher
+		// Reading from publisher, this will only return when our connection fails.
 		connectionFailureMode := s.readFromPublisher(conn)
 
-		// Under healthy conditions, we don't get here
-		// handle the returned connection state
+		// Under healthy conditions, we don't get here. Always close the connection, then handle the returned connection state.
+		conn.Close()
+		conn = nil
 
-		// TCP out of sync; we will attempt to resync by closing the connection and trying again
-		if connectionFailureMode == tcpOutOfSync {
-			conn.Close()
-			logger.Debug(s.topic, " : Connection closed, reconnecting with publisher")
-		}
-
-		// A stop was externally requested - easy one!
-		if connectionFailureMode == stopRequested {
+		switch connectionFailureMode {
+		case tcpOutOfSync: // TCP out of sync; we will attempt to resync by closing the connection and trying again.
+			logger.Debug(s.topic, " : connection closed - attempting to reconnect with publisher")
+			continue
+		case stopRequested: // A stop was externally requested - easy, just return!
 			return
-		}
-
-		// Publisher disconnected - not much we can do here, the subscription has ended
-		if connectionFailureMode == publisherDisconnected {
-			logger.Infof("Publisher %s on topic %s disconnected", s.pubURI, s.topic)
+		case publisherDisconnected: // Publisher disconnected - not much we can do here, the subscription has ended.
+			logger.Infof(s.topic, " : connection closed - publisher %s has disconnected", s.pubURI)
 			s.remoteDisconnectedChan <- s.pubURI
 			return
-		}
-
-		// read failure; the reason is uncertain, so we will give up
-		if connectionFailureMode == readFailure {
-			logger.Error(s.topic, " : Failed to read a message correctly")
+		case readFailure: // read failure; the reason is uncertain, maybe the bus is polluted? We give up.
+			logger.Error(s.topic, " : connection closed - failed to read a message correctly")
 			s.remoteDisconnectedChan <- s.pubURI
+			return
+		default: // read failure; the reason is uncertain, maybe the bus is polluted? We give up.
+			logger.Errorf(s.topic, " : connection closed - unknown failure mode %d", connectionFailureMode)
 			return
 		}
 	}
 }
 
-// ConnectToPublisher Estabilishes a TCPROS connection with a publishing node
-// Connects via TCP and then exchanges headers to ensure
-// both nodes are using the same message type
+// connectToPublisher estabilishes a TCPROS connection with a publishing node by exchanging headers to ensure both nodes are using the same message type.
 func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.ModuleLogger) bool {
 	var err error
 
 	logger := *log
 
-	// 1. Connnect to tcp
+	// 1. Connnect to tcp.
 	select {
 	case <-time.After(time.Duration(3000) * time.Millisecond):
 		logger.Error(s.topic, " : Failed to connect to ", s.pubURI, "timed out")
@@ -147,7 +137,7 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 		}
 	}
 
-	// 2. Write connection header
+	// 2. Write connection header to the publisher.
 	var headers []header
 	headers = append(headers, header{"topic", s.topic})
 	headers = append(headers, header{"md5sum", s.msgType.MD5Sum()})
@@ -163,7 +153,7 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 		return false
 	}
 
-	// 3. Read reponse header
+	// 3. Read the publisher's reponse header.
 	var resHeaders []header
 	resHeaders, err = readConnectionHeader(*conn)
 	if err != nil {
@@ -177,18 +167,19 @@ func (s *defaultSubscription) connectToPublisher(conn *net.Conn, log *modular.Mo
 		logger.Debugf("          `%s` = `%s`", h.key, h.value)
 	}
 
-	// 4. Verify response header
+	// 4. Verify the publisher's response header.
 	if resHeaderMap["type"] != s.msgType.Name() || resHeaderMap["md5sum"] != s.msgType.MD5Sum() {
 		logger.Error("Incompatible message type for ", s.topic, ": ", resHeaderMap["type"], ":", s.msgType.Name(), " ", resHeaderMap["md5sum"], ":", s.msgType.MD5Sum())
 		return false
 	}
 
-	// Some incomplete TCPROS implementations do not include topic name in response
+	// Some incomplete TCPROS implementations do not include topic name in response; set it if it is currently empty.
 	if resHeaderMap["topic"] == "" {
 		resHeaderMap["topic"] = s.topic
 	}
 
-	s.event = MessageEvent{ // Event struct to be sent with each message.
+	// Construct the event struct to be sent with each message.
+	s.event = MessageEvent{
 		PublisherName:    resHeaderMap["callerid"],
 		ConnectionHeader: resHeaderMap,
 	}
