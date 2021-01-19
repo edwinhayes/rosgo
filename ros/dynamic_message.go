@@ -1536,6 +1536,7 @@ func zeroValueData(s string) (map[string]interface{}, error) {
 
 // padArray pads the provided array to the specified length using the default value for the array type.
 func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {
+	fmt.Printf("padding array: %+v from actualSize: %v to requiredSize: %v\n", array, actualSize, requiredSize)
 	switch field.GoType {
 	case "bool":
 		// Make sure we've actually got a bool.
