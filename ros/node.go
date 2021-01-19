@@ -618,6 +618,11 @@ func (node *defaultNode) RemoveSubscriber(topic string) {
 }
 
 func (node *defaultNode) NewSubscriber(topic string, msgType MessageType, callback interface{}) (Subscriber, error) {
+	// Respect the legacy interface
+	return node.NewSubscriberWithFlowControl(topic, msgType, nil, callback)
+}
+
+func (node *defaultNode) NewSubscriberWithFlowControl(topic string, msgType MessageType, enableChan chan bool, callback interface{}) (Subscriber, error) {
 	node.subscribersMutex.Lock()
 	defer node.subscribersMutex.Unlock()
 
@@ -653,7 +658,7 @@ func (node *defaultNode) NewSubscriber(topic string, msgType MessageType, callba
 		node.subscribers[name] = sub
 
 		node.logger.Debugf("Start subscriber goroutine for topic '%s'", sub.topic)
-		go sub.start(&node.waitGroup, node.qualifiedName, node.xmlrpcURI, node.masterURI, node.jobChan, &node.logger)
+		go sub.start(&node.waitGroup, node.qualifiedName, node.xmlrpcURI, node.masterURI, node.jobChan, enableChan, &node.logger)
 		node.logger.Debugf("Done")
 		sub.pubListChan <- publishers
 		node.logger.Debugf("Update publisher list for topic '%s'", sub.topic)

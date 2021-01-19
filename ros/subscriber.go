@@ -15,20 +15,24 @@ type messageEvent struct {
 	event MessageEvent
 }
 
+type subscriptionChannels struct {
+	quit           chan struct{}
+	enableMessages chan bool
+}
+
 // The subscriber object runs in own goroutine (start).
-// Do not access any properties from other goroutine.
 type defaultSubscriber struct {
-	topic            string
-	msgType          MessageType
-	pubList          []string
-	pubListChan      chan []string
-	msgChan          chan messageEvent
-	callbacks        []interface{}
-	addCallbackChan  chan interface{}
-	shutdownChan     chan struct{}
-	connections      map[string]chan struct{}
-	uri2pub          map[string]string
-	disconnectedChan chan string
+	topic             string
+	msgType           MessageType
+	pubList           []string
+	pubListChan       chan []string
+	msgChan           chan messageEvent
+	callbacks         []interface{}
+	addCallbackChan   chan interface{}
+	shutdownChan      chan struct{}
+	subscriptionChans map[string]subscriptionChannels
+	uri2pub           map[string]string
+	disconnectedChan  chan string
 }
 
 func newDefaultSubscriber(topic string, msgType MessageType, callback interface{}) *defaultSubscriber {
@@ -40,13 +44,13 @@ func newDefaultSubscriber(topic string, msgType MessageType, callback interface{
 	sub.addCallbackChan = make(chan interface{}, 10)
 	sub.shutdownChan = make(chan struct{}, 10)
 	sub.disconnectedChan = make(chan string, 10)
-	sub.connections = make(map[string]chan struct{})
 	sub.uri2pub = make(map[string]string)
+	sub.subscriptionChans = make(map[string]subscriptionChannels)
 	sub.callbacks = []interface{}{callback}
 	return sub
 }
 
-func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIURI string, masterURI string, jobChan chan func(), log *modular.ModuleLogger) {
+func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIURI string, masterURI string, jobChan chan func(), enableChan chan bool, log *modular.ModuleLogger) {
 	logger := *log
 	logger.Debugf("Subscriber goroutine for %s started.", sub.topic)
 	wg.Add(1)
@@ -63,9 +67,9 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			sub.pubList = list
 
 			for _, pub := range deadPubs {
-				quitChan := sub.connections[pub]
-				quitChan <- struct{}{}
-				delete(sub.connections, pub)
+				deadSubscription := sub.subscriptionChans[pub]
+				deadSubscription.quit <- struct{}{}
+				delete(sub.subscriptionChans, pub)
 			}
 
 			for _, pub := range newPubs {
@@ -87,9 +91,10 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					port := protocolParams[2].(int32)
 					uri := fmt.Sprintf("%s:%d", addr, port)
 					quitChan := make(chan struct{}, 10)
-					sub.connections[pub] = quitChan
+					enableMessagesChan := make(chan bool)
 					sub.uri2pub[uri] = pub
-					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, quitChan, sub.disconnectedChan)
+					sub.subscriptionChans[pub] = subscriptionChannels{quit: quitChan, enableMessages: enableMessagesChan}
+					startRemotePublisherConn(log, uri, sub.topic, sub.msgType, nodeID, sub.msgChan, enableMessagesChan, quitChan, sub.disconnectedChan)
 				} else {
 					logger.Warn(sub.topic, " : rosgo does not support protocol: ", name)
 				}
@@ -100,7 +105,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			sub.callbacks = append(sub.callbacks, callback)
 
 		case msgEvent := <-sub.msgChan:
-			// Pop received message then bind callbacks and enqueue to the job channle.
+			// Pop received message then bind callbacks and enqueue to the job channel.
 			logger.Debug(sub.topic, " : Receive msgChan")
 
 			callbacks := make([]interface{}, len(sub.callbacks))
@@ -130,15 +135,16 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 
 		case pubURI := <-sub.disconnectedChan:
 			logger.Debugf("Connection to %s was disconnected.", pubURI)
-			delete(sub.connections, sub.uri2pub[pubURI])
+			pub := sub.uri2pub[pubURI]
+			delete(sub.subscriptionChans, pub)
 			delete(sub.uri2pub, pubURI)
 
 		case <-sub.shutdownChan:
-			// Shutdown subscription goroutine
+			// Shutdown subscription goroutine.
 			logger.Debug(sub.topic, " : Receive shutdownChan")
-			for _, closeChan := range sub.connections {
-				closeChan <- struct{}{}
-				close(closeChan)
+			for _, closeChan := range sub.subscriptionChans {
+				closeChan.quit <- struct{}{}
+				close(closeChan.quit)
 			}
 			_, err := callRosAPI(masterURI, "unregisterSubscriber", nodeID, sub.topic, nodeAPIURI)
 			if err != nil {
@@ -146,17 +152,23 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			}
 			sub.shutdownChan <- struct{}{}
 			return
+
+		case enabled := <-enableChan:
+			for _, subscription := range sub.subscriptionChans {
+				subscription.enableMessages <- enabled
+			}
 		}
 	}
 }
 
-// startRemotePublisherConn creates a subscription to a remote publisher and runs it
+// startRemotePublisherConn creates a subscription to a remote publisher and runs it.
 func startRemotePublisherConn(log *modular.ModuleLogger,
 	pubURI string, topic string, msgType MessageType, nodeID string,
 	msgChan chan messageEvent,
+	enableMessagesChan chan bool,
 	quitChan chan struct{},
 	disconnectedChan chan string) {
-	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
+	sub := newDefaultSubscription(pubURI, topic, msgType, nodeID, msgChan, enableMessagesChan, quitChan, disconnectedChan)
 	sub.start(log)
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type startRemotePublisher func(*modular.ModuleLogger, string, string, MessageType, string, chan messageEvent, chan struct{}, chan string)
+type startRemotePublisher func(*modular.ModuleLogger, string, string, MessageType, string, chan messageEvent, chan bool, chan struct{}, chan string)
 
 func BenchmarkRemotePublisherConn_Throughput1Kb(b *testing.B) {
 
@@ -52,6 +52,7 @@ func setupRemotePublisherConnBenchmark(b *testing.B, start startRemotePublisher)
 	topic := "/test/topic"
 	nodeID := "testNode"
 	msgChan := make(chan messageEvent)
+	enableChan := make(chan bool)
 	quitChan := make(chan struct{})
 	disconnectedChan := make(chan string)
 	msgType := testMessageType{}
@@ -64,7 +65,7 @@ func setupRemotePublisherConnBenchmark(b *testing.B, start startRemotePublisher)
 		b.Fatal(err)
 	}
 
-	start(&log, l.Addr().String(), topic, msgType, nodeID, msgChan, quitChan, disconnectedChan)
+	start(&log, l.Addr().String(), topic, msgType, nodeID, msgChan, enableChan, quitChan, disconnectedChan)
 
 	conn := connectToSubscriberWithB(b, l, topic, msgType)
 	return l, conn, msgChan, disconnectedChan

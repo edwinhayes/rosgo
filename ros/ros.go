@@ -24,6 +24,7 @@ type Node interface {
 	// generated message type and the second argument should be of
 	// type MessageEvent.
 	NewSubscriber(topic string, msgType MessageType, callback interface{}) (Subscriber, error)
+	NewSubscriberWithFlowControl(topic string, msgType MessageType, enable chan bool, callback interface{}) (Subscriber, error)
 	NewServiceClient(service string, srvType ServiceType) ServiceClient
 	NewServiceServer(service string, srvType ServiceType, callback interface{}) ServiceServer
 
