@@ -719,7 +719,9 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			arrayValue := reflect.ValueOf(array)
 			for i := uint32(0); i < size; i++ {
 				//Casting the array item to interface type
-				fmt.Printf("field = %v, i = %v\n", field, i)
+				fmt.Printf("field = %+v, i = %v\n", field, i)
+				fmt.Printf("name = %+v\n", field.Name)
+				fmt.Printf("DynamicMessage m = %+v\n", m)
 				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v, array: %+v\n", size, arrayValue, field.ArrayLen, array)
 				var arrayItem interface{} = arrayValue.Index(int(i)).Interface()
 				// Need to handle each type appropriately.
