@@ -92,18 +92,16 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 	}
 }
 
-//
-// Setup, establishes all init values and kicks off the start function
-//
+// setupRemotePublisherConnTest establishes all init values and kicks off the start function.
 func setupRemotePublisherConnTest(t *testing.T) (net.Listener, net.Conn, chan messageEvent, chan bool,
 	chan struct{}, chan string) {
 	logger := modular.NewRootLogger(logrus.New())
 	topic := "/test/topic"
 	nodeID := "testNode"
-	msgChan := make(chan messageEvent, 1)
-	enableChan := make(chan bool, 1)
-	quitChan := make(chan struct{}, 1)
-	disconnectedChan := make(chan string, 1)
+	msgChan := make(chan messageEvent)
+	enableChan := make(chan bool)
+	quitChan := make(chan struct{})
+	disconnectedChan := make(chan string)
 	msgType := testMessageType{}
 
 	log := logger.GetModuleLogger()
@@ -126,6 +124,7 @@ func setupRemotePublisherConnTest(t *testing.T) (net.Listener, net.Conn, chan me
 	return l, conn, msgChan, enableChan, quitChan, disconnectedChan
 }
 
+// connectToSubscriber connects a net.Conn object to a subscriber and emulates the publisher header exchange. Puts the subscriber in a state where it is ready to receive messages.
 func connectToSubscriber(t *testing.T, conn net.Conn) {
 	msgType := testMessageType{}
 	topic := "/test/topic"
