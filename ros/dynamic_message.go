@@ -512,8 +512,7 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 		//Find message spec field that matches JSON key
 		fmt.Printf("m = %+v\n", m)
 		fmt.Printf("m.dynamicType = %+v\n", m.dynamicType)
-		fmt.Printf("m.dynamicType.spec = %+v\n", m.dynamicType.spec)
-		fmt.Printf("m.dynamicType.spec.Fields = %+v\n", m.dynamicType.spec.Fields)
+
 		if m == nil || m.dynamicType == nil || m.dynamicType.spec == nil || m.dynamicType.spec.Fields == nil {
 			return errors.New("nil pointer to Fields")
 		}
