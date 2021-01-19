@@ -194,8 +194,10 @@ func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 // used to id the resulting schema.
 func (t *DynamicMessageType) GenerateJSONSchema(prefix string, topic string) ([]byte, error) {
 	// The JSON schema for a message consist of the (recursive) properties names/types:
+	fmt.Printf("GenerateJSONSchem: %s, %s\n", prefix, topic)
 	schemaItems, err := t.generateJSONSchemaProperties(prefix + topic)
 	if err != nil {
+		fmt.Printf("error returned from t.generateJSONSchemaProperties, err: %v\n", err)
 		return nil, err
 	}
 
@@ -206,6 +208,7 @@ func (t *DynamicMessageType) GenerateJSONSchema(prefix string, topic string) ([]
 	// The schema itself is created from the map of properties.
 	schemaString, err := json.Marshal(schemaItems)
 	if err != nil {
+		fmt.Printf("error returned from json.Marshal, err: %v\n", err)
 		return nil, err
 	}
 
@@ -222,7 +225,9 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 
 	// Iterate over each of the fields in the message.
 	for _, field := range t.spec.Fields {
+		fmt.Printf("field = %+v\n", field)
 		if field.IsArray {
+			fmt.Printf("field is an array!\n")
 			// It's an array.
 			propertyContent := make(map[string]interface{})
 			properties[field.Name] = propertyContent
