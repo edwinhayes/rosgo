@@ -721,7 +721,10 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				// Make sure that the 'fixed length' array that is expected is the correct length. Pad it if necessary.
 				reflectLen := uint32(reflect.ValueOf(array).Len())
 				if reflectLen < size {
-					padArray(array, field, reflectLen, size)
+					array, err = padArray(array, field, reflectLen, size)
+					if err != nil {
+						return errors.Wrap(err, "unable to pad array to correct length")
+					}
 				}
 			}
 
