@@ -727,7 +727,9 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				fmt.Printf("field = %+v, i = %v\n", field, i)
 				fmt.Printf("name = %+v\n", field.Name)
 				fmt.Printf("DynamicMessage m = %+v\n", m)
-				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v, array: %+v\n", size, arrayValue, field.ArrayLen, array)
+				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v, array: %+v\n", size, field.ArrayLen, arrayValue, array)
+				fmt.Printf("uint32(reflect.ValueOf(array).Len()) = %v\n", uint32(reflect.ValueOf(array).Len()))
+				fmt.Printf("array len is less than size = %v\n", uint32(reflect.ValueOf(array).Len()) < size)
 				var arrayItem interface{} = arrayValue.Index(int(i)).Interface()
 				// Need to handle each type appropriately.
 				if field.IsBuiltin {
