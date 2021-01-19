@@ -194,10 +194,8 @@ func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 // used to id the resulting schema.
 func (t *DynamicMessageType) GenerateJSONSchema(prefix string, topic string) ([]byte, error) {
 	// The JSON schema for a message consist of the (recursive) properties names/types:
-	fmt.Printf("GenerateJSONSchem: %s, %s\n", prefix, topic)
 	schemaItems, err := t.generateJSONSchemaProperties(prefix + topic)
 	if err != nil {
-		fmt.Printf("error returned from t.generateJSONSchemaProperties, err: %v\n", err)
 		return nil, err
 	}
 
@@ -208,7 +206,6 @@ func (t *DynamicMessageType) GenerateJSONSchema(prefix string, topic string) ([]
 	// The schema itself is created from the map of properties.
 	schemaString, err := json.Marshal(schemaItems)
 	if err != nil {
-		fmt.Printf("error returned from json.Marshal, err: %v\n", err)
 		return nil, err
 	}
 
@@ -225,9 +222,7 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 
 	// Iterate over each of the fields in the message.
 	for _, field := range t.spec.Fields {
-		fmt.Printf("field = %+v\n", field)
 		if field.IsArray {
-			fmt.Printf("field is an array!\n")
 			// It's an array.
 			propertyContent := make(map[string]interface{})
 			properties[field.Name] = propertyContent
@@ -392,8 +387,6 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 
 	//JSON key is an array
 	arrayHandler = func(key []byte, dataType jsonparser.ValueType, offset int, err error) {
-		fmt.Printf("ArrayHandler: m = %+v\n", m)
-		fmt.Printf("dataType.String() = %+v\n", dataType.String())
 		switch dataType.String() {
 		//We have a string array
 		case "string":
@@ -516,10 +509,8 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 		//Store keyName for usage in ArrayEach function
 		keyName = key
 		fieldExists = false
-		//Find message spec field that matches JSON key
-		fmt.Printf("m = %+v\n", m)
-		fmt.Printf("m.dynamicType = %+v\n", m.dynamicType)
 
+		//Find message spec field that matches JSON key
 		if m == nil || m.dynamicType == nil || m.dynamicType.spec == nil || m.dynamicType.spec.Fields == nil {
 			return errors.New("nil pointer to Fields")
 		}
@@ -730,12 +721,6 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			arrayValue := reflect.ValueOf(array)
 			for i := uint32(0); i < size; i++ {
 				//Casting the array item to interface type
-				fmt.Printf("field = %+v, i = %v\n", field, i)
-				fmt.Printf("name = %+v\n", field.Name)
-				fmt.Printf("DynamicMessage m = %+v\n", m)
-				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v, array: %+v\n", size, field.ArrayLen, arrayValue, array)
-				fmt.Printf("uint32(reflect.ValueOf(array).Len()) = %v\n", uint32(reflect.ValueOf(array).Len()))
-				fmt.Printf("array len is less than size = %v\n", uint32(reflect.ValueOf(array).Len()) < size)
 				var arrayItem interface{} = arrayValue.Index(int(i)).Interface()
 				// Need to handle each type appropriately.
 				if field.IsBuiltin {
