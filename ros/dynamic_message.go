@@ -387,6 +387,8 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 
 	//JSON key is an array
 	arrayHandler = func(key []byte, dataType jsonparser.ValueType, offset int, err error) {
+		fmt.Printf("ArrayHandler: m = %+v\n", m)
+		fmt.Printf("dataType.String() = %+v\n", dataType.String())
 		switch dataType.String() {
 		//We have a string array
 		case "string":
