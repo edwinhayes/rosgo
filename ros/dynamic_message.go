@@ -718,6 +718,11 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				}
 			} else {
 				size = uint32(field.ArrayLen)
+
+				// Make sure that we take the (positve) smallest value in case the array given is empty / incomplete.
+				if uint32(reflect.ValueOf(array).Len()) < size {
+					size = uint32(reflect.ValueOf(array).Len())
+				}
 			}
 
 			// Then we just write out all the elements one after another.
