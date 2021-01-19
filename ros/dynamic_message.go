@@ -510,10 +510,18 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 		keyName = key
 		fieldExists = false
 
-		//Find message spec field that matches JSON key
-		if m == nil || m.dynamicType == nil || m.dynamicType.spec == nil || m.dynamicType.spec.Fields == nil {
+		// Confirm the pointers are valid
+		if m == nil {
+			return errors.New("nil pointer to DynamicMessage")
+		} else if m.dynamicType == nil {
+			return errors.New("nil pointer to dynamicType")
+		} else if m.dynamicType.spec == nil {
+			return errors.New("nil pointer to MsgSpec")
+		} else if m.dynamicType.spec.Fields == nil {
 			return errors.New("nil pointer to Fields")
 		}
+
+		//Find message spec field that matches JSON key
 		for _, field := range m.dynamicType.spec.Fields {
 			if string(key) == field.Name {
 				goField = field
