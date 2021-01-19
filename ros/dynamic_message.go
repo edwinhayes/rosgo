@@ -718,7 +718,7 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			for i := uint32(0); i < size; i++ {
 				//Casting the array item to interface type
 				fmt.Printf("field = %v, i = %v\n", field, i)
-				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v\n", size, arrayValue, field.ArrayLen)
+				fmt.Printf("size = %v, field.ArrayLen = %v, arrayValue = %+v, array: %+v\n", size, arrayValue, field.ArrayLen, array)
 				var arrayItem interface{} = arrayValue.Index(int(i)).Interface()
 				// Need to handle each type appropriately.
 				if field.IsBuiltin {
