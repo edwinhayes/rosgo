@@ -720,8 +720,9 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				size = uint32(field.ArrayLen)
 
 				// Make sure that we take the (positve) smallest value in case the array given is empty / incomplete.
-				if uint32(reflect.ValueOf(array).Len()) < size {
-					size = uint32(reflect.ValueOf(array).Len())
+				reflectLen := uint32(reflect.ValueOf(array).Len())
+				if reflectLen >= 0 && reflectLen < size {
+					size = reflectLen
 				}
 			}
 
