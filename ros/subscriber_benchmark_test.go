@@ -117,7 +117,7 @@ func sendMessageAndReceiveInChannelWithB(t *testing.B, conn net.Conn, msgChan ch
 	if err != nil {
 		t.Fatalf("Failed to write message size, err: %s", err)
 	}
-	n, err := conn.Write(buffer) // payload
+	n, err := conn.Write(buffer) // Write the payload.
 	if n != len(buffer) || err != nil {
 		t.Fatalf("Failed to write message payload, n: %d : err: %s", n, err)
 	}

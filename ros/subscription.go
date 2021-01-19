@@ -17,8 +17,8 @@ type defaultSubscription struct {
 	msgType                MessageType
 	nodeID                 string
 	messageChan            chan messageEvent
-	requestStopChan        chan struct{} // tell the subscription to disconnect
-	remoteDisconnectedChan chan string   // tell the subscriber that the remote has disconnected
+	requestStopChan        chan struct{} // Inbound signal for subscription to disconnect.
+	remoteDisconnectedChan chan string   // Outbound signal to indicate a disconnected channel.
 	event                  MessageEvent
 	pool                   []byte
 }
@@ -234,7 +234,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 					select {
 					case s.messageChan <- messageEvent{bytes: buffer, event: s.event}:
 					case <-time.After(time.Duration(30) * time.Millisecond):
-						// Dropping message
+						// Dropping message.
 					}
 					readingSize = true
 				}
@@ -245,7 +245,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 				}
 			}
 
-			// Handle read result cases
+			// Handle read result cases.
 			if result == readOutOfSync {
 				return tcpOutOfSync
 			}

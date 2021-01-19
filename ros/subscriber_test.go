@@ -89,10 +89,10 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 	conn := connectToSubscriber(t, l, topic, msgType)
 	defer conn.Close()
 
-	// Signal to close
+	// Signal to close.
 	quitChan <- struct{}{}
 
-	// Check that buffer closed
+	// Check that buffer closed.
 	buffer := make([]byte, 1)
 	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
 	_, err = conn.Read(buffer)

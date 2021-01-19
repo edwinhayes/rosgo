@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Helper structs
+// Helper structs.
 
 // Set up testMessage fakes.
 type testMessageType struct{}
@@ -388,7 +388,7 @@ func writeAndVerifyPublisherHeader(t *testing.T, conn net.Conn, subscription *de
 		t.Fatalf("Failed to write header: %s", replyHeader)
 	}
 
-	// wait for the subscription to receive the data
+	// Wait for the subscription to receive the data.
 	<-time.After(time.Millisecond)
 
 	for _, expected := range replyHeader {
