@@ -9,7 +9,6 @@ import (
 	gengo "github.com/team-rocos/rosgo/libgengo"
 )
 
-// Simple test to prove that we have a test spec that we can start scrutinizing
 func TestDynamicMessage_TypeGetters(t *testing.T) {
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "float32", "x", false, 0),
@@ -20,11 +19,11 @@ func TestDynamicMessage_TypeGetters(t *testing.T) {
 	}
 
 	if testMessageType.Name() != "TestMessage" {
-		t.Fatalf("DynamicMessageType has undexpected Name %s", testMessageType.Name())
+		t.Fatalf("DynamicMessageType has unexpected Name %s", testMessageType.Name())
 	}
 
 	if testMessageType.MD5Sum() != "1337beeffeed1337" {
-		t.Fatalf("DynamicMessageType has undexpected MD5Sum %s", testMessageType.MD5Sum())
+		t.Fatalf("DynamicMessageType has unexpected MD5Sum %s", testMessageType.MD5Sum())
 	}
 }
 
@@ -39,19 +38,19 @@ func TestDynamicMessage_Deserialize_Simple(t *testing.T) {
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
 	// 1234.5678 = 0x449a522b
-	// Then convert to little-endian
+	// Then convert to little-endian.
 	expected := float32(1234.5678)
 	byteReader := bytes.NewReader([]byte{0x2b, 0x52, 0x9a, 0x44})
 
 	testMessage := testMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err != nil {
-		t.Fatalf("Deserialize failed %s", err)
+		t.Fatalf("deserialize failed %s", err)
 	}
 
 	xWrapped, ok := testMessage.data["x"]
 	if ok == false {
-		t.Fatalf("Deserialize failed to extract x, got %s", testMessage.data)
+		t.Fatalf("failed to deserialize x, got %s", testMessage.data)
 	}
 
 	x, ok := xWrapped.(JsonFloat32)
@@ -68,59 +67,58 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 	poseMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
 
 	if err != nil {
-		t.Logf("Test skipped because ROS environment not set up")
+		t.Skip("test skipped because ROS environment not set up")
 		return
 	}
 
 	if len(poseMessageType.spec.Fields) != 2 {
-		t.Fatalf("Expected 2 pose fields!")
+		t.Fatalf("expected 2 pose fields")
 	}
 
-	// test that we have embedded additional DynamicMessageTypes for
-	// Point and Quaternion
+	// Ensure that we have embedded additional DynamicMessageTypes for Point and Quaternion.
 	if len(poseMessageType.nested) != 2 {
-		t.Fatalf("Expected 2 nested message types")
+		t.Fatalf("expected 2 nested message types")
 	}
 
 	if pointType, ok := poseMessageType.nested["position"]; ok {
 		if pointType.spec.FullName != "geometry_msgs/Point" {
-			t.Fatalf("Expected nexted Point, got %s", pointType.spec.FullName)
+			t.Fatalf("expected nested Point, got %s", pointType.spec.FullName)
 		}
 		if len(pointType.spec.Fields) != 3 {
-			t.Fatalf("Expected 3 fields for nested Point type")
+			t.Fatalf("expected 3 fields for nested Point type")
 		}
 	} else {
-		t.Fatalf("Expected point type under nested[\"position\"]")
+		t.Fatalf("expected point type under nested[\"position\"]")
 	}
 
 	if quatType, ok := poseMessageType.nested["orientation"]; ok {
 		if quatType.spec.FullName != "geometry_msgs/Quaternion" {
-			t.Fatalf("Expected nested Quaternion, got %s", quatType.spec.FullName)
+			t.Fatalf("expected nested Quaternion, got %s", quatType.spec.FullName)
 		}
 		if len(quatType.spec.Fields) != 4 {
-			t.Fatalf("Expected 4 fields for nested Quaternion type")
+			t.Fatalf("expected 4 fields for nested Quaternion type")
 		}
 	} else {
-		t.Fatalf("Expected quaternion type under nested[\"orientation\"]")
+		t.Fatalf("expected quaternion type under nested[\"orientation\"]")
 	}
 
-	// Pose has 7 float64 values, so 56 bytes
+	// Pose has 7 float64 values, 7 x 8 bytes = 56 bytes.
 	slice := make([]byte, 56)
 	byteReader := bytes.NewReader(slice)
 
 	testMessage := poseMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err != nil {
-		t.Fatalf("Deserialize pose failed!")
+		t.Fatalf("deserialize pose failed")
 	}
 
 	pos, ok := testMessage.Data()["position"]
 	if !ok {
-		t.Fatalf("Failed to get position from pose message!")
+		t.Fatalf("failed to get position from pose message")
 	}
 
 	if _, ok = pos.(*DynamicMessage).Data()["x"]; !ok {
-		t.Fatalf("Failed to get position.x from pose message!")
+		t.Fatalf("failed to get position.x from pose message")
 	}
 }
 
@@ -133,13 +131,13 @@ func TestDynamicMessage_Deserialize_Unknown(t *testing.T) {
 		make(map[string]*DynamicMessageType),
 	}
 
-	// The unknown type isn't real, so just give it some junk bytes
+	// The unknown type isn't real, so just give it some junk bytes.
 	byteReader := bytes.NewReader([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 
 	testMessage := testMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err == nil {
-		t.Fatalf("Deserialize unknown type succeeded - expected failure")
+		t.Fatalf("deserialized unknown type, expected failure")
 	}
 }
 
@@ -165,9 +163,6 @@ func TestDynamicMessage_Deserialize_SingularMedley(t *testing.T) {
 		make(map[string]*DynamicMessageType),
 	}
 
-	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
-	// 1234.5678 = 0x449a522b
-	// Then convert to little-endian
 	var expected = map[string]interface{}{
 		"u8":  uint8(0x12),
 		"u16": uint16(0x3456),
@@ -178,11 +173,11 @@ func TestDynamicMessage_Deserialize_SingularMedley(t *testing.T) {
 		"i32": int32(-2),
 		"i64": int64(-2),
 		"b":   true,
-		"f32": JsonFloat32{1234.5678},
-		"f64": JsonFloat64{-9876.5432}, //0xC0C3 4A45 8793 DD98
+		"f32": JsonFloat32{1234.5678},  // 1234.5678 = 0x449a522b
+		"f64": JsonFloat64{-9876.5432}, // 0xC0C3 4A45 8793 DD98
 		"s":   "Rocos",
 		"t":   NewTime(0xfeedf00d, 0x1337beef),
-		"d":   NewDuration(0x50607080, 0x10203040), // -2.000000002 sec
+		"d":   NewDuration(0x50607080, 0x10203040),
 	}
 
 	byteReader := bytes.NewReader([]byte{
@@ -205,14 +200,14 @@ func TestDynamicMessage_Deserialize_SingularMedley(t *testing.T) {
 	testMessage := testMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err != nil {
-		t.Fatalf("Deserialize failed %s", err)
+		t.Fatalf("deserialize failed %s", err)
 	}
 
-	// Test our resulting data
+	// Check that our resulting data matches our expected result.
 	for key := range expected {
 		value, ok := testMessage.data[key]
 		if !ok {
-			t.Fatalf("Deserialize failed to extract %s, got %s", key, testMessage.data)
+			t.Fatalf("failed to deserialize %s, got %s", key, testMessage.data)
 		}
 
 		var expectedValue interface{} = expected[key]
@@ -244,9 +239,6 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 		make(map[string]*DynamicMessageType),
 	}
 
-	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
-	// 1234.5678 = 0x449a522b
-	// Then convert to little-endian
 	var expected = map[string]interface{}{
 		"u8":  []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
 		"u16": []uint16{0xdef0, 0x9abc, 0x5678, 0x1234},
@@ -257,11 +249,11 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 		"i32": []int32{-2, 1},
 		"i64": []int64{-2},
 		"b":   []bool{true, true, false, false, true, false, true, false},
-		"f32": []JsonFloat32{{1234.5678}, {1234.5678}},
-		"f64": []JsonFloat64{{-9876.5432}}, //0xC0C3 4A45 8793 DD98
+		"f32": []JsonFloat32{{1234.5678}, {1234.5678}}, // 1234.5678 = 0x449a522b
+		"f64": []JsonFloat64{{-9876.5432}},             // -9876.5432 = 0xC0C3 4A45 8793 DD98
 		"s":   []string{"Rocos", "soroc", "croos"},
 		"t":   []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x1337f00d)},
-		"d":   []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)}, // -2.000000002 sec
+		"d":   []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
 	}
 
 	byteReader := bytes.NewReader([]byte{
@@ -288,14 +280,14 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 	testMessage := testMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err != nil {
-		t.Fatalf("Deserialize failed %s", err)
+		t.Fatalf("deserialize failed %s", err)
 	}
 
-	// Test our resulting data
+	// Check that our resulting data matches our expected result.
 	for key := range expected {
 		value, ok := testMessage.data[key]
 		if !ok {
-			t.Fatalf("Deserialize failed to extract %s, got %s", key, testMessage.data)
+			t.Fatalf("failed to deserialize %s, got %s", key, testMessage.data)
 		}
 
 		expectedValue := expected[key]
@@ -306,7 +298,7 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 }
 
 func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
-	// Negative array sizes = dynamic arrays!
+	// Dynamic array type used for testing across all ROS primitives. Note: negative array sizes => dynamic arrays.
 	fields := []gengo.Field{
 		*gengo.NewField("Testing", "uint8", "u8", true, -1),
 		*gengo.NewField("Testing", "uint16", "u16", true, -1),
@@ -328,9 +320,6 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 		make(map[string]*DynamicMessageType),
 	}
 
-	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
-	// 1234.5678 = 0x449a522b
-	// Then convert to little-endian
 	var expected = map[string]interface{}{
 		"u8":  []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
 		"u16": []uint16{0xdef0, 0x9abc, 0x5678, 0x1234},
@@ -341,44 +330,44 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 		"i32": []int32{-2, 1},
 		"i64": []int64{-2},
 		"b":   []bool{true, true, false, false, true, false, true, false},
-		"f32": []JsonFloat32{{1234.5678}, {1234.5678}},
-		"f64": []JsonFloat64{{-9876.5432}}, //0xC0C3 4A45 8793 DD98
+		"f32": []JsonFloat32{{1234.5678}, {1234.5678}}, // 1234.5678 = 0x449A 522B
+		"f64": []JsonFloat64{{-9876.5432}},             // -9876.5432 = 0xC0C3 4A45 8793 DD98
 		"s":   []string{"Rocos", "soroc", "croos"},
 		"t":   []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x1337f00d)},
-		"d":   []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)}, // -2.000000002 sec
+		"d":   []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
 	}
 
 	byteReader := bytes.NewReader([]byte{
-		0x08, 0x00, 0x00, 0x00, // array size
+		0x08, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, // u8
-		0x04, 0x00, 0x00, 0x00, // array size
+		0x04, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, // u16
-		0x02, 0x00, 0x00, 0x00, // array size
+		0x02, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, // u32
-		0x01, 0x00, 0x00, 0x00, // array size
+		0x01, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, // u64
-		0x08, 0x00, 0x00, 0x00, // array size
+		0x08, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xfe, 0xff, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, // i8
-		0x04, 0x00, 0x00, 0x00, // array size
+		0x04, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xfe, 0xff, 0xff, 0xff, 0x00, 0x00, 0x01, 0x00, // i16
-		0x02, 0x00, 0x00, 0x00, // array size
+		0x02, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xfe, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, // i32
-		0x01, 0x00, 0x00, 0x00, // array size
+		0x01, 0x00, 0x00, 0x00, // Dynamic array size.
 		0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // i64
-		0x08, 0x00, 0x00, 0x00, // array size
+		0x08, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, // b
-		0x02, 0x00, 0x00, 0x00, // array size
+		0x02, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x2b, 0x52, 0x9a, 0x44, 0x2b, 0x52, 0x9a, 0x44, // f32
-		0x01, 0x00, 0x00, 0x00, // array size
+		0x01, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x98, 0xdd, 0x93, 0x87, 0x45, 0x4a, 0xc3, 0xc0, // f64
-		0x03, 0x00, 0x00, 0x00, // array size
+		0x03, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x05, 0x00, 0x00, 0x00, 'R', 'o', 'c', 'o', 's', // s[0]
 		0x05, 0x00, 0x00, 0x00, 's', 'o', 'r', 'o', 'c', // s[1]
 		0x05, 0x00, 0x00, 0x00, 'c', 'r', 'o', 'o', 's', // s[2]
-		0x02, 0x00, 0x00, 0x00, // array size
+		0x02, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x0d, 0xf0, 0xed, 0xfe, 0xef, 0xbe, 0x37, 0x13, // t[0]
 		0xef, 0xbe, 0x37, 0x13, 0x0d, 0xf0, 0x37, 0x13, // t[1]
-		0x02, 0x00, 0x00, 0x00, // array size
+		0x02, 0x00, 0x00, 0x00, // Dynamic array size.
 		0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x00, // d[0]
 		0x80, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, // d[1]
 	})
@@ -386,14 +375,14 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 	testMessage := testMessageType.NewDynamicMessage()
 
 	if err := testMessage.Deserialize(byteReader); err != nil {
-		t.Fatalf("Deserialize failed %s", err)
+		t.Fatalf("deserialize failed %s", err)
 	}
 
 	// Test our resulting data
 	for key := range expected {
 		value, ok := testMessage.data[key]
 		if !ok {
-			t.Fatalf("Deserialize failed to extract %s, got %s", key, testMessage.data)
+			t.Fatalf("failed to deserialize %s, got %s", key, testMessage.data)
 		}
 
 		expectedValue := expected[key]
@@ -405,12 +394,12 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 
 // Testing helpers
 
-// Checks that two float32s are within a tolerance
+// Float32Near helper to check that two float32 are within a tolerance.
 func Float32Near(expected float32, actual float32, tol float32) bool {
 	return math.Abs(float64(expected-actual)) < float64(tol)
 }
 
-// generate a message spec for a ficticious message type
+// generateTestSpec creates a message spec for a ficticious message type.
 func generateTestSpec(fields []gengo.Field) *gengo.MsgSpec {
 	msgSpec := &gengo.MsgSpec{}
 	msgSpec.FullName = "TestMessage"

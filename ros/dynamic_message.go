@@ -89,21 +89,22 @@ func ResetContext() {
 // be used for the definition is looked up by name.  On subsequent calls, the ROS message type is looked up directly from the existing context.
 func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
 	t, err := newDynamicMessageTypeNested(typeName, "")
-	return &t, err
+	return t, err
 }
 
+// NewDynamicMessageTypeLiteral generates a DynamicMessageType, and returns a copy of the generated type. This is required by DynamicAction.
 func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 	t, err := newDynamicMessageTypeNested(typeName, "")
-	return t, err
+	return *t, err
 }
 
 // newDynamicMessageTypeNested generates a DynamicMessageType from the available ROS message definitions.  The first time the function is run, a message 'context' is created by
 // searching through the available ROS message definitions, then the ROS message type to use for the defintion is looked up by name.  On subsequent calls, the ROS message type
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
-func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
+func newDynamicMessageTypeNested(typeName string, packageName string) (*DynamicMessageType, error) {
 	// Create an empty message type.
-	m := DynamicMessageType{}
+	m := &DynamicMessageType{}
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
@@ -149,7 +150,7 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 			if err != nil {
 				return m, err
 			}
-			m.nested[field.Name] = &newType
+			m.nested[field.Name] = newType
 		}
 	}
 
@@ -487,7 +488,7 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				} else {
 					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package)
 					_ = err
-					msgType = &msgT
+					msgType = msgT
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
