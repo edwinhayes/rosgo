@@ -718,7 +718,7 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 			} else {
 				size = uint32(field.ArrayLen)
 
-				// Make sure that we take the (positve) smallest value in case the array given is empty / incomplete.
+				// Make sure that the 'fixed length' array that is expected is the correct length. Pad it if necessary.
 				reflectLen := uint32(reflect.ValueOf(array).Len())
 				if reflectLen < size {
 					padArray(array, field, reflectLen, size)
