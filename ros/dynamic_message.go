@@ -1531,6 +1531,7 @@ func zeroValueData(s string) (map[string]interface{}, error) {
 	return d, err
 }
 
+// padArray pads the provided array to the specified length using the default value for the array type.
 func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {
 	switch field.GoType {
 	case "bool":
@@ -1540,6 +1541,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]bool, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = false
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "int8":
@@ -1549,6 +1553,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]int8, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "int16":
@@ -1558,6 +1565,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]int16, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "int32":
@@ -1567,6 +1577,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]int32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "int64":
@@ -1576,6 +1589,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]int64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "uint8":
@@ -1585,6 +1601,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]uint8, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "uint16":
@@ -1594,6 +1613,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]uint16, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "uint32":
@@ -1603,6 +1625,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]uint32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "uint64":
@@ -1612,6 +1637,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]uint64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "float32":
@@ -1621,6 +1649,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]float32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	case "float64":
@@ -1630,6 +1661,9 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
 		}
 		padding := make([]float64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
 		v = append(v, padding...)
 		return v, nil
 	default:
