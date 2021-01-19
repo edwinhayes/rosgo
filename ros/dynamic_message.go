@@ -907,6 +907,9 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 					if !ok {
 						return errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(arrayItem).Name() + ", expected Message.")
 					}
+					if msg == nil || msg.GetDynamicType() == nil || msg.GetDynamicType().spec == nil {
+						return errors.New("Field: " + field.Name + ": is not initialised completely, nil pointer found")
+					}
 					if msg.GetDynamicType().spec.ShortName != field.Type {
 						return errors.New("Field: " + field.Name + ": Found msg " + msg.GetDynamicType().spec.ShortName + ", expected " + field.Type + ".")
 					}
