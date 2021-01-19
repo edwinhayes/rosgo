@@ -712,8 +712,8 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 
 				// Make sure that we take the (positve) smallest value in case the array given is empty / incomplete.
 				reflectLen := uint32(reflect.ValueOf(array).Len())
-				if reflectLen >= 0 && reflectLen < size {
-					size = reflectLen
+				if reflectLen < size {
+					padArray(array, field, reflectLen, size)
 				}
 			}
 
@@ -1521,6 +1521,113 @@ func zeroValueData(s string) (map[string]interface{}, error) {
 		}
 	}
 	return d, err
+}
+
+func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {
+	switch field.GoType {
+	case "bool":
+		// Make sure we've actually got a bool.
+		v, ok := array.([]bool)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]bool, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "int8":
+		// Make sure we've actually got an int8.
+		v, ok := array.([]int8)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]int8, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "int16":
+		// Make sure we've actually got an int16.
+		v, ok := array.([]int16)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]int16, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "int32":
+		// Make sure we've actually got an int32.
+		v, ok := array.([]int32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]int32, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "int64":
+		// Make sure we've actually got an int64.
+		v, ok := array.([]int64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]int64, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "uint8":
+		// Make sure we've actually got a uint8.
+		v, ok := array.([]uint8)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]uint8, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "uint16":
+		// Make sure we've actually got a uint16.
+		v, ok := array.([]uint16)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]uint16, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "uint32":
+		// Make sure we've actually got a uint32.
+		v, ok := array.([]uint32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]uint32, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "uint64":
+		// Make sure we've actually got a uint64.
+		v, ok := array.([]uint64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]uint64, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "float32":
+		// Make sure we've actually got a float32.
+		v, ok := array.([]float32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]float32, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	case "float64":
+		// Make sure we've actually got a float64.
+		v, ok := array.([]float64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]float64, requiredSize-actualSize)
+		v = append(v, padding...)
+		return v, nil
+	default:
+		// Something went wrong.
+		return nil, errors.New("we haven't implemented this primitive yet")
+	}
 }
 
 // DEFINE PRIVATE RECEIVER FUNCTIONS.
