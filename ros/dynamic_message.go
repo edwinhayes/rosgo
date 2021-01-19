@@ -510,6 +510,10 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 		keyName = key
 		fieldExists = false
 		//Find message spec field that matches JSON key
+		fmt.Printf("m = %+v\n", m)
+		fmt.Printf("m.dynamicType = %+v\n", m.dynamicType)
+		fmt.Printf("m.dynamicType.spec = %+v\n", m.dynamicType.spec)
+		fmt.Printf("m.dynamicType.spec.Fields = %+v\n", m.dynamicType.spec.Fields)
 		for _, field := range m.dynamicType.spec.Fields {
 			if string(key) == field.Name {
 				goField = field
