@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -44,8 +43,9 @@ type dynamicMessageLike interface {
 	GetDynamicType() *DynamicMessageType
 }
 
-func (d *DynamicMessage) GetDynamicType() *DynamicMessageType {
-	return d.dynamicType
+// GetDynamicType returns the DynamicMessageType of a DynamicMessage
+func (m *DynamicMessage) GetDynamicType() *DynamicMessageType {
+	return m.dynamicType
 }
 
 // DEFINE PUBLIC GLOBALS.
@@ -186,6 +186,7 @@ func (t *DynamicMessageType) NewMessage() Message {
 	return t.NewDynamicMessage()
 }
 
+// NewDynamicMessage constructs a DynamicMessage with zeroed fields.
 func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
 	d := &DynamicMessage{}
@@ -1120,15 +1121,15 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 	return err
 }
 
-//
 // Deserialize parses a byte stream into a DynamicMessage, thus reconstructing the fields of a received ROS message; required for ros.Message.
-//
 func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
 	var err error = nil
 	tmpData := make(map[string]interface{})
 	m.data = nil
+
+	d := LEByteDecoder{}
 
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
@@ -1141,7 +1142,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 			if field.ArrayLen < 0 {
 				// The array is dynamic, so it starts with a declaration of the number of array elements.
 				var usize uint32
-				if usize, err = decodeUint32(buf); err != nil {
+				if usize, err = d.DecodeUint32(buf); err != nil {
 					return errors.Wrap(err, "Field: "+field.Name)
 				}
 				size = int(usize)
@@ -1149,33 +1150,33 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 			// Create an array of the target type.
 			switch field.GoType {
 			case "bool":
-				tmpData[field.Name], err = decodeBoolArray(buf, size)
+				tmpData[field.Name], err = d.DecodeBoolArray(buf, size)
 			case "int8":
-				tmpData[field.Name], err = decodeInt8Array(buf, size)
+				tmpData[field.Name], err = d.DecodeInt8Array(buf, size)
 			case "int16":
-				tmpData[field.Name], err = decodeInt16Array(buf, size)
+				tmpData[field.Name], err = d.DecodeInt16Array(buf, size)
 			case "int32":
-				tmpData[field.Name], err = decodeInt32Array(buf, size)
+				tmpData[field.Name], err = d.DecodeInt32Array(buf, size)
 			case "int64":
-				tmpData[field.Name], err = decodeInt64Array(buf, size)
+				tmpData[field.Name], err = d.DecodeInt64Array(buf, size)
 			case "uint8":
-				tmpData[field.Name], err = decodeUint8Array(buf, size)
+				tmpData[field.Name], err = d.DecodeUint8Array(buf, size)
 			case "uint16":
-				tmpData[field.Name], err = decodeUint16Array(buf, size)
+				tmpData[field.Name], err = d.DecodeUint16Array(buf, size)
 			case "uint32":
-				tmpData[field.Name], err = decodeUint32Array(buf, size)
+				tmpData[field.Name], err = d.DecodeUint32Array(buf, size)
 			case "uint64":
-				tmpData[field.Name], err = decodeUint64Array(buf, size)
+				tmpData[field.Name], err = d.DecodeUint64Array(buf, size)
 			case "float32":
-				tmpData[field.Name], err = decodeFloat32Array(buf, size)
+				tmpData[field.Name], err = d.DecodeFloat32Array(buf, size)
 			case "float64":
-				tmpData[field.Name], err = decodeFloat64Array(buf, size)
+				tmpData[field.Name], err = d.DecodeFloat64Array(buf, size)
 			case "string":
-				tmpData[field.Name], err = decodeStringArray(buf, size)
+				tmpData[field.Name], err = d.DecodeStringArray(buf, size)
 			case "ros.Time":
-				tmpData[field.Name], err = decodeTimeArray(buf, size)
+				tmpData[field.Name], err = d.DecodeTimeArray(buf, size)
 			case "ros.Duration":
-				tmpData[field.Name], err = decodeDurationArray(buf, size)
+				tmpData[field.Name], err = d.DecodeDurationArray(buf, size)
 			default:
 				if field.IsBuiltin {
 					// Something went wrong.
@@ -1184,9 +1185,9 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 				// In this case, it will probably be because the go_type is describing another ROS message type
 				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
-					tmpData[field.Name], err = decodeMessageArray(buf, size, msgType)
+					tmpData[field.Name], err = d.DecodeMessageArray(buf, size, msgType)
 				} else {
-					err = errors.New("Nested message type not known!")
+					err = errors.New("nested message type not known")
 				}
 			}
 			if err != nil {
@@ -1199,33 +1200,33 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 				// It's a regular primitive element.
 				switch field.GoType {
 				case "bool":
-					tmpData[field.Name], err = decodeBool(buf)
+					tmpData[field.Name], err = d.DecodeBool(buf)
 				case "int8":
-					tmpData[field.Name], err = decodeInt8(buf)
+					tmpData[field.Name], err = d.DecodeInt8(buf)
 				case "int16":
-					tmpData[field.Name], err = decodeInt16(buf)
+					tmpData[field.Name], err = d.DecodeInt16(buf)
 				case "int32":
-					tmpData[field.Name], err = decodeInt32(buf)
+					tmpData[field.Name], err = d.DecodeInt32(buf)
 				case "int64":
-					tmpData[field.Name], err = decodeInt64(buf)
+					tmpData[field.Name], err = d.DecodeInt64(buf)
 				case "uint8":
-					tmpData[field.Name], err = decodeUint8(buf)
+					tmpData[field.Name], err = d.DecodeUint8(buf)
 				case "uint16":
-					tmpData[field.Name], err = decodeUint16(buf)
+					tmpData[field.Name], err = d.DecodeUint16(buf)
 				case "uint32":
-					tmpData[field.Name], err = decodeUint32(buf)
+					tmpData[field.Name], err = d.DecodeUint32(buf)
 				case "uint64":
-					tmpData[field.Name], err = decodeUint64(buf)
+					tmpData[field.Name], err = d.DecodeUint64(buf)
 				case "float32":
-					tmpData[field.Name], err = decodeFloat32(buf)
+					tmpData[field.Name], err = d.DecodeFloat32(buf)
 				case "float64":
-					tmpData[field.Name], err = decodeFloat64(buf)
+					tmpData[field.Name], err = d.DecodeFloat64(buf)
 				case "string":
-					tmpData[field.Name], err = decodeString(buf)
+					tmpData[field.Name], err = d.DecodeString(buf)
 				case "ros.Time":
-					tmpData[field.Name], err = decodeTime(buf)
+					tmpData[field.Name], err = d.DecodeTime(buf)
 				case "ros.Duration":
-					tmpData[field.Name], err = decodeDuration(buf)
+					tmpData[field.Name], err = d.DecodeDuration(buf)
 				default:
 					// Something went wrong.
 					return errors.New("we haven't implemented this primitive yet")
@@ -1238,12 +1239,12 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 			} else {
 				// Else it's not a built-in
 				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
-					tmpData[field.Name], err = decodeMessage(buf, msgType)
+					tmpData[field.Name], err = d.DecodeMessage(buf, msgType)
 					if err != nil {
 						return errors.Wrap(err, "Field: "+field.Name)
 					}
 				} else {
-					return errors.Wrap(errors.New("Nested message type not known!"), "Field: "+field.Name)
+					return errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
 				}
 			}
 		}
@@ -1254,6 +1255,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 	return err
 }
 
+// String returns a string which represents the encapsulared DynamicMessage data.
 func (m *DynamicMessage) String() string {
 	// Just print out the data!
 	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
@@ -1261,400 +1263,22 @@ func (m *DynamicMessage) String() string {
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
 
-//
-// Decode helpers
-// The core goal of these decode functions are to improve efficiency, for this reason
-// reuse between functions is only used when it won't impact efficiency
-//
+// DEFINE PRIVATE RECEIVER FUNCTIONS.
 
-//
-// Array decodes
-// Arrays typically don't use the singular decodes since additional efficiencies can be made
-// by reusing allocated resources inline
-//
-
-// Benchmarking suggested that reading a buffer one-by-one was more efficient for a 1Mbyte array
-// than allocating a byte array which is read instantly and then iterated through
-func decodeBoolArray(buf *bytes.Reader, size int) ([]bool, error) {
-	var arr [1]byte
-	var n int
-	var err error
-	slice := make([]bool, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 1 || err != nil {
-			return slice, errors.New("Could not read 1 byte from buffer!")
-		}
-		slice[i] = (arr[0] != 0x00)
-	}
-	return slice, nil
-}
-
-func decodeInt8Array(buf *bytes.Reader, size int) ([]int8, error) {
-	var arr [1]byte
-	var n int
-	var err error
-	slice := make([]int8, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 1 || err != nil {
-			return slice, errors.New("Could not read 1 byte from buffer!")
-		}
-		slice[i] = int8(arr[0])
-	}
-
-	return slice, nil
-}
-
-func decodeUint8Array(buf *bytes.Reader, size int) ([]uint8, error) {
-	var err error
-	var n int
-	slice := make([]uint8, size)
-	n, err = buf.Read(slice)
-	if n != size || err != nil {
-		return slice, errors.New("Did not read entire uint8 buffer!")
-	}
-
-	return slice, nil
-}
-
-func decodeInt16Array(buf *bytes.Reader, size int) ([]int16, error) {
-	var arr [2]byte
-	var n int
-	var err error
-	slice := make([]int16, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 2 || err != nil {
-			return slice, errors.New("Could not read 2 bytes from buffer!")
-		}
-		slice[i] = int16(binary.LittleEndian.Uint16(arr[:]))
-	}
-
-	return slice, nil
-}
-
-func decodeUint16Array(buf *bytes.Reader, size int) ([]uint16, error) {
-	var arr [2]byte
-	var n int
-	var err error
-	slice := make([]uint16, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 2 || err != nil {
-			return slice, errors.New("Could not read 2 bytes from buffer!")
-		}
-		slice[i] = binary.LittleEndian.Uint16(arr[:])
-	}
-
-	return slice, nil
-}
-
-func decodeInt32Array(buf *bytes.Reader, size int) ([]int32, error) {
-	var arr [4]byte
-	var n int
-	var err error
-	slice := make([]int32, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 4 || err != nil {
-			return slice, errors.New("Could not read 4 bytes from buffer!")
-		}
-		slice[i] = int32(binary.LittleEndian.Uint32(arr[:]))
-	}
-
-	return slice, nil
-}
-
-func decodeUint32Array(buf *bytes.Reader, size int) ([]uint32, error) {
-	var arr [4]byte
-	var n int
-	var err error
-	slice := make([]uint32, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 4 || err != nil {
-			return slice, errors.New("Could not read 4 bytes from buffer!")
-		}
-		slice[i] = binary.LittleEndian.Uint32(arr[:])
-	}
-
-	return slice, nil
-}
-
-func decodeFloat32Array(buf *bytes.Reader, size int) ([]JsonFloat32, error) {
-	var arr [4]byte
-	var n int
-	var err error
-	var value float32
-	slice := make([]JsonFloat32, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 4 || err != nil {
-			return slice, errors.New("Could not read 4 bytes from buffer!")
-		}
-		value = math.Float32frombits(binary.LittleEndian.Uint32(arr[:]))
-		slice[i] = JsonFloat32{F: value}
-	}
-
-	return slice, nil
-}
-
-func decodeInt64Array(buf *bytes.Reader, size int) ([]int64, error) {
-	var arr [8]byte
-	var n int
-	var err error
-	slice := make([]int64, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 8 || err != nil {
-			return slice, errors.New("Could not read 8 bytes from buffer!")
-		}
-		slice[i] = int64(binary.LittleEndian.Uint64(arr[:]))
-	}
-
-	return slice, nil
-}
-
-func decodeUint64Array(buf *bytes.Reader, size int) ([]uint64, error) {
-	var arr [8]byte
-	var n int
-	var err error
-	slice := make([]uint64, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 8 || err != nil {
-			return slice, errors.New("Could not read 8 bytes from buffer!")
-		}
-		slice[i] = binary.LittleEndian.Uint64(arr[:])
-	}
-
-	return slice, nil
-}
-
-func decodeFloat64Array(buf *bytes.Reader, size int) ([]JsonFloat64, error) {
-	var arr [8]byte
-	var n int
-	var err error
-	var value float64
-	slice := make([]JsonFloat64, size)
-	for i := 0; i < size; i++ {
-		if n, err = buf.Read(arr[:]); n != 8 || err != nil {
-			return slice, errors.New("Could not read 8 bytes from buffer!")
-		}
-		value = math.Float64frombits(binary.LittleEndian.Uint64(arr[:]))
-		slice[i] = JsonFloat64{F: value}
-	}
-
-	return slice, nil
-}
-
-// String format is: [size|string] where size is a u32
-func decodeStringArray(buf *bytes.Reader, size int) ([]string, error) {
-	var strSize uint32
-	var err error
-
-	slice := make([]string, size)
-	for i := 0; i < size; i++ {
-		if strSize, err = decodeUint32(buf); err != nil {
-			return slice, err
-		}
-		var value []uint8
-		value, err = decodeUint8Array(buf, int(strSize))
-		if err != nil {
-			return slice, err
-		}
-		slice[i] = string(value)
-	}
-	return slice, nil
-}
-
-// Time format is: [sec|nanosec] where sec and nanosec are unsigned integers
-func decodeTimeArray(buf *bytes.Reader, size int) ([]Time, error) {
-	var err error
-
-	slice := make([]Time, size)
-	for i := 0; i < size; i++ {
-		if slice[i].Sec, err = decodeUint32(buf); err != nil {
-			return slice, err
-		}
-		if slice[i].NSec, err = decodeUint32(buf); err != nil {
-			return slice, err
-		}
-	}
-	return slice, nil
-}
-
-// Duration format is: [sec|nanosec] where sec and nanosec are unsigned integers
-func decodeDurationArray(buf *bytes.Reader, size int) ([]Duration, error) {
-	var err error
-
-	slice := make([]Duration, size)
-	for i := 0; i < size; i++ {
-		if slice[i].Sec, err = decodeUint32(buf); err != nil {
-			return slice, err
-		}
-		if slice[i].NSec, err = decodeUint32(buf); err != nil {
-			return slice, err
-		}
-	}
-	return slice, nil
-}
-
-func decodeMessageArray(buf *bytes.Reader, size int, msgType *DynamicMessageType) ([]Message, error) {
-	slice := make([]Message, size)
-
-	for i := 0; i < size; i++ {
-		// note: this skips the zero value initialization, this would just get discarded anyway
-		msg := &DynamicMessage{}
-		msg.dynamicType = msgType
-		if err := msg.Deserialize(buf); err != nil {
-			return slice, err
-		}
-		slice[i] = msg
-	}
-	return slice, nil
-}
-
-//
-// singular decodes
-//
-
-func decodeBool(buf *bytes.Reader) (bool, error) {
-	raw, err := decodeUint8(buf)
-	return (raw != 0x00), err
-}
-
-func decodeInt8(buf *bytes.Reader) (int8, error) {
-	raw, err := decodeUint8(buf)
-	return int8(raw), err
-}
-
-func decodeUint8(buf *bytes.Reader) (uint8, error) {
-	var arr [1]byte
-
-	if n, err := buf.Read(arr[:]); n != 1 || err != nil {
-		return 0, errors.New("Could not read 1 byte from buffer!")
-	}
-
-	return arr[0], nil
-}
-
-func decodeInt16(buf *bytes.Reader) (int16, error) {
-	raw, err := decodeUint16(buf)
-	return int16(raw), err
-}
-
-func decodeUint16(buf *bytes.Reader) (uint16, error) {
-	var arr [2]byte
-
-	if n, err := buf.Read(arr[:]); n != 2 || err != nil {
-		return 0, errors.New("Could not read 2 bytes from buffer!")
-	}
-
-	return binary.LittleEndian.Uint16(arr[:]), nil
-}
-
-func decodeInt32(buf *bytes.Reader) (int32, error) {
-	raw, err := decodeUint32(buf)
-	return int32(raw), err
-}
-
-func decodeUint32(buf *bytes.Reader) (uint32, error) {
-	var arr [4]byte
-
-	if n, err := buf.Read(arr[:]); n != 4 || err != nil {
-		return 0, errors.New("Could not read 4 bytes from buffer!")
-	}
-
-	return binary.LittleEndian.Uint32(arr[:]), nil
-}
-
-func decodeFloat32(buf *bytes.Reader) (JsonFloat32, error) {
-	raw, err := decodeUint32(buf)
-	return JsonFloat32{F: math.Float32frombits(raw)}, err
-}
-
-func decodeInt64(buf *bytes.Reader) (int64, error) {
-	raw, err := decodeUint64(buf)
-	return int64(raw), err
-}
-
-func decodeUint64(buf *bytes.Reader) (uint64, error) {
-	var arr [8]byte
-
-	if n, err := buf.Read(arr[:]); n != 8 || err != nil {
-		return 0, errors.New("Could not read 8 bytes from buffer!")
-	}
-
-	return binary.LittleEndian.Uint64(arr[:]), nil
-}
-
-func decodeFloat64(buf *bytes.Reader) (JsonFloat64, error) {
-	raw, err := decodeUint64(buf)
-	return JsonFloat64{F: math.Float64frombits(raw)}, err
-}
-
-// String format is: [size|string] where size is a u32
-func decodeString(buf *bytes.Reader) (string, error) {
-	var err error
-	var strSize uint32
-	if strSize, err = decodeUint32(buf); err != nil {
-		return "", err
-	}
-	var value []uint8
-	if value, err = decodeUint8Array(buf, int(strSize)); err != nil {
-		return "", err
-	}
-	return string(value), nil
-}
-
-// Time format is: [sec|nanosec] where sec and nanosec are unsigned integers
-func decodeTime(buf *bytes.Reader) (Time, error) {
-	var err error
-	var value Time
-
-	if value.Sec, err = decodeUint32(buf); err != nil {
-		return Time{}, err
-	}
-	if value.NSec, err = decodeUint32(buf); err != nil {
-		return Time{}, err
-	}
-
-	return value, nil
-}
-
-// Duration format is: [sec|nanosec] where sec and nanosec are unsigned integers
-func decodeDuration(buf *bytes.Reader) (Duration, error) {
-	var err error
-	var value Duration
-
-	if value.Sec, err = decodeUint32(buf); err != nil {
-		return Duration{}, err
-	}
-	if value.NSec, err = decodeUint32(buf); err != nil {
-		return Duration{}, err
-	}
-
-	return value, nil
-}
-
-func decodeMessage(buf *bytes.Reader, msgType *DynamicMessageType) (Message, error) {
-	// note: this skips the zero value initialization, this would just get discarded anyway
-	msg := &DynamicMessage{}
-	msg.dynamicType = msgType
-	if err := msg.Deserialize(buf); err != nil {
-		return nil, err
-	}
-
-	return msg, nil
-}
-
-// zeroValueData creates the zeroValue (default) data map for a new dynamic message
+// zeroValueData creates the zeroValue (default) data map for a new DynamicMessage.
 func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 	//Create map
 	d := make(map[string]interface{})
 
 	var err error
 
-	//Range fields in the dynamic message type
+	//Range fields in the dynamic message type.
 	for _, field := range t.spec.Fields {
 		if field.IsArray {
-			// If the array length is static set the size, for dynamic arrays, use 0
-			var size uint32 = 0
+			// If the array length is static set the size, for dynamic arrays, use 0.
+			var size int = 0
 			if field.ArrayLen > 0 {
-				size = uint32(field.ArrayLen)
+				size = field.ArrayLen
 			}
 
 			switch field.GoType {
@@ -1695,18 +1319,18 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				// In this case, the go_type is describing another ROS message, so we nest a DynamicMessage.
 				messages := make([]Message, size)
 				if msgType, ok := t.nested[field.Name]; ok {
-					// Fill out our new messages
-					for i := 0; i < int(size); i++ {
+					// Fill out our new messages.
+					for i := 0; i < size; i++ {
 						messages[i] = msgType.NewMessage()
 					}
 				} else {
-					return d, errors.Wrap(errors.New("Nested message type not known!"), "Type: "+field.Type)
+					return d, errors.Wrap(errors.New("nested message type not known"), "Type: "+field.Type)
 				}
 				d[field.Name] = messages
 			}
-		} else { // mot array
+		} else { // Not an array.
 			if field.IsBuiltin {
-				//If its a built in type
+				// If it is a built in type.
 				switch field.GoType {
 				case "string":
 					d[field.Name] = ""
@@ -1737,7 +1361,7 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				case "ros.Duration":
 					d[field.Name] = Duration{}
 				default:
-					return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
+					return d, errors.Wrap(err, "builtin field "+field.GoType+" not found")
 				}
 				//Else its a ros message type
 			} else {
@@ -1745,7 +1369,7 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				if msgType, ok := t.nested[field.Name]; ok {
 					d[field.Name] = msgType.NewMessage()
 				} else {
-					return d, errors.Wrap(errors.New("Nested message type not known!"), "Field: "+field.Name)
+					return d, errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
 				}
 			}
 		}
