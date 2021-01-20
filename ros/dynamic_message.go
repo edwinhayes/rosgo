@@ -24,7 +24,8 @@ import (
 // ROS Message definition files.  DynamicMessageType implements the rosgo MessageType interface, allowing it to be used throughout rosgo in the same manner as message schemas generated
 // at compiletime by gengo.
 type DynamicMessageType struct {
-	spec *libgengo.MsgSpec
+	spec   *libgengo.MsgSpec
+	nested map[string]*DynamicMessageType // Map with key string = messageType name.
 }
 
 // DynamicMessage abstracts an instance of a ROS Message whose type is only known at runtime.  The schema of the message is denoted by the referenced DynamicMessageType, while the
@@ -42,8 +43,9 @@ type dynamicMessageLike interface {
 	GetDynamicType() *DynamicMessageType
 }
 
-func (d *DynamicMessage) GetDynamicType() *DynamicMessageType {
-	return d.dynamicType
+// GetDynamicType returns the DynamicMessageType of a DynamicMessage
+func (m *DynamicMessage) GetDynamicType() *DynamicMessageType {
+	return m.dynamicType
 }
 
 // DEFINE PUBLIC GLOBALS.
@@ -86,22 +88,35 @@ func ResetContext() {
 // ROS message type name.  The first time the function is run, a message 'context' is created by searching through the available ROS message definitions, then the ROS message to
 // be used for the definition is looked up by name.  On subsequent calls, the ROS message type is looked up directly from the existing context.
 func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
-	t, err := newDynamicMessageTypeNested(typeName, "")
-	return &t, err
+	t, err := newDynamicMessageTypeNested(typeName, "", nil)
+	return t, err
 }
 
+// NewDynamicMessageTypeLiteral generates a DynamicMessageType, and returns a copy of the generated type. This is required by DynamicAction.
 func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
-	t, err := newDynamicMessageTypeNested(typeName, "")
-	return t, err
+	t, err := NewDynamicMessageType(typeName)
+	return *t, err
 }
 
 // newDynamicMessageTypeNested generates a DynamicMessageType from the available ROS message definitions.  The first time the function is run, a message 'context' is created by
 // searching through the available ROS message definitions, then the ROS message type to use for the defintion is looked up by name.  On subsequent calls, the ROS message type
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
-func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMessageType, error) {
+func newDynamicMessageTypeNested(typeName string, packageName string, nested map[string]*DynamicMessageType) (*DynamicMessageType, error) {
+
 	// Create an empty message type.
-	m := DynamicMessageType{}
+	m := &DynamicMessageType{}
+
+	if nested == nil {
+		nested = make(map[string]*DynamicMessageType)
+	}
+
+	m.nested = nested
+	if t, ok := nested[typeName]; ok {
+		// DynamicMessageType already created, recursive messages are scary, return error!
+		return t, errors.New("type already in nested map, message is recursive")
+	}
+
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
 		// Create context for our ROS install.
@@ -139,6 +154,21 @@ func newDynamicMessageTypeNested(typeName string, packageName string) (DynamicMe
 	// Now we know all about the message!
 	m.spec = spec
 
+	// Register type in the nested map, this prevents recursion.
+	nested[typeName] = m
+	m.nested = nested
+
+	// Generate the spec for any nested messages.
+	for _, field := range spec.Fields {
+		if field.IsBuiltin == false {
+			newType, err := newDynamicMessageTypeNested(field.Type, field.Package, nested)
+			if err != nil {
+				return m, err
+			}
+			m.nested[field.Name] = newType
+		}
+	}
+
 	// We've successfully made a new message type matching the requested ROS type.
 	return m, nil
 }
@@ -171,18 +201,14 @@ func (t *DynamicMessageType) NewMessage() Message {
 	return t.NewDynamicMessage()
 }
 
+// NewDynamicMessage constructs a DynamicMessage with zeroed fields.
 func (t *DynamicMessageType) NewDynamicMessage() *DynamicMessage {
 	// But otherwise, make a new one.
 	d := &DynamicMessage{}
 	d.dynamicType = t
 
-	name := t.Name()
-	if name == "" {
-		return d
-	}
-
 	var err error
-	d.data, err = zeroValueData(name)
+	d.data, err = t.zeroValueData()
 	if err != nil {
 		return d
 	}
@@ -272,7 +298,7 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 					// It's another nested message.
 
 					// Generate the nested type.
-					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil)
 					if err != nil {
 						return nil, errors.Wrap(err, "Schema Field: "+field.Name)
 					}
@@ -327,7 +353,7 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 				// It's another nested message.
 
 				// Generate the nested type.
-				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil)
 				if err != nil {
 					return nil, errors.Wrap(err, "Schema Field: "+field.Name)
 				}
@@ -476,9 +502,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				if oldMsgType != "" && oldMsgType == newMsgType {
 					//We've already generated this type
 				} else {
-					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package)
+					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil)
 					_ = err
-					msgType = &msgT
+					msgType = msgT
 				}
 				msg = msgType.NewMessage().(*DynamicMessage)
 				err = msg.UnmarshalJSON(key)
@@ -624,7 +650,7 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 					m.data[goField.Name] = tmpDuration
 				default:
 					//We have a nested message
-					msgType, err := newDynamicMessageTypeNested(goField.Type, goField.Package)
+					msgType, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil)
 					if err != nil {
 						return errors.Wrap(err, "Field: "+goField.Name)
 					}
@@ -1112,12 +1138,13 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 
 // Deserialize parses a byte stream into a DynamicMessage, thus reconstructing the fields of a received ROS message; required for ros.Message.
 func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
-	// THIS METHOD IS BASICALLY AN UNTEMPLATED COPY OF THE TEMPLATE IN LIBGENGO.
 
 	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
 	var err error = nil
 	tmpData := make(map[string]interface{})
 	m.data = nil
+
+	d := LEByteDecoder{}
 
 	// Iterate over each of the fields in the message.
 	for _, field := range m.dynamicType.spec.Fields {
@@ -1126,250 +1153,113 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 			// It's an array.
 
 			// The array may be a fixed length, or it may be dynamic.
-			var size uint32 = uint32(field.ArrayLen)
+			size := field.ArrayLen
 			if field.ArrayLen < 0 {
 				// The array is dynamic, so it starts with a declaration of the number of array elements.
-				if err = binary.Read(buf, binary.LittleEndian, &size); err != nil {
+				var usize uint32
+				if usize, err = d.DecodeUint32(buf); err != nil {
 					return errors.Wrap(err, "Field: "+field.Name)
 				}
+				size = int(usize)
 			}
 			// Create an array of the target type.
 			switch field.GoType {
 			case "bool":
-				tmpData[field.Name] = make([]bool, 0)
+				tmpData[field.Name], err = d.DecodeBoolArray(buf, size)
 			case "int8":
-				tmpData[field.Name] = make([]int8, 0)
+				tmpData[field.Name], err = d.DecodeInt8Array(buf, size)
 			case "int16":
-				tmpData[field.Name] = make([]int16, 0)
+				tmpData[field.Name], err = d.DecodeInt16Array(buf, size)
 			case "int32":
-				tmpData[field.Name] = make([]int32, 0)
+				tmpData[field.Name], err = d.DecodeInt32Array(buf, size)
 			case "int64":
-				tmpData[field.Name] = make([]int64, 0)
+				tmpData[field.Name], err = d.DecodeInt64Array(buf, size)
 			case "uint8":
-				tmpData[field.Name] = make([]uint8, 0)
+				tmpData[field.Name], err = d.DecodeUint8Array(buf, size)
 			case "uint16":
-				tmpData[field.Name] = make([]uint16, 0)
+				tmpData[field.Name], err = d.DecodeUint16Array(buf, size)
 			case "uint32":
-				tmpData[field.Name] = make([]uint32, 0)
+				tmpData[field.Name], err = d.DecodeUint32Array(buf, size)
 			case "uint64":
-				tmpData[field.Name] = make([]uint64, 0)
+				tmpData[field.Name], err = d.DecodeUint64Array(buf, size)
 			case "float32":
-				tmpData[field.Name] = make([]JsonFloat32, 0)
+				tmpData[field.Name], err = d.DecodeFloat32Array(buf, size)
 			case "float64":
-				tmpData[field.Name] = make([]JsonFloat64, 0)
+				tmpData[field.Name], err = d.DecodeFloat64Array(buf, size)
 			case "string":
-				tmpData[field.Name] = make([]string, 0)
+				tmpData[field.Name], err = d.DecodeStringArray(buf, size)
 			case "ros.Time":
-				tmpData[field.Name] = make([]Time, 0)
+				tmpData[field.Name], err = d.DecodeTimeArray(buf, size)
 			case "ros.Duration":
-				tmpData[field.Name] = make([]Duration, 0)
+				tmpData[field.Name], err = d.DecodeDurationArray(buf, size)
 			default:
-				// In this case, it will probably be because the go_type is describing another ROS message, so we need to replace that with a nested DynamicMessage.
-				tmpData[field.Name] = make([]Message, 0)
-			}
-			// Iterate over each item in the array.
-			for i := 0; i < int(size); i++ {
 				if field.IsBuiltin {
-					if field.Type == "string" {
-						// The string will start with a declaration of the number of characters.
-						var strSize uint32
-						if err = binary.Read(buf, binary.LittleEndian, &strSize); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						data := make([]byte, int(strSize))
-						if err = binary.Read(buf, binary.LittleEndian, &data); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						tmpData[field.Name] = append(tmpData[field.Name].([]string), string(data))
-					} else if field.Type == "time" {
-						var data Time
-						// Time/duration types have two fields, so consume into these in two reads.
-						if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						tmpData[field.Name] = append(tmpData[field.Name].([]Time), data)
-					} else if field.Type == "duration" {
-						var data Duration
-						// Time/duration types have two fields, so consume into these in two reads.
-						if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-						tmpData[field.Name] = append(tmpData[field.Name].([]Duration), data)
-					} else {
-						// It's a regular primitive element.
+					// Something went wrong.
+					return errors.New("we haven't implemented this primitive yet")
+				}
 
-						// Because not runtime expressions in type assertions in Go, we need to manually do this.
-						switch field.GoType {
-						case "bool":
-							var data bool
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]bool), data)
-						case "int8":
-							var data int8
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]int8), data)
-						case "int16":
-							var data int16
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]int16), data)
-						case "int32":
-							var data int32
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]int32), data)
-						case "int64":
-							var data int64
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]int64), data)
-						case "uint8":
-							var data uint8
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]uint8), data)
-						case "uint16":
-							var data uint16
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]uint16), data)
-						case "uint32":
-							var data uint32
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]uint32), data)
-						case "uint64":
-							var data uint64
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]uint64), data)
-						case "float32":
-							var data float32
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]JsonFloat32), JsonFloat32{F: data})
-						case "float64":
-							var data float64
-							binary.Read(buf, binary.LittleEndian, &data)
-							tmpData[field.Name] = append(tmpData[field.Name].([]JsonFloat64), JsonFloat64{F: data})
-						default:
-							// Something went wrong.
-							return errors.New("we haven't implemented this primitive yet")
-						}
-						if err != nil {
-							return errors.Wrap(err, "Field: "+field.Name)
-						}
-					}
+				// In this case, it will probably be because the go_type is describing another ROS message type
+				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+					tmpData[field.Name], err = d.DecodeMessageArray(buf, size, msgType)
 				} else {
-					// Else it's not a builtin.
-					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
-					if err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					msg := msgType.NewMessage()
-					if err = msg.Deserialize(buf); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					tmpData[field.Name] = append(tmpData[field.Name].([]Message), msg)
+					err = errors.New("nested message type not known")
 				}
 			}
-		} else {
-			// Else it's a scalar.  This is just the same as above, with the '[i]' bits removed.
+			if err != nil {
+				return errors.Wrap(err, "Field: "+field.Name)
+			}
+
+		} else { // Else it's a scalar.
 
 			if field.IsBuiltin {
-				if field.Type == "string" {
-					// The string will start with a declaration of the number of characters.
-					var strSize uint32
-					if err = binary.Read(buf, binary.LittleEndian, &strSize); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					data := make([]byte, int(strSize))
-					if err = binary.Read(buf, binary.LittleEndian, data); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					tmpData[field.Name] = string(data)
-				} else if field.Type == "time" {
-					var data Time
-					// Time/duration types have two fields, so consume into these in two reads.
-					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					tmpData[field.Name] = data
-				} else if field.Type == "duration" {
-					var data Duration
-					// Time/duration types have two fields, so consume into these in two reads.
-					if err = binary.Read(buf, binary.LittleEndian, &data.Sec); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					if err = binary.Read(buf, binary.LittleEndian, &data.NSec); err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-					tmpData[field.Name] = data
-				} else {
-					// It's a regular primitive element.
-					switch field.GoType {
-					case "bool":
-						var data bool
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "int8":
-						var data int8
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "int16":
-						var data int16
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "int32":
-						var data int32
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "int64":
-						var data int64
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "uint8":
-						var data uint8
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "uint16":
-						var data uint16
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "uint32":
-						var data uint32
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "uint64":
-						var data uint64
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = data
-					case "float32":
-						var data float32
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = JsonFloat32{F: data}
-					case "float64":
-						var data float64
-						err = binary.Read(buf, binary.LittleEndian, &data)
-						tmpData[field.Name] = JsonFloat64{F: data}
-					default:
-						// Something went wrong.
-						return errors.New("we haven't implemented this primitive yet")
-					}
-					if err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
+				// It's a regular primitive element.
+				switch field.GoType {
+				case "bool":
+					tmpData[field.Name], err = d.DecodeBool(buf)
+				case "int8":
+					tmpData[field.Name], err = d.DecodeInt8(buf)
+				case "int16":
+					tmpData[field.Name], err = d.DecodeInt16(buf)
+				case "int32":
+					tmpData[field.Name], err = d.DecodeInt32(buf)
+				case "int64":
+					tmpData[field.Name], err = d.DecodeInt64(buf)
+				case "uint8":
+					tmpData[field.Name], err = d.DecodeUint8(buf)
+				case "uint16":
+					tmpData[field.Name], err = d.DecodeUint16(buf)
+				case "uint32":
+					tmpData[field.Name], err = d.DecodeUint32(buf)
+				case "uint64":
+					tmpData[field.Name], err = d.DecodeUint64(buf)
+				case "float32":
+					tmpData[field.Name], err = d.DecodeFloat32(buf)
+				case "float64":
+					tmpData[field.Name], err = d.DecodeFloat64(buf)
+				case "string":
+					tmpData[field.Name], err = d.DecodeString(buf)
+				case "ros.Time":
+					tmpData[field.Name], err = d.DecodeTime(buf)
+				case "ros.Duration":
+					tmpData[field.Name], err = d.DecodeDuration(buf)
+				default:
+					// Something went wrong.
+					return errors.New("we haven't implemented this primitive yet")
 				}
-			} else {
-				// Else it's not a builtin.
-				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package)
+
 				if err != nil {
 					return errors.Wrap(err, "Field: "+field.Name)
 				}
-				tmpData[field.Name] = msgType.NewMessage()
-				if err = tmpData[field.Name].(Message).Deserialize(buf); err != nil {
-					return errors.Wrap(err, "Field: "+field.Name)
+
+			} else {
+				// Else it's not a built-in
+				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+					tmpData[field.Name], err = d.DecodeMessage(buf, msgType)
+					if err != nil {
+						return errors.Wrap(err, "Field: "+field.Name)
+					}
+				} else {
+					return errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
 				}
 			}
 		}
@@ -1380,6 +1270,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 	return err
 }
 
+// String returns a string which represents the encapsulared DynamicMessage data.
 func (m *DynamicMessage) String() string {
 	// Just print out the data!
 	return fmt.Sprint(m.dynamicType.Name(), "::", m.data)
@@ -1387,148 +1278,115 @@ func (m *DynamicMessage) String() string {
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
 
-// zeroValueData creates the zeroValue (default) data map for a new dynamic message
-func zeroValueData(s string) (map[string]interface{}, error) {
+// DEFINE PRIVATE RECEIVER FUNCTIONS.
+
+// zeroValueData creates the zeroValue (default) data map for a new DynamicMessage.
+func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 	//Create map
 	d := make(map[string]interface{})
 
-	//Instantiate new dynamic message type from string name parsed
-	t, err := NewDynamicMessageType(s)
-	if err != nil {
-		return d, errors.Wrap(err, "Failed to create NewDynamicMessageType "+s)
-	}
-	//Range fields in the dynamic message type
+	var err error
+
+	//Range fields in the dynamic message type.
 	for _, field := range t.spec.Fields {
 		if field.IsArray {
-			//It's an array. Create empty Slices
+			// If the array length is static set the size, for dynamic arrays, use 0.
+			var size int = 0
+			if field.ArrayLen > 0 {
+				size = field.ArrayLen
+			}
+
 			switch field.GoType {
 			case "bool":
-				d[field.Name] = make([]bool, 0)
+				d[field.Name] = make([]bool, size)
 			case "int8":
-				d[field.Name] = make([]int8, 0)
+				d[field.Name] = make([]int8, size)
 			case "int16":
-				d[field.Name] = make([]int16, 0)
+				d[field.Name] = make([]int16, size)
 			case "int32":
-				d[field.Name] = make([]int32, 0)
+				d[field.Name] = make([]int32, size)
 			case "int64":
-				d[field.Name] = make([]int64, 0)
+				d[field.Name] = make([]int64, size)
 			case "uint8":
-				d[field.Name] = make([]uint8, 0)
+				d[field.Name] = make([]uint8, size)
 			case "uint16":
-				d[field.Name] = make([]uint16, 0)
+				d[field.Name] = make([]uint16, size)
 			case "uint32":
-				d[field.Name] = make([]uint32, 0)
+				d[field.Name] = make([]uint32, size)
 			case "uint64":
-				d[field.Name] = make([]uint64, 0)
+				d[field.Name] = make([]uint64, size)
 			case "float32":
-				d[field.Name] = make([]JsonFloat32, 0)
+				d[field.Name] = make([]JsonFloat32, size)
 			case "float64":
-				d[field.Name] = make([]JsonFloat64, 0)
+				d[field.Name] = make([]JsonFloat64, size)
 			case "string":
-				d[field.Name] = make([]string, 0)
+				d[field.Name] = make([]string, size)
 			case "ros.Time":
-				d[field.Name] = make([]Time, 0)
+				d[field.Name] = make([]Time, size)
 			case "ros.Duration":
-				d[field.Name] = make([]Duration, 0)
+				d[field.Name] = make([]Duration, size)
 			default:
-				// In this case, it will probably be because the go_type is describing another ROS message, so we need to replace that with a nested DynamicMessage.
-				d[field.Name] = make([]Message, 0)
-			}
-			var size uint32 = uint32(field.ArrayLen)
-			//In the case the array length is static, we iterated through array items
-			if field.ArrayLen != -1 {
-				for i := 0; i < int(size); i++ {
-					if field.IsBuiltin {
-						//Append the goType zeroValues to their arrays
-						switch field.GoType {
-						case "bool":
-							d[field.Name] = append(d[field.Name].([]bool), false)
-						case "int8":
-							d[field.Name] = append(d[field.Name].([]int8), 0)
-						case "int16":
-							d[field.Name] = append(d[field.Name].([]int16), 0)
-						case "int32":
-							d[field.Name] = append(d[field.Name].([]int32), 0)
-						case "int64":
-							d[field.Name] = append(d[field.Name].([]int64), 0)
-						case "uint8":
-							d[field.Name] = append(d[field.Name].([]uint8), 0)
-						case "uint16":
-							d[field.Name] = append(d[field.Name].([]uint16), 0)
-						case "uint32":
-							d[field.Name] = append(d[field.Name].([]uint32), 0)
-						case "uint64":
-							d[field.Name] = append(d[field.Name].([]uint64), 0)
-						case "float32":
-							d[field.Name] = append(d[field.Name].([]JsonFloat32), JsonFloat32{F: 0.0})
-						case "float64":
-							d[field.Name] = append(d[field.Name].([]JsonFloat64), JsonFloat64{F: 0.0})
-						case "string":
-							d[field.Name] = append(d[field.Name].([]string), "")
-						case "ros.Time":
-							d[field.Name] = append(d[field.Name].([]Time), Time{})
-						case "ros.Duration":
-							d[field.Name] = append(d[field.Name].([]Duration), Duration{})
-						default:
-							// Something went wrong.
-							return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
-						}
-					} else {
-						// Else it's not a builtin. Create a nested message type for values inside
-						t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-						if err != nil {
-							return d, errors.Wrap(err, "Failed to create newDynamicMessageTypeNested "+field.Type)
-						}
-						msg := t2.NewMessage()
-						//Append nested message map to message type array in main map
-						d[field.Name] = append(d[field.Name].([]Message), msg)
+				if field.IsBuiltin {
+					// Something went wrong.
+					return d, errors.New("we haven't implemented this primitive yet")
+				}
+
+				// In this case, the go_type is describing another ROS message, so we nest a DynamicMessage.
+				messages := make([]Message, size)
+				if msgType, ok := t.nested[field.Name]; ok {
+					// Fill out our new messages.
+					for i := 0; i < size; i++ {
+						messages[i] = msgType.NewMessage()
 					}
-					//Else array is dynamic, by default we do not initialize any values in it
+				} else {
+					return d, errors.Wrap(errors.New("nested message type not known"), "Type: "+field.Type)
+				}
+				d[field.Name] = messages
+			}
+		} else { // Not an array.
+			if field.IsBuiltin {
+				// If it is a built in type.
+				switch field.GoType {
+				case "string":
+					d[field.Name] = ""
+				case "bool":
+					d[field.Name] = bool(false)
+				case "int8":
+					d[field.Name] = int8(0)
+				case "int16":
+					d[field.Name] = int16(0)
+				case "int32":
+					d[field.Name] = int32(0)
+				case "int64":
+					d[field.Name] = int64(0)
+				case "uint8":
+					d[field.Name] = uint8(0)
+				case "uint16":
+					d[field.Name] = uint16(0)
+				case "uint32":
+					d[field.Name] = uint32(0)
+				case "uint64":
+					d[field.Name] = uint64(0)
+				case "float32":
+					d[field.Name] = JsonFloat32{F: float32(0.0)}
+				case "float64":
+					d[field.Name] = JsonFloat64{F: float64(0.0)}
+				case "ros.Time":
+					d[field.Name] = Time{}
+				case "ros.Duration":
+					d[field.Name] = Duration{}
+				default:
+					return d, errors.Wrap(err, "builtin field "+field.GoType+" not found")
+				}
+				//Else its a ros message type
+			} else {
+				//Create new dynamic message type nested
+				if msgType, ok := t.nested[field.Name]; ok {
+					d[field.Name] = msgType.NewMessage()
+				} else {
+					return d, errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
 				}
 			}
-		} else if field.IsBuiltin {
-			//If its a built in type
-			switch field.GoType {
-			case "string":
-				d[field.Name] = ""
-			case "bool":
-				d[field.Name] = bool(false)
-			case "int8":
-				d[field.Name] = int8(0)
-			case "int16":
-				d[field.Name] = int16(0)
-			case "int32":
-				d[field.Name] = int32(0)
-			case "int64":
-				d[field.Name] = int64(0)
-			case "uint8":
-				d[field.Name] = uint8(0)
-			case "uint16":
-				d[field.Name] = uint16(0)
-			case "uint32":
-				d[field.Name] = uint32(0)
-			case "uint64":
-				d[field.Name] = uint64(0)
-			case "float32":
-				d[field.Name] = JsonFloat32{F: float32(0.0)}
-			case "float64":
-				d[field.Name] = JsonFloat64{F: float64(0.0)}
-			case "ros.Time":
-				d[field.Name] = Time{}
-			case "ros.Duration":
-				d[field.Name] = Duration{}
-			default:
-				return d, errors.Wrap(err, "Builtin field "+field.GoType+" not found")
-			}
-			//Else its a ros message type
-		} else {
-			//Create new dynamic message type nested
-			t2, err := newDynamicMessageTypeNested(field.Type, field.Package)
-			if err != nil {
-				return d, errors.Wrap(err, "Failed to create dewDynamicMessageTypeNested "+field.Type)
-			}
-			//Append message as a map item
-			d[field.Name] = t2.NewMessage()
 		}
 	}
 	return d, err
@@ -1674,7 +1532,5 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 		return nil, errors.New("we haven't implemented this primitive yet")
 	}
 }
-
-// DEFINE PRIVATE RECEIVER FUNCTIONS.
 
 // ALL DONE.
