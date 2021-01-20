@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// LEByteDecoder is a little-endian byte decoder, implements the ByteDecode interface.
+// LEByteDecoder is a little-endian byte decoder, implements the ByteDecoder interface.
 type LEByteDecoder struct{}
 
 var _ ByteDecoder = LEByteDecoder{}

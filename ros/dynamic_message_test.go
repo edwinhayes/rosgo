@@ -76,8 +76,8 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 	}
 
 	// Ensure that we have embedded additional DynamicMessageTypes for Point and Quaternion.
-	if len(poseMessageType.nested) != 2 {
-		t.Fatalf("expected 2 nested message types")
+	if len(poseMessageType.nested) != 5 {
+		t.Fatalf("expected 5 nested message types, got %v", poseMessageType.nested)
 	}
 
 	if pointType, ok := poseMessageType.nested["position"]; ok {
@@ -119,6 +119,61 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 
 	if _, ok = pos.(*DynamicMessage).Data()["x"]; !ok {
 		t.Fatalf("failed to get position.x from pose message")
+	}
+}
+
+func TestDynamicMessage_TypeWithRecursion(t *testing.T) {
+	// We don't care about Pose in this step, but we want to load libgengo's context.
+	_, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+	fields := []gengo.Field{
+		*gengo.NewField("test", "recursiveMessage", "x", true, -1),
+	}
+	msgSpec := generateTestSpec(fields)
+	context.RegisterMsg("recursiveMessage", msgSpec)
+
+	_, err = NewDynamicMessageType("recursiveMessage") // If this isn't handled correctly, we get stack overflow.
+
+	if err == nil {
+		t.Fatal("recursive message defintion did not result in an error")
+	}
+}
+
+func TestDynamicMessage_TypeWithBuriedRecursion(t *testing.T) {
+	// We don't care about Pose in this step, but we want to load libgengo's context.
+	_, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+	// Recursive pattern is x->y->z.
+	fields := []gengo.Field{
+		*gengo.NewField("test", "yMessage", "y", true, -1),
+	}
+	msgSpec := generateTestSpec(fields)
+	context.RegisterMsg("xMessage", msgSpec)
+
+	fields = []gengo.Field{
+		*gengo.NewField("test", "zMessage", "z", true, -1),
+	}
+	msgSpec = generateTestSpec(fields)
+	context.RegisterMsg("yMessage", msgSpec)
+
+	fields = []gengo.Field{
+		*gengo.NewField("test", "xMessage", "x", true, -1),
+	}
+	msgSpec = generateTestSpec(fields)
+	context.RegisterMsg("zMessage", msgSpec)
+
+	_, err = NewDynamicMessageType("xMessage") // If this isn't handled correctly, we get stack overflow.
+
+	if err == nil {
+		t.Fatal("recursive message defintion did not result in an error")
 	}
 }
 
