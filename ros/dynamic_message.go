@@ -509,6 +509,18 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 		//Store keyName for usage in ArrayEach function
 		keyName = key
 		fieldExists = false
+
+		// Confirm the pointers are valid
+		if m == nil {
+			return errors.New("nil pointer to DynamicMessage")
+		} else if m.dynamicType == nil {
+			return errors.New("nil pointer to dynamicType")
+		} else if m.dynamicType.spec == nil {
+			return errors.New("nil pointer to MsgSpec")
+		} else if m.dynamicType.spec.Fields == nil {
+			return errors.New("nil pointer to Fields")
+		}
+
 		//Find message spec field that matches JSON key
 		for _, field := range m.dynamicType.spec.Fields {
 			if string(key) == field.Name {
@@ -705,6 +717,15 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 				}
 			} else {
 				size = uint32(field.ArrayLen)
+
+				// Make sure that the 'fixed length' array that is expected is the correct length. Pad it if necessary.
+				reflectLen := uint32(reflect.ValueOf(array).Len())
+				if reflectLen < size {
+					array, err = padArray(array, field, reflectLen, size)
+					if err != nil {
+						return errors.Wrap(err, "unable to pad array to correct length")
+					}
+				}
 			}
 
 			// Then we just write out all the elements one after another.
@@ -881,6 +902,9 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 					msg, ok := arrayItem.(dynamicMessageLike)
 					if !ok {
 						return errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(arrayItem).Name() + ", expected Message.")
+					}
+					if msg == nil || msg.GetDynamicType() == nil || msg.GetDynamicType().spec == nil {
+						return errors.New("Field: " + field.Name + ": nil pointer to MsgSpec")
 					}
 					if msg.GetDynamicType().spec.ShortName != field.Type {
 						return errors.New("Field: " + field.Name + ": Found msg " + msg.GetDynamicType().spec.ShortName + ", expected " + field.Type + ".")
@@ -1508,6 +1532,147 @@ func zeroValueData(s string) (map[string]interface{}, error) {
 		}
 	}
 	return d, err
+}
+
+// padArray pads the provided array to the specified length using the default value for the array type.
+func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {
+	switch field.GoType {
+	case "bool":
+		// Make sure we've actually got a bool.
+		v, ok := array.([]bool)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []bool.")
+		}
+		padding := make([]bool, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = false
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "int8":
+		// Make sure we've actually got an int8.
+		v, ok := array.([]int8)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []int8.")
+		}
+		padding := make([]int8, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "int16":
+		// Make sure we've actually got an int16.
+		v, ok := array.([]int16)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []int16.")
+		}
+		padding := make([]int16, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "int32":
+		// Make sure we've actually got an int32.
+		v, ok := array.([]int32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []int32.")
+		}
+		padding := make([]int32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "int64":
+		// Make sure we've actually got an int64.
+		v, ok := array.([]int64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []int64.")
+		}
+		padding := make([]int64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "uint8":
+		// Make sure we've actually got a uint8.
+		v, ok := array.([]uint8)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []uint8.")
+		}
+		padding := make([]uint8, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "uint16":
+		// Make sure we've actually got a uint16.
+		v, ok := array.([]uint16)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []uint16.")
+		}
+		padding := make([]uint16, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "uint32":
+		// Make sure we've actually got a uint32.
+		v, ok := array.([]uint32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []uint32.")
+		}
+		padding := make([]uint32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "uint64":
+		// Make sure we've actually got a uint64.
+		v, ok := array.([]uint64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []uint64.")
+		}
+		padding := make([]uint64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "float32":
+		// Make sure we've actually got a float32.
+		v, ok := array.([]float32)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []float32.")
+		}
+		padding := make([]float32, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	case "float64":
+		// Make sure we've actually got a float64.
+		v, ok := array.([]float64)
+		if !ok {
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []float64.")
+		}
+		padding := make([]float64, requiredSize-actualSize)
+		for i := range padding {
+			padding[i] = 0
+		}
+		v = append(v, padding...)
+		return v, nil
+	default:
+		// Something went wrong.
+		return nil, errors.New("we haven't implemented this primitive yet")
+	}
 }
 
 // DEFINE PRIVATE RECEIVER FUNCTIONS.
