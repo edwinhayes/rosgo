@@ -447,6 +447,34 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 	}
 }
 
+// Don't panic when the dynamic type is empty - just do nothing instead.
+func TestDynamicMessage_EmptyType_NoPanic(t *testing.T) {
+	testMessageType := DynamicMessageType{}
+
+	msg := testMessageType.NewDynamicMessage()
+
+	if msg.Type().Name() != "" {
+		t.Fatalf("unexpected dynamic message name %s", msg.Type().Name())
+	}
+
+	if msg.Type().MD5Sum() != "" {
+		t.Fatalf("unexpected dynamic message MD5 %s", msg.Type().MD5Sum())
+	}
+
+	if msg.Type().Text() != "" {
+		t.Fatalf("unexpected dynamic message text %s", msg.Type().Text())
+	}
+
+	byteReader := bytes.NewReader([]byte{0x00})
+	if err := msg.Deserialize(byteReader); err == nil {
+		t.Fatalf("expected deserialize error %s", err)
+	}
+	byteBuffer := bytes.NewBuffer(make([]byte, 100))
+	if err := msg.Serialize(byteBuffer); err == nil {
+		t.Fatalf("expected serialize error %s", err)
+	}
+}
+
 // Testing helpers
 
 // Float32Near helper to check that two float32 are within a tolerance.
