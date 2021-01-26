@@ -1230,11 +1230,14 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 					return errors.New("we haven't implemented this primitive yet")
 				}
 
-				// In this case, it will probably be because the go_type is describing another ROS message type
-				if msgType, ok := m.dynamicType.nested[field.Package+"/"+field.Type]; ok {
-					tmpData[field.Name], err = d.DecodeMessageArray(buf, size, msgType)
-				} else {
-					err = errors.New("nested message type not known")
+				// The type encapsulates another ROS message, so we nest a DynamicMessage.
+				msgType, err := m.dynamicType.getNestedTypeFromField(&field)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+
+				if tmpData[field.Name], err = d.DecodeMessageArray(buf, size, msgType); err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
 				}
 			}
 			if err != nil {
@@ -1284,14 +1287,14 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 				}
 
 			} else {
-				// Else it's not a built-in
-				if msgType, ok := m.dynamicType.nested[field.Package+"/"+field.Type]; ok {
-					tmpData[field.Name], err = d.DecodeMessage(buf, msgType)
-					if err != nil {
-						return errors.Wrap(err, "Field: "+field.Name)
-					}
-				} else {
-					return errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
+				// The type encapsulates another ROS message, so we nest a DynamicMessage.
+				msgType, err := m.dynamicType.getNestedTypeFromField(&field)
+				if err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
+				}
+
+				if tmpData[field.Name], err = d.DecodeMessage(buf, msgType); err != nil {
+					return errors.Wrap(err, "Field: "+field.Name)
 				}
 			}
 		}
@@ -1371,15 +1374,15 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 					return d, errors.New("we haven't implemented this primitive yet")
 				}
 
-				// In this case, the go_type is describing another ROS message, so we nest a DynamicMessage.
+				// The type encapsulates another ROS message, so we nest a DynamicMessage.
+				msgType, err := t.getNestedTypeFromField(&field)
+				if err != nil {
+					return d, errors.Wrap(err, "Field: "+field.Name)
+				}
+				// Fill out our new messages.
 				messages := make([]Message, size)
-				if msgType, ok := t.nested[field.Package+"/"+field.Type]; ok {
-					// Fill out our new messages.
-					for i := 0; i < size; i++ {
-						messages[i] = msgType.NewMessage()
-					}
-				} else {
-					return d, errors.Wrap(errors.New("nested message type not known"), "Type: "+field.Type)
+				for i := 0; i < size; i++ {
+					messages[i] = msgType.NewMessage()
 				}
 				d[field.Name] = messages
 			}
@@ -1418,23 +1421,32 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				default:
 					return d, errors.Wrap(err, "builtin field "+field.GoType+" not found")
 				}
-				//Else its a ros message type
 			} else {
-				//Create new dynamic message type nested
-				if msgType, ok := t.nested[field.Package+"/"+field.Type]; ok {
-					d[field.Name] = msgType.NewMessage()
-				} else {
-					return d, errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
+				// The type encapsulates another ROS message, so we nest a DynamicMessage.
+				msgType, err := t.getNestedTypeFromField(&field)
+				if err != nil {
+					return d, errors.Wrap(err, "Field: "+field.Name)
 				}
+				d[field.Name] = msgType.NewMessage()
 			}
 		}
 	}
 	return d, err
 }
 
-// func (t *DynamicMessageType) getNestedTypeFromField(field *libgengo.Field) (*DynamicMessageType, error) {
-// 	if field.Type
-// }
+// Get a nested type of a dynamic message from a field.
+func (t *DynamicMessageType) getNestedTypeFromField(field *libgengo.Field) (*DynamicMessageType, error) {
+	if t.nested == nil {
+		return nil, errors.New("cannot get nested type from invalid dynamic message type")
+	}
+	fieldtype := field.Package + "/" + field.Type
+
+	if msgType, ok := t.nested[fieldtype]; ok {
+		return msgType, nil
+	}
+	// Did not find the message type. Return an error.
+	return nil, errors.Wrap(errors.New("nested map does not contain requested field"), "fieldtype: "+fieldtype)
+}
 
 // padArray pads the provided array to the specified length using the default value for the array type.
 func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {

@@ -122,7 +122,7 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 	}
 }
 
-func TestDynamicMessage_DynamicType_LoadWithRepeatedFields(t *testing.T) {
+func TestDynamicMessage_DynamicType_LoadWithRepeatedFieldNames(t *testing.T) {
 	odomMessageType, err := NewDynamicMessageType("nav_msgs/Odometry")
 
 	if err != nil {
@@ -133,15 +133,6 @@ func TestDynamicMessage_DynamicType_LoadWithRepeatedFields(t *testing.T) {
 	if n := len(odomMessageType.spec.Fields); n != 4 {
 		t.Fatalf("got %d fields ,expected 4", n)
 	}
-
-	// Ensure that we have embedded additional DynamicMessageTypes for Point and Quaternion.
-	// if len(poseMessageType.nested) != 5 {
-	// 	t.Fatalf("expected 5 nested message types, got %v", poseMessageType.nested)
-	// }
-
-	// // Pose has 7 float64 values, 7 x 8 bytes = 56 bytes.
-	// slice := make([]byte, 56)
-	// byteReader := bytes.NewReader(slice)
 
 	testMessage := odomMessageType.NewDynamicMessage()
 
@@ -173,18 +164,18 @@ func TestDynamicMessage_DynamicType_LoadWithRepeatedFields(t *testing.T) {
 		}
 	}
 
-	// if err := testMessage.Deserialize(byteReader); err != nil {
-	// 	t.Fatalf("deserialize pose failed")
-	// }
+	// Ensure we can deserialize.
 
-	// pos, ok := testMessage.Data()["position"]
-	// if !ok {
-	// 	t.Fatalf("failed to get position from pose message")
-	// }
+	// Header has 4 + 8 + 4 (with empty string) = 16 bytes
+	// child_frame string has 4 bytes
+	// PoseWithCovariance has 7 + 36 float64 values, 43 x 8 bytes = 344 bytes.
+	// TwistWithCovariance has 6 + 36 float64 values, 42 x 8 bytes = 336 bytes.
+	slice := make([]byte, 700)
+	byteReader := bytes.NewReader(slice)
 
-	// if _, ok = pos.(*DynamicMessage).Data()["x"]; !ok {
-	// 	t.Fatalf("failed to get position.x from pose message")
-	// }
+	if err := testMessage.Deserialize(byteReader); err != nil {
+		t.Fatalf("deserialize odom failed, %s", err)
+	}
 }
 
 func TestDynamicMessage_TypeWithRecursion(t *testing.T) {
@@ -601,6 +592,44 @@ func TestDynamicMessage_EmptyType_NoPanic(t *testing.T) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 100))
 	if err := msg.Serialize(byteBuffer); err == nil {
 		t.Fatalf("expected serialize error %s", err)
+	}
+}
+
+func TestDynamicMessage_getNestedTypeFromField_basic(t *testing.T) {
+	testMessageType := &DynamicMessageType{}
+	field := gengo.NewField("pkg", "type", "name", false, 0)
+
+	// Invalid test message returns error
+	testMessageType.nested = nil
+	if _, err := testMessageType.getNestedTypeFromField(field); err == nil {
+		t.Fatalf("did not return error when getting nested type from invalid message type")
+	}
+
+	// Type not included in nested list.
+	testMessageType.nested = map[string](*DynamicMessageType){
+		"type":      &DynamicMessageType{},
+		"pkg":       &DynamicMessageType{},
+		"pkg.type":  &DynamicMessageType{},
+		"pkg-type":  &DynamicMessageType{},
+		"type/pkg":  &DynamicMessageType{},
+		"pkg/typex": &DynamicMessageType{},
+	}
+	if _, err := testMessageType.getNestedTypeFromField(field); err == nil {
+		t.Fatalf("did not return error when field is not included in nested map")
+	}
+
+	// Type is included in nested list.
+	expectedNestedType := &DynamicMessageType{}
+	expectedNestedType.nested = map[string](*DynamicMessageType){"found": &DynamicMessageType{}}
+
+	testMessageType.nested["pkg/type"] = expectedNestedType
+
+	nestedType, err := testMessageType.getNestedTypeFromField(field)
+	if err != nil {
+		t.Fatalf("did not find pkg/type, got error: %s", err)
+	}
+	if _, ok := nestedType.nested["found"]; ok == false {
+		t.Fatalf("look up returned the incorrect nested type")
 	}
 }
 
