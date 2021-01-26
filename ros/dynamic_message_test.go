@@ -2,6 +2,7 @@ package ros
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"testing"
@@ -567,6 +568,128 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 	}
 }
 
+// Marshalling dynamic message is equivalent to marshalling the raw data in dynamic message
+func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
+
+	fields := []gengo.Field{
+		// Singular primitives.
+		*gengo.NewField("Testing", "uint8", "singular_u8", false, 0),
+		*gengo.NewField("Testing", "uint16", "singular_u16", false, 0),
+		*gengo.NewField("Testing", "uint32", "singular_u32", false, 0),
+		*gengo.NewField("Testing", "uint64", "singular_u64", false, 0),
+		*gengo.NewField("Testing", "int8", "singular_i8", false, 0),
+		*gengo.NewField("Testing", "int16", "singular_i16", false, 0),
+		*gengo.NewField("Testing", "int32", "singular_i32", false, 0),
+		*gengo.NewField("Testing", "int64", "singular_i64", false, 0),
+		*gengo.NewField("Testing", "bool", "singular_b", false, 0),
+		*gengo.NewField("Testing", "float32", "singular_f32", false, 0),
+		*gengo.NewField("Testing", "float64", "singular_f64", false, 0),
+		*gengo.NewField("Testing", "string", "singular_s", false, 0),
+		*gengo.NewField("Testing", "time", "singular_t", false, 0),
+		*gengo.NewField("Testing", "duration", "singular_d", false, 0),
+		// Fixed arrays.
+		*gengo.NewField("Testing", "uint8", "fixed_u8", true, 8),
+		*gengo.NewField("Testing", "uint16", "fixed_u16", true, 4),
+		*gengo.NewField("Testing", "uint32", "fixed_u32", true, 2),
+		*gengo.NewField("Testing", "uint64", "fixed_u64", true, 1),
+		*gengo.NewField("Testing", "int8", "fixed_i8", true, 8),
+		*gengo.NewField("Testing", "int16", "fixed_i16", true, 4),
+		*gengo.NewField("Testing", "int32", "fixed_i32", true, 2),
+		*gengo.NewField("Testing", "int64", "fixed_i64", true, 1),
+		*gengo.NewField("Testing", "bool", "fixed_b", true, 8),
+		*gengo.NewField("Testing", "float32", "fixed_f32", true, 2),
+		*gengo.NewField("Testing", "float64", "fixed_f64", true, 1),
+		*gengo.NewField("Testing", "string", "fixed_s", true, 3),
+		*gengo.NewField("Testing", "time", "fixed_t", true, 2),
+		*gengo.NewField("Testing", "duration", "fixed_d", true, 2),
+		// Dynamic arrays.
+		*gengo.NewField("Testing", "uint8", "dyn_u8", true, -1),
+		*gengo.NewField("Testing", "uint16", "dyn_u16", true, -1),
+		*gengo.NewField("Testing", "uint32", "dyn_u32", true, -1),
+		*gengo.NewField("Testing", "uint64", "dyn_u64", true, -1),
+		*gengo.NewField("Testing", "int8", "dyn_i8", true, -1),
+		*gengo.NewField("Testing", "int16", "dyn_i16", true, -1),
+		*gengo.NewField("Testing", "int32", "dyn_i32", true, -1),
+		*gengo.NewField("Testing", "int64", "dyn_i64", true, -1),
+		*gengo.NewField("Testing", "bool", "dyn_b", true, -1),
+		*gengo.NewField("Testing", "float32", "dyn_f32", true, -1),
+		*gengo.NewField("Testing", "float64", "dyn_f64", true, -1),
+		*gengo.NewField("Testing", "string", "dyn_s", true, -1),
+		*gengo.NewField("Testing", "time", "dyn_t", true, -1),
+		*gengo.NewField("Testing", "duration", "dyn_d", true, -1),
+	}
+
+	data := map[string]interface{}{
+		"singular_u8":  uint8(0x12),
+		"singular_u16": uint16(0x3456),
+		"singular_u32": uint32(0x789abcde),
+		"singular_u64": uint64(0x123456789abcdef0),
+		"singular_i8":  int8(-2),
+		"singular_i16": int16(-2),
+		"singular_i32": int32(-2),
+		"singular_i64": int64(-2),
+		"singular_b":   true,
+		"singular_f32": JsonFloat32{1234.5678},
+		"singular_f64": JsonFloat64{-9876.5432},
+		"singular_s":   "Rocos",
+		"singular_t":   NewTime(0xfeedf00d, 0x1337beef),
+		"singular_d":   NewDuration(0x50607080, 0x10203040),
+		"fixed_u8":     []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
+		"fixed_u16":    []uint16{0xdef0, 0x9abc, 0x5678, 0x1234},
+		"fixed_u32":    []uint32{0x9abcdef0, 0x12345678},
+		"fixed_u64":    []uint64{0x123456789abcdef0},
+		"fixed_i8":     []int8{-2, -1, 0, 1, 2, 3, 4, 5},
+		"fixed_i16":    []int16{-2, -1, 0, 1},
+		"fixed_i32":    []int32{-2, 1},
+		"fixed_i64":    []int64{-2},
+		"fixed_b":      []bool{true, true, false, false, true, false, true, false},
+		"fixed_f32":    []JsonFloat32{{1234.5678}, {1234.5678}},
+		"fixed_f64":    []JsonFloat64{{-9876.5432}},
+		"fixed_s":      []string{"Rocos", "soroc", "croos"},
+		"fixed_t":      []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x1337f00d)},
+		"fixed_d":      []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
+		"dyn_u8":       []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
+		"dyn_u16":      []uint16{0xdef0, 0x9abc, 0x5678, 0x1234},
+		"dyn_u32":      []uint32{0x9abcdef0, 0x12345678},
+		"dyn_u64":      []uint64{0x123456789abcdef0},
+		"dyn_i8":       []int8{-2, -1, 0, 1, 2, 3, 4, 5},
+		"dyn_i16":      []int16{-2, -1, 0, 1},
+		"dyn_i32":      []int32{-2, 1},
+		"dyn_i64":      []int64{-2},
+		"dyn_b":        []bool{true, true, false, false, true, false, true, false},
+		"dyn_f32":      []JsonFloat32{{1234.5678}, {1234.5678}},
+		"dyn_f64":      []JsonFloat64{{-9876.5432}},
+		"dyn_s":        []string{"Rocos", "soroc", "croos"},
+		"dyn_t":        []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x1337f00d)},
+		"dyn_d":        []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
+	}
+
+	testMessageType := &DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
+
+	testMessage := &DynamicMessage{
+		dynamicType: testMessageType,
+		data:        data,
+	}
+
+	verifyJSONMarshalling(t, testMessage)
+}
+
+func TestDynamicMessage_marshalJSON_nested(t *testing.T) {
+	testMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+
+	testMessage := testMessageType.NewDynamicMessage()
+
+	verifyJSONMarshalling(t, testMessage)
+}
+
 // Don't panic when the dynamic type is empty - just do nothing instead.
 func TestDynamicMessage_EmptyType_NoPanic(t *testing.T) {
 	testMessageType := DynamicMessageType{}
@@ -649,4 +772,41 @@ func generateTestSpec(fields []gengo.Field) *gengo.MsgSpec {
 	msgSpec.ShortName = "Test"
 	msgSpec.Fields = fields
 	return msgSpec
+}
+
+func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
+	defaultMarshalledBytes, err := json.Marshal(msg.data)
+	if err != nil {
+		t.Fatalf("failed to marshal raw data of dynamic message")
+	}
+
+	customMarshalledBytes, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal dynamic message")
+	}
+
+	if len(customMarshalledBytes) != len(defaultMarshalledBytes) {
+		t.Log("default:\n" + string(defaultMarshalledBytes))
+		t.Log("custom:\n" + string(customMarshalledBytes))
+		t.Fatalf("custom JSON marshalling does not match default marshalling")
+	}
+
+	for i, b := range defaultMarshalledBytes {
+		if b != customMarshalledBytes[i] {
+			t.Fatalf("byte %d mismatch in json encoding, default: %x, custom: %x", i, b, customMarshalledBytes[i])
+		}
+	}
+
+	customUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
+	err = json.Unmarshal(customMarshalledBytes, customUnmarshalledMessage)
+	if err != nil {
+		t.Fatalf("failed to unmarshal dynamic message, %v", err)
+	}
+
+	// We won't get a perfect match, because JSON promotes human-readability over numeric correctness, just check the fields match.
+	for key := range msg.data {
+		if _, ok := customUnmarshalledMessage.data[key]; ok == false {
+			t.Fatalf("unmarshalled dynamic message missing key %v", key)
+		}
+	}
 }
