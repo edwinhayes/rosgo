@@ -151,7 +151,7 @@ func TestDynamicMessage_TypeWithBuriedRecursion(t *testing.T) {
 		t.Skip("test skipped because ROS environment not set up")
 		return
 	}
-	// Recursive pattern is x->y->z.
+	// Structure pattern is x->y->z.
 	fields := []gengo.Field{
 		*gengo.NewField("test", "yMessage", "y", true, -1),
 	}
@@ -174,6 +174,70 @@ func TestDynamicMessage_TypeWithBuriedRecursion(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("recursive message defintion did not result in an error")
+	}
+}
+
+func TestDynamicMessage_RepeatedTypes_ButNoRecursion(t *testing.T) {
+	// We don't care about Pose in this step, but we want to load libgengo's context.
+	_, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+	// Structure is z->{x, x}.
+	fields := []gengo.Field{
+		*gengo.NewField("test", "uint8", "val", true, -1),
+	}
+	msgSpec := generateTestSpec(fields)
+	context.RegisterMsg("xMessage", msgSpec)
+
+	fields = []gengo.Field{
+		*gengo.NewField("test", "xMessage", "x1", true, -1),
+		*gengo.NewField("test", "xMessage", "x2", true, -1),
+	}
+	msgSpec = generateTestSpec(fields)
+	context.RegisterMsg("zMessage", msgSpec)
+
+	_, err = NewDynamicMessageType("zMessage")
+
+	if err != nil {
+		t.Fatalf("Recursion false positives, error: %v", err)
+	}
+}
+
+func TestDynamicMessage_RepeatedBuriedTypes_ButNoRecursion(t *testing.T) {
+	// We don't care about Pose in this step, but we want to load libgengo's context.
+	_, err := NewDynamicMessageType("geometry_msgs/Pose")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+	// Structure is z->{y->x, x}.
+	fields := []gengo.Field{
+		*gengo.NewField("test", "uint8", "val", true, -1),
+	}
+	msgSpec := generateTestSpec(fields)
+	context.RegisterMsg("xMessage", msgSpec)
+
+	fields = []gengo.Field{
+		*gengo.NewField("test", "xMessage", "x", true, -1),
+	}
+	msgSpec = generateTestSpec(fields)
+	context.RegisterMsg("yMessage", msgSpec)
+
+	fields = []gengo.Field{
+		*gengo.NewField("test", "xMessage", "x", true, -1),
+		*gengo.NewField("test", "yMessage", "y", true, -1),
+	}
+	msgSpec = generateTestSpec(fields)
+	context.RegisterMsg("zMessage", msgSpec)
+
+	_, err = NewDynamicMessageType("zMessage")
+
+	if err != nil {
+		t.Fatalf("Recursion false positives, error: %v", err)
 	}
 }
 

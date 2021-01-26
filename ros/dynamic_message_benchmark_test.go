@@ -526,7 +526,7 @@ func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArray(b *testing.B) {
 		make(map[string]*DynamicMessageType),
 	}
 
-	msgType, err := newDynamicMessageTypeNested("Pose", "geometry_msgs", nil)
+	msgType, err := newDynamicMessageTypeNested("Pose", "geometry_msgs", nil, nil)
 	if err != nil {
 		b.Skip("benchmark skipped, ROS environment not set up")
 		return
