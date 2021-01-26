@@ -187,11 +187,17 @@ func (t *DynamicMessageType) Name() string {
 
 // Text returns the full ROS message specification for this message type; required for ros.MessageType.
 func (t *DynamicMessageType) Text() string {
+	if t.spec == nil {
+		return ""
+	}
 	return t.spec.Text
 }
 
 // MD5Sum returns the ROS compatible MD5 sum of the message type; required for ros.MessageType.
 func (t *DynamicMessageType) MD5Sum() string {
+	if t.spec == nil {
+		return ""
+	}
 	return t.spec.MD5Sum
 }
 
@@ -714,6 +720,13 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 
 // Serialize converts a DynamicMessage into a TCPROS bytestream allowing it to be published to other nodes; required for ros.Message.
 func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
+	if m.dynamicType.spec == nil {
+		return errors.New("dynamic message type spec is nil")
+	}
+	if m.dynamicType.nested == nil {
+		return errors.New("dynamic message type nested is nil")
+	}
+
 	// THIS METHOD IS BASICALLY AN UNTEMPLATED COPY OF THE TEMPLATE IN LIBGENGO.
 
 	var err error = nil
@@ -1139,6 +1152,13 @@ func (m *DynamicMessage) Serialize(buf *bytes.Buffer) error {
 // Deserialize parses a byte stream into a DynamicMessage, thus reconstructing the fields of a received ROS message; required for ros.Message.
 func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
+	if m.dynamicType.spec == nil {
+		return errors.New("dynamic message type spec is nil")
+	}
+	if m.dynamicType.nested == nil {
+		return errors.New("dynamic message type nested is nil")
+	}
+
 	// To give more sane results in the event of a decoding issue, we decode into a copy of the data field.
 	var err error = nil
 	tmpData := make(map[string]interface{})
@@ -1284,6 +1304,14 @@ func (m *DynamicMessage) String() string {
 func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 	//Create map
 	d := make(map[string]interface{})
+
+	// Function guards to prevent this call from panicking.
+	if t.spec == nil {
+		return d, errors.New("dynamic message type spec is nil")
+	}
+	if t.nested == nil {
+		return d, errors.New("dynamic message type nested is nil")
+	}
 
 	var err error
 
