@@ -103,31 +103,8 @@ func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
 func newDynamicMessageTypeNested(typeName string, packageName string, nested map[string]*DynamicMessageType, nestedChain map[string]struct{}) (*DynamicMessageType, error) {
-
 	// Create an empty message type.
 	m := &DynamicMessageType{}
-
-	if nested == nil {
-		nested = make(map[string]*DynamicMessageType)
-	}
-	if nestedChain == nil {
-		nestedChain = make(map[string]struct{})
-	}
-
-	m.nested = nested
-
-	// The nestedChain is used for recursion detection.
-	if _, ok := nestedChain[typeName]; ok {
-		// DynamicMessageType already created, recursive messages are scary, return error!
-		return nil, errors.New("type already in nested map, message is recursive")
-	}
-
-	// Just return with the messageType if it has been defined already
-	if t, ok := nested[typeName]; ok {
-		return t, nil
-	}
-
-	nestedChain[typeName] = struct{}{}
 
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
@@ -157,6 +134,27 @@ func newDynamicMessageTypeNested(typeName string, packageName string, nested map
 		}
 	}
 
+	// Create nested maps if required.
+	if nested == nil {
+		nested = make(map[string]*DynamicMessageType)
+	}
+	if nestedChain == nil {
+		nestedChain = make(map[string]struct{})
+	}
+
+	// The nestedChain is used for recursion detection.
+	if _, ok := nestedChain[fullname]; ok {
+		// DynamicMessageType already created, recursive messages are scary, return error!
+		return nil, errors.New("type already in nested chain, message is recursive")
+	}
+
+	// Just return with the messageType if it has been defined already
+	if t, ok := nested[fullname]; ok {
+		return t, nil
+	}
+
+	nestedChain[fullname] = struct{}{}
+
 	// Load context for the target message.
 	spec, err := context.LoadMsg(fullname)
 	if err != nil {
@@ -167,22 +165,21 @@ func newDynamicMessageTypeNested(typeName string, packageName string, nested map
 	m.spec = spec
 
 	// Register type in the nested map, this prevents recursion.
-	nested[typeName] = m
+	nested[fullname] = m
 	m.nested = nested
 
 	// Generate the spec for any nested messages.
 	for _, field := range spec.Fields {
 		if field.IsBuiltin == false {
-			newType, err := newDynamicMessageTypeNested(field.Type, field.Package, nested, nestedChain)
+			_, err := newDynamicMessageTypeNested(field.Type, field.Package, nested, nestedChain)
 			if err != nil {
 				return m, err
 			}
-			m.nested[field.Name] = newType
 		}
 	}
 
 	// Unravelling the nested chain, we are done.
-	delete(nestedChain, typeName)
+	delete(nestedChain, fullname)
 
 	// We've successfully made a new message type matching the requested ROS type.
 	return m, nil
@@ -1234,7 +1231,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 				}
 
 				// In this case, it will probably be because the go_type is describing another ROS message type
-				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+				if msgType, ok := m.dynamicType.nested[field.Package+"/"+field.Type]; ok {
 					tmpData[field.Name], err = d.DecodeMessageArray(buf, size, msgType)
 				} else {
 					err = errors.New("nested message type not known")
@@ -1288,7 +1285,7 @@ func (m *DynamicMessage) Deserialize(buf *bytes.Reader) error {
 
 			} else {
 				// Else it's not a built-in
-				if msgType, ok := m.dynamicType.nested[field.Name]; ok {
+				if msgType, ok := m.dynamicType.nested[field.Package+"/"+field.Type]; ok {
 					tmpData[field.Name], err = d.DecodeMessage(buf, msgType)
 					if err != nil {
 						return errors.Wrap(err, "Field: "+field.Name)
@@ -1376,7 +1373,7 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 
 				// In this case, the go_type is describing another ROS message, so we nest a DynamicMessage.
 				messages := make([]Message, size)
-				if msgType, ok := t.nested[field.Name]; ok {
+				if msgType, ok := t.nested[field.Package+"/"+field.Type]; ok {
 					// Fill out our new messages.
 					for i := 0; i < size; i++ {
 						messages[i] = msgType.NewMessage()
@@ -1424,7 +1421,7 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 				//Else its a ros message type
 			} else {
 				//Create new dynamic message type nested
-				if msgType, ok := t.nested[field.Name]; ok {
+				if msgType, ok := t.nested[field.Package+"/"+field.Type]; ok {
 					d[field.Name] = msgType.NewMessage()
 				} else {
 					return d, errors.Wrap(errors.New("nested message type not known"), "Field: "+field.Name)
@@ -1434,6 +1431,10 @@ func (t *DynamicMessageType) zeroValueData() (map[string]interface{}, error) {
 	}
 	return d, err
 }
+
+// func (t *DynamicMessageType) getNestedTypeFromField(field *libgengo.Field) (*DynamicMessageType, error) {
+// 	if field.Type
+// }
 
 // padArray pads the provided array to the specified length using the default value for the array type.
 func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize uint32) (interface{}, error) {
