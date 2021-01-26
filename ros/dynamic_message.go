@@ -121,6 +121,12 @@ func newDynamicMessageTypeNested(typeName string, packageName string, nested map
 		// DynamicMessageType already created, recursive messages are scary, return error!
 		return nil, errors.New("type already in nested map, message is recursive")
 	}
+
+	// Just return with the messageType if it has been defined already
+	if t, ok := nested[typeName]; ok {
+		return t, nil
+	}
+
 	nestedChain[typeName] = struct{}{}
 
 	// If we haven't created a message context yet, better do that.
