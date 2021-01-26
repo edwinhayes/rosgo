@@ -88,7 +88,7 @@ func ResetContext() {
 // ROS message type name.  The first time the function is run, a message 'context' is created by searching through the available ROS message definitions, then the ROS message to
 // be used for the definition is looked up by name.  On subsequent calls, the ROS message type is looked up directly from the existing context.
 func NewDynamicMessageType(typeName string) (*DynamicMessageType, error) {
-	t, err := newDynamicMessageTypeNested(typeName, "", nil)
+	t, err := newDynamicMessageTypeNested(typeName, "", nil, nil)
 	return t, err
 }
 
@@ -102,7 +102,7 @@ func NewDynamicMessageTypeLiteral(typeName string) (DynamicMessageType, error) {
 // searching through the available ROS message definitions, then the ROS message type to use for the defintion is looked up by name.  On subsequent calls, the ROS message type
 // is looked up directly from the existing context.  This 'nested' version of the function is able to be called recursively, where packageName should be the typeName of the
 // parent ROS message; this is used internally for handling complex ROS messages.
-func newDynamicMessageTypeNested(typeName string, packageName string, nested map[string]*DynamicMessageType) (*DynamicMessageType, error) {
+func newDynamicMessageTypeNested(typeName string, packageName string, nested map[string]*DynamicMessageType, nestedChain map[string]struct{}) (*DynamicMessageType, error) {
 
 	// Create an empty message type.
 	m := &DynamicMessageType{}
@@ -110,12 +110,24 @@ func newDynamicMessageTypeNested(typeName string, packageName string, nested map
 	if nested == nil {
 		nested = make(map[string]*DynamicMessageType)
 	}
+	if nestedChain == nil {
+		nestedChain = make(map[string]struct{})
+	}
 
 	m.nested = nested
-	if t, ok := nested[typeName]; ok {
+
+	// The nestedChain is used for recursion detection.
+	if _, ok := nestedChain[typeName]; ok {
 		// DynamicMessageType already created, recursive messages are scary, return error!
-		return t, errors.New("type already in nested map, message is recursive")
+		return nil, errors.New("type already in nested map, message is recursive")
 	}
+
+	// Just return with the messageType if it has been defined already
+	if t, ok := nested[typeName]; ok {
+		return t, nil
+	}
+
+	nestedChain[typeName] = struct{}{}
 
 	// If we haven't created a message context yet, better do that.
 	if context == nil {
@@ -161,13 +173,16 @@ func newDynamicMessageTypeNested(typeName string, packageName string, nested map
 	// Generate the spec for any nested messages.
 	for _, field := range spec.Fields {
 		if field.IsBuiltin == false {
-			newType, err := newDynamicMessageTypeNested(field.Type, field.Package, nested)
+			newType, err := newDynamicMessageTypeNested(field.Type, field.Package, nested, nestedChain)
 			if err != nil {
 				return m, err
 			}
 			m.nested[field.Name] = newType
 		}
 	}
+
+	// Unravelling the nested chain, we are done.
+	delete(nestedChain, typeName)
 
 	// We've successfully made a new message type matching the requested ROS type.
 	return m, nil
@@ -304,7 +319,7 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 					// It's another nested message.
 
 					// Generate the nested type.
-					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil)
+					msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil, nil)
 					if err != nil {
 						return nil, errors.Wrap(err, "Schema Field: "+field.Name)
 					}
@@ -359,7 +374,7 @@ func (t *DynamicMessageType) generateJSONSchemaProperties(topic string) (map[str
 				// It's another nested message.
 
 				// Generate the nested type.
-				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil)
+				msgType, err := newDynamicMessageTypeNested(field.Type, field.Package, nil, nil)
 				if err != nil {
 					return nil, errors.Wrap(err, "Schema Field: "+field.Name)
 				}
@@ -508,7 +523,7 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				if oldMsgType != "" && oldMsgType == newMsgType {
 					//We've already generated this type
 				} else {
-					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil)
+					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil, nil)
 					_ = err
 					msgType = msgT
 				}
@@ -656,7 +671,7 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 					m.data[goField.Name] = tmpDuration
 				default:
 					//We have a nested message
-					msgType, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil)
+					msgType, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil, nil)
 					if err != nil {
 						return errors.Wrap(err, "Field: "+goField.Name)
 					}
