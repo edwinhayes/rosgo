@@ -76,11 +76,11 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 	}
 
 	// Ensure that we have embedded additional DynamicMessageTypes for Point and Quaternion.
-	if len(poseMessageType.nested) != 5 {
-		t.Fatalf("expected 5 nested message types, got %v", poseMessageType.nested)
+	if len(poseMessageType.nested) != 3 {
+		t.Fatalf("expected 3 nested message types, got %v", poseMessageType.nested)
 	}
 
-	if pointType, ok := poseMessageType.nested["position"]; ok {
+	if pointType, ok := poseMessageType.nested["geometry_msgs/Point"]; ok {
 		if pointType.spec.FullName != "geometry_msgs/Point" {
 			t.Fatalf("expected nested Point, got %s", pointType.spec.FullName)
 		}
@@ -88,10 +88,10 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 			t.Fatalf("expected 3 fields for nested Point type")
 		}
 	} else {
-		t.Fatalf("expected point type under nested[\"position\"]")
+		t.Fatalf("expected point type under nested[\"geometry_msgs/Point\"]")
 	}
 
-	if quatType, ok := poseMessageType.nested["orientation"]; ok {
+	if quatType, ok := poseMessageType.nested["geometry_msgs/Quaternion"]; ok {
 		if quatType.spec.FullName != "geometry_msgs/Quaternion" {
 			t.Fatalf("expected nested Quaternion, got %s", quatType.spec.FullName)
 		}
@@ -99,7 +99,7 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 			t.Fatalf("expected 4 fields for nested Quaternion type")
 		}
 	} else {
-		t.Fatalf("expected quaternion type under nested[\"orientation\"]")
+		t.Fatalf("expected quaternion type under nested[\"geometry_msgs/Quaternion\"]")
 	}
 
 	// Pose has 7 float64 values, 7 x 8 bytes = 56 bytes.
@@ -119,6 +119,62 @@ func TestDynamicMessage_DynamicType_Load(t *testing.T) {
 
 	if _, ok = pos.(*DynamicMessage).Data()["x"]; !ok {
 		t.Fatalf("failed to get position.x from pose message")
+	}
+}
+
+func TestDynamicMessage_DynamicType_LoadWithRepeatedFieldNames(t *testing.T) {
+	odomMessageType, err := NewDynamicMessageType("nav_msgs/Odometry")
+
+	if err != nil {
+		t.Skip("test skipped because ROS environment not set up")
+		return
+	}
+
+	if n := len(odomMessageType.spec.Fields); n != 4 {
+		t.Fatalf("got %d fields ,expected 4", n)
+	}
+
+	testMessage := odomMessageType.NewDynamicMessage()
+
+	if testMessage.Data() == nil {
+		t.Fatalf("did not form test message correctly")
+	}
+
+	expectedKeys := map[string]struct{}{
+		"nav_msgs/Odometry":                 {},
+		"std_msgs/Header":                   {},
+		"geometry_msgs/PoseWithCovariance":  {},
+		"geometry_msgs/Pose":                {},
+		"geometry_msgs/Point":               {},
+		"geometry_msgs/Quaternion":          {},
+		"geometry_msgs/TwistWithCovariance": {},
+		"geometry_msgs/Twist":               {},
+		"geometry_msgs/Vector3":             {},
+	}
+
+	for expKey := range expectedKeys {
+		if _, ok := odomMessageType.nested[expKey]; ok == false {
+			t.Fatalf("key '%s' not found in nested type map", expKey)
+		}
+	}
+
+	for nestedKey := range odomMessageType.nested {
+		if _, ok := expectedKeys[nestedKey]; ok == false {
+			t.Fatalf("unexpected key %s found in nested type map", nestedKey)
+		}
+	}
+
+	// Ensure we can deserialize.
+
+	// Header has 4 + 8 + 4 (with empty string) = 16 bytes
+	// child_frame string has 4 bytes
+	// PoseWithCovariance has 7 + 36 float64 values, 43 x 8 bytes = 344 bytes.
+	// TwistWithCovariance has 6 + 36 float64 values, 42 x 8 bytes = 336 bytes.
+	slice := make([]byte, 700)
+	byteReader := bytes.NewReader(slice)
+
+	if err := testMessage.Deserialize(byteReader); err != nil {
+		t.Fatalf("deserialize odom failed, %s", err)
 	}
 }
 
@@ -536,6 +592,44 @@ func TestDynamicMessage_EmptyType_NoPanic(t *testing.T) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 100))
 	if err := msg.Serialize(byteBuffer); err == nil {
 		t.Fatalf("expected serialize error %s", err)
+	}
+}
+
+func TestDynamicMessage_getNestedTypeFromField_basic(t *testing.T) {
+	testMessageType := &DynamicMessageType{}
+	field := gengo.NewField("pkg", "type", "name", false, 0)
+
+	// Invalid test message returns error
+	testMessageType.nested = nil
+	if _, err := testMessageType.getNestedTypeFromField(field); err == nil {
+		t.Fatalf("did not return error when getting nested type from invalid message type")
+	}
+
+	// Type not included in nested list.
+	testMessageType.nested = map[string](*DynamicMessageType){
+		"type":      &DynamicMessageType{},
+		"pkg":       &DynamicMessageType{},
+		"pkg.type":  &DynamicMessageType{},
+		"pkg-type":  &DynamicMessageType{},
+		"type/pkg":  &DynamicMessageType{},
+		"pkg/typex": &DynamicMessageType{},
+	}
+	if _, err := testMessageType.getNestedTypeFromField(field); err == nil {
+		t.Fatalf("did not return error when field is not included in nested map")
+	}
+
+	// Type is included in nested list.
+	expectedNestedType := &DynamicMessageType{}
+	expectedNestedType.nested = map[string](*DynamicMessageType){"found": &DynamicMessageType{}}
+
+	testMessageType.nested["pkg/type"] = expectedNestedType
+
+	nestedType, err := testMessageType.getNestedTypeFromField(field)
+	if err != nil {
+		t.Fatalf("did not find pkg/type, got error: %s", err)
+	}
+	if _, ok := nestedType.nested["found"]; ok == false {
+		t.Fatalf("look up returned the incorrect nested type")
 	}
 }
 
