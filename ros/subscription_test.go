@@ -387,6 +387,26 @@ func TestSubscription_FlowControl(t *testing.T) {
 	}
 }
 
+// Request stop shuts down an active connection.
+func TestSubscription_RequestStop(t *testing.T) {
+	l, conn, subscription := createAndConnectToSubscription(t)
+	defer l.Close()
+	defer conn.Close()
+
+	// Close the stop channel. Expect this to shutdown the subscription.
+	close(subscription.requestStopChan)
+
+	// Check the connection is closed by the subscription.
+	buffer := make([]byte, 1)
+	deadlineDuration := 5 * time.Second                // Subscriptions only check the stop request every second, so our close check needs to be longer.
+	conn.SetDeadline(time.Now().Add(deadlineDuration)) // Deadline stops this running forever if the connection wasn't closed.
+	_, err := conn.Read(buffer)
+
+	if err != io.EOF {
+		t.Fatalf("Expected subscription to close connection, err: %s", err)
+	}
+}
+
 // Private Helper functions.
 
 // Create a test subscription object.

@@ -42,7 +42,7 @@ func newDefaultSubscriber(topic string, msgType MessageType, callback interface{
 	sub.msgChan = make(chan messageEvent, 10)
 	sub.pubListChan = make(chan []string, 10)
 	sub.addCallbackChan = make(chan interface{}, 10)
-	sub.shutdownChan = make(chan struct{}, 10)
+	sub.shutdownChan = make(chan struct{})
 	sub.disconnectedChan = make(chan string, 10)
 	sub.uri2pub = make(map[string]string)
 	sub.subscriptionChans = make(map[string]subscriptionChannels)
@@ -90,7 +90,7 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 					addr := protocolParams[1].(string)
 					port := protocolParams[2].(int32)
 					uri := fmt.Sprintf("%s:%d", addr, port)
-					quitChan := make(chan struct{}, 10)
+					quitChan := make(chan struct{})
 					enableMessagesChan := make(chan bool)
 					sub.uri2pub[uri] = pub
 					sub.subscriptionChans[pub] = subscriptionChannels{quit: quitChan, enableMessages: enableMessagesChan}
@@ -143,7 +143,6 @@ func (sub *defaultSubscriber) start(wg *sync.WaitGroup, nodeID string, nodeAPIUR
 			// Shutdown subscription goroutine.
 			logger.Debug(sub.topic, " : Receive shutdownChan")
 			for _, closeChan := range sub.subscriptionChans {
-				closeChan.quit <- struct{}{}
 				close(closeChan.quit)
 			}
 			_, err := callRosAPI(masterURI, "unregisterSubscriber", nodeID, sub.topic, nodeAPIURI)
