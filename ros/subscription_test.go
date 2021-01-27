@@ -125,37 +125,6 @@ func TestSubscription_ReadSize_otherError(t *testing.T) {
 
 // Read Raw Data tests.
 
-// Verify pool buffer resizing logic.
-func TestSubscription_ReadRawData_PoolBuffer(t *testing.T) {
-	subscription := getTestSubscription("testUri")
-	if len(subscription.pool) != 0 {
-		t.Fatalf("Expected pool size of 0, but got %d", len(subscription.pool))
-	}
-
-	reader := testReader{[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 4, nil}
-
-	// Test 1, read 4 bytes, pool size goes to 4 bytes.
-	reader.n = 4
-	_, _ = subscription.readRawMessage(&reader, 4)
-	if len(subscription.pool) != 4 {
-		t.Fatalf("Expected pool size of 4, but got %d", len(subscription.pool))
-	}
-
-	// Test 2, read 2 bytes, pool size stays at 4 bytes.
-	reader.n = 2
-	_, _ = subscription.readRawMessage(&reader, 2)
-	if len(subscription.pool) != 4 {
-		t.Fatalf("Expected pool size of 4, but got %d", len(subscription.pool))
-	}
-
-	// Test 3, read 10 bytes, pool size goes to 10 bytes.
-	reader.n = 10
-	_, _ = subscription.readRawMessage(&reader, 10)
-	if len(subscription.pool) != 10 {
-		t.Fatalf("Expected pool size of 10, but got %d", len(subscription.pool))
-	}
-}
-
 // Verify basic buffer reading works correctly.
 func TestSubscription_ReadRawData_ReadData(t *testing.T) {
 	subscription := getTestSubscription("testUri")

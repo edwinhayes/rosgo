@@ -21,7 +21,6 @@ type defaultSubscription struct {
 	requestStopChan        chan struct{} // Inbound signal for subscription to disconnect.
 	remoteDisconnectedChan chan string   // Outbound signal to indicate a disconnected channel.
 	event                  MessageEvent
-	pool                   []byte
 }
 
 // newDefaultSubscription populates a subscription struct from the instantiation fields and fills in default data for the operational fields.
@@ -42,7 +41,6 @@ func newDefaultSubscription(
 		requestStopChan:        requestStopChan,
 		remoteDisconnectedChan: remoteDisconnectedChan,
 		event:                  MessageEvent{"", time.Time{}, nil},
-		pool:                   nil,
 	}
 }
 
@@ -209,7 +207,6 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 	enabled := true
 	readingSize := true
 	var msgSize int
-	var buffer []byte
 	var result readResult
 
 	// Subscriber loop:
@@ -236,7 +233,7 @@ func (s *defaultSubscription) readFromPublisher(conn net.Conn) connectionFailure
 				}
 
 			} else {
-				buffer, result = s.readRawMessage(conn, msgSize)
+				buffer, result := s.readRawMessage(conn, msgSize)
 
 				if result == readOk {
 					if enabled { // Apply flow control - only read when enabled!
@@ -288,11 +285,8 @@ func readSize(r io.Reader) (int, readResult) {
 
 // readRawMessage reads ROS message bytes from the io.Reader.
 func (s *defaultSubscription) readRawMessage(r io.Reader, size int) ([]byte, readResult) {
-	// First, ensure our pool is large enough to receive the bytes. It is reallocated if it is too small.
-	if len(s.pool) < size {
-		s.pool = make([]byte, size)
-	}
-	buffer := s.pool[:size]
+	// Allocate a new slice for this raw message. We need to allocate everytime because we aren't guaranteed that buffer will be processed immediately.
+	buffer := make([]byte, size)
 
 	// Read the full buffer; we expect this call to timeout if the read takes too long.
 	_, err := io.ReadFull(r, buffer)
