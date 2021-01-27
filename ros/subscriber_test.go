@@ -8,6 +8,7 @@ import (
 
 	modular "github.com/edwinhayes/logrus-modular"
 	"github.com/sirupsen/logrus"
+	gengo "github.com/team-rocos/rosgo/libgengo"
 )
 
 // `subscriber_test.go` uses `testMessageType` and `testMessage` defined in `subscription_test.go`.
@@ -48,6 +49,7 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 
 	l, conn, _, _, quitChan, _ := setupRemotePublisherConnTest(t)
 	defer l.Close()
+	defer conn.Close()
 
 	connectToSubscriber(t, conn)
 
@@ -62,9 +64,6 @@ func TestRemotePublisherConn_ClosesFromSignal(t *testing.T) {
 	if err != io.EOF {
 		t.Fatalf("Expected subscriber to close connection")
 	}
-
-	conn.Close()
-	l.Close()
 }
 
 func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
@@ -89,6 +88,35 @@ func TestRemotePublisherConn_RemoteReceivesData(t *testing.T) {
 		return
 	case <-time.After(time.Duration(100) * time.Millisecond):
 		t.Fatalf("Took too long for client to disconnect from publisher")
+	}
+}
+
+func TestSubscriber_Shutdown(t *testing.T) {
+	fields := []gengo.Field{
+		*gengo.NewField("Testing", "uint8", "u8", true, 8),
+	}
+	msgType := &DynamicMessageType{
+		generateTestSpec(fields), // From dynamic_message_tests.go.
+		make(map[string]*DynamicMessageType),
+	}
+	sub := newDefaultSubscriber("testTopic", msgType, func() {})
+
+	hasShutdown := make(chan struct{})
+	pass := false
+	go func() {
+		select {
+		case <-time.After(time.Second):
+		case <-sub.shutdownChan:
+			sub.shutdownChan <- struct{}{}
+			pass = true
+		}
+		hasShutdown <- struct{}{}
+	}()
+
+	sub.Shutdown()
+	<-hasShutdown
+	if pass == false {
+		t.Fatal("shutdown command failed to shutdown mock subscriber")
 	}
 }
 
