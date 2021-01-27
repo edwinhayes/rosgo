@@ -387,7 +387,7 @@ func TestSubscription_FlowControl(t *testing.T) {
 	}
 }
 
-// Valid messages are forwarded from the publisher TCP stream by the subscription.
+// Request stop shuts down an active connection.
 func TestSubscription_RequestStop(t *testing.T) {
 	l, conn, subscription := createAndConnectToSubscription(t)
 	defer l.Close()
