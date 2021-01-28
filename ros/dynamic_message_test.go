@@ -16,8 +16,9 @@ func TestDynamicMessage_TypeGetters(t *testing.T) {
 		*gengo.NewField("Testing", "float32", "x", false, 0),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	if testMessageType.Name() != "TestMessage" {
@@ -34,8 +35,9 @@ func TestDynamicMessage_Deserialize_Simple(t *testing.T) {
 		*gengo.NewField("Testing", "float32", "x", false, 0),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	// Using IEEE754 https://www.h-schmidt.net/FloatConverter/IEEE754.html
@@ -304,8 +306,9 @@ func TestDynamicMessage_Deserialize_Unknown(t *testing.T) {
 		*gengo.NewField("Testing", "Unknown", "x", false, 0),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	// The unknown type isn't real, so just give it some junk bytes.
@@ -336,8 +339,9 @@ func TestDynamicMessage_Deserialize_SingularMedley(t *testing.T) {
 		*gengo.NewField("Testing", "duration", "d", false, 0),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	var expected = map[string]interface{}{
@@ -412,8 +416,9 @@ func TestDynamicMessage_Deserialize_FixedArrayMedley(t *testing.T) {
 		*gengo.NewField("Testing", "duration", "d", true, 2),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	var expected = map[string]interface{}{
@@ -493,8 +498,9 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 		*gengo.NewField("Testing", "duration", "d", true, -1),
 	}
 	testMessageType := DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	var expected = map[string]interface{}{
@@ -666,8 +672,9 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 	}
 
 	testMessageType := &DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := &DynamicMessage{
@@ -694,8 +701,9 @@ func TestDynamicMessage_marshalJSON_strings(t *testing.T) {
 	}
 
 	testMessageType := &DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := &DynamicMessage{
@@ -736,8 +744,9 @@ func TestDynamicMessage_marshalJSON_floats(t *testing.T) {
 	}
 
 	testMessageType := &DynamicMessageType{
-		generateTestSpec(fields),
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := &DynamicMessage{
