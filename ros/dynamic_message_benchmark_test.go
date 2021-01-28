@@ -2,7 +2,6 @@ package ros
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	gengo "github.com/team-rocos/rosgo/libgengo"
@@ -597,48 +596,5 @@ func BenchmarkDynamicMessage_NewMessage_BigArray(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testMessage := uint16BigArrayMessageType.NewDynamicMessage()
 		_ = testMessage.data
-	}
-}
-
-// Benchmarks on JSON marshalling.
-
-var singularMessageData map[string]interface{} = map[string]interface{}{
-	"u8":  uint8(0x12),
-	"u16": uint16(0x3456),
-	"u32": uint32(0x789abcde),
-	"u64": uint64(0x123456789abcdef0),
-	"i8":  int8(-2),
-	"i16": int16(-2),
-	"i32": int32(-2),
-	"i64": int64(-2),
-	"b":   true,
-	"f32": JsonFloat32{1234.5678},
-	"f64": JsonFloat64{-9876.5432},
-	"s":   "Rocos",
-	"t":   NewTime(0xfeedf00d, 0x1337beef),
-	"d":   NewDuration(0x50607080, 0x10203040),
-}
-
-func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_default(b *testing.B) {
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(singularMessageData)
-		if err != nil {
-			b.Fatalf("marshal failed %s", err)
-		}
-	}
-}
-
-func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_custom(b *testing.B) {
-	testMessage := singularMessageType.NewDynamicMessage()
-	testMessage.data = singularMessageData
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(testMessage)
-		if err != nil {
-			b.Fatalf("marshal failed %s", err)
-		}
 	}
 }

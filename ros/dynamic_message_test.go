@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 
 	gengo "github.com/team-rocos/rosgo/libgengo"
@@ -791,10 +792,16 @@ func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
 		t.Fatalf("custom JSON marshalling does not match default marshalling")
 	}
 
-	for i, b := range defaultMarshalledBytes {
-		if b != customMarshalledBytes[i] {
-			t.Fatalf("byte %d mismatch in json encoding, default: %x, custom: %x", i, b, customMarshalledBytes[i])
-		}
+	// for i, b := range defaultMarshalledBytes {
+	// 	if b != customMarshalledBytes[i] {
+	// 		t.Fatalf("byte %d mismatch in json encoding, default: %x, custom: %x", i, b, customMarshalledBytes[i])
+	// 	}
+	// }
+
+	defaultUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
+	err = json.Unmarshal(defaultMarshalledBytes, defaultUnmarshalledMessage)
+	if err != nil {
+		t.Fatalf("failed to unmarshal default dynamic message, %v", err)
 	}
 
 	customUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
@@ -808,5 +815,9 @@ func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
 		if _, ok := customUnmarshalledMessage.data[key]; ok == false {
 			t.Fatalf("unmarshalled dynamic message missing key %v", key)
 		}
+	}
+
+	if reflect.DeepEqual(defaultUnmarshalledMessage.data, customUnmarshalledMessage.data) == false {
+		t.Fatalf("default and custom marshall mismatch. \n Default: %v \n Custom: %v", defaultUnmarshalledMessage.data, customUnmarshalledMessage.data)
 	}
 }
