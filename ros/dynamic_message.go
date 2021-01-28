@@ -455,10 +455,11 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 		case "uint64":
 			buf = strconv.AppendUint(buf, v.(uint64), 10)
 		case "float32":
-			// TODO: Need to be careful here, need to coerce these into e values sometimes
-			buf = strconv.AppendFloat(buf, float64(v.(JsonFloat32).F), byte('f'), -1, 32)
+			buf = strconv.AppendFloat(buf, float64(v.(JsonFloat32).F), byte('g'), -1, 32)
 		case "float64":
-			buf = strconv.AppendFloat(buf, v.(JsonFloat64).F, byte('f'), -1, 64)
+			buf = strconv.AppendFloat(buf, v.(JsonFloat64).F, byte('g'), -1, 64)
+		case "string":
+			buf = strconv.AppendQuote(buf, v.(string))
 		case "ros.Time":
 			buf = append(buf, []byte("{\"Sec\":")...)
 			buf = strconv.AppendUint(buf, uint64(v.(Time).Sec), 10)
@@ -483,7 +484,6 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 	buf = append(buf, byte('}'))
 
 	return buf, nil
-	// return json.Marshal(m.data)
 }
 
 //UnmarshalJSON provides a custom implementation of JSON unmarshalling. Using the dynamicMessage provided, Msgspec is used to

@@ -569,7 +569,7 @@ func TestDynamicMessage_Deserialize_DynamicArrayMedley(t *testing.T) {
 	}
 }
 
-// Marshalling dynamic message is equivalent to marshalling the raw data in dynamic message
+// Marshalling dynamic message is equivalent to marshalling the raw data in dynamic message.
 func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 
 	fields := []gengo.Field{
@@ -663,6 +663,76 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 		"dyn_s":        []string{"Rocos", "soroc", "croos"},
 		"dyn_t":        []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x1337f00d)},
 		"dyn_d":        []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
+	}
+
+	testMessageType := &DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
+
+	testMessage := &DynamicMessage{
+		dynamicType: testMessageType,
+		data:        data,
+	}
+
+	verifyJSONMarshalling(t, testMessage)
+}
+
+// Marshalling dynamic message strings is equivalent to the default marshaller.
+func TestDynamicMessage_marshalJSON_strings(t *testing.T) {
+
+	fields := []gengo.Field{
+		*gengo.NewField("T", "string", "newline", false, 0),
+		*gengo.NewField("T", "string", "quotes", false, 0),
+		*gengo.NewField("T", "string", "backslash", false, 0),
+	}
+
+	data := map[string]interface{}{
+		"newline":   "custom string \n with newline",
+		"quotes":    "custom string \"with quotes\"",
+		"backslash": "custom string with backs\\ash",
+	}
+
+	testMessageType := &DynamicMessageType{
+		generateTestSpec(fields),
+		make(map[string]*DynamicMessageType),
+	}
+
+	testMessage := &DynamicMessage{
+		dynamicType: testMessageType,
+		data:        data,
+	}
+
+	verifyJSONMarshalling(t, testMessage)
+}
+
+// Marshalling dynamic message floats is equivalent to the default marshaller.
+func TestDynamicMessage_marshalJSON_floats(t *testing.T) {
+
+	fields := []gengo.Field{
+		*gengo.NewField("T", "float32", "f32big", false, 0),
+		*gengo.NewField("T", "float32", "f32small", false, 0),
+		*gengo.NewField("T", "float32", "f32nbig", false, 0),
+		*gengo.NewField("T", "float32", "f32nsmall", false, 0),
+		*gengo.NewField("T", "float32", "f32zero", false, 0),
+		*gengo.NewField("T", "float64", "f64big", false, 0),
+		*gengo.NewField("T", "float64", "f64small", false, 0),
+		*gengo.NewField("T", "float64", "f64nbig", false, 0),
+		*gengo.NewField("T", "float64", "f64nsmall", false, 0),
+		*gengo.NewField("T", "float64", "f64zero", false, 0),
+	}
+
+	data := map[string]interface{}{
+		"f32big":    JsonFloat32{F: 1.13e22},
+		"f32small":  JsonFloat32{F: 1.13e-7},
+		"f32nbig":   JsonFloat32{F: -1.13e22},
+		"f32nsmall": JsonFloat32{F: -1.13e-7},
+		"f32zero":   JsonFloat32{F: 0.0},
+		"f64big":    JsonFloat64{F: 1.13e22},
+		"f64small":  JsonFloat64{F: 1.13e-7},
+		"f64nbig":   JsonFloat64{F: -1.13e22},
+		"f64nsmall": JsonFloat64{F: -1.13e-7},
+		"f64zero":   JsonFloat64{F: 0.0},
 	}
 
 	testMessageType := &DynamicMessageType{
@@ -785,18 +855,6 @@ func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
 	if err != nil {
 		t.Fatalf("failed to marshal dynamic message")
 	}
-
-	if len(customMarshalledBytes) != len(defaultMarshalledBytes) {
-		t.Log("default:\n" + string(defaultMarshalledBytes))
-		t.Log("custom:\n" + string(customMarshalledBytes))
-		t.Fatalf("custom JSON marshalling does not match default marshalling")
-	}
-
-	// for i, b := range defaultMarshalledBytes {
-	// 	if b != customMarshalledBytes[i] {
-	// 		t.Fatalf("byte %d mismatch in json encoding, default: %x, custom: %x", i, b, customMarshalledBytes[i])
-	// 	}
-	// }
 
 	defaultUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
 	err = json.Unmarshal(defaultMarshalledBytes, defaultUnmarshalledMessage)
