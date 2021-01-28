@@ -421,35 +421,63 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 		if !ok {
 			return nil, errors.Wrap(errors.New("key not in data"), "key: "+field.Name)
 		}
-		encValue, err := json.Marshal(v)
-		if err != nil {
-			return nil, errors.Wrap(err, "field: "+field.Name)
+
+		if field.IsArray {
+			encValue, err := json.Marshal(v)
+			if err != nil {
+				return nil, errors.Wrap(err, "field: "+field.Name)
+			}
+			buf = append(buf, encValue...)
+			continue
 		}
-		buf = append(buf, encValue...)
-		// switch t.t {
-		// case "uint8":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "uint16":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "uint32":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "uint64":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "int8":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "int16":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "int32":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "int64":
-		// 	buf = strconv.AppendInt(buf, v.(int64), 10)
-		// case "string":
-		// 	buf = strconv.AppendQuote(buf, v.(string))
-		// case "float32":
-		// 	return nil, errors.Wrap(errors.New("unsupported type"), "type: "+t.t)
-		// case "float64":
-		// 	buf = strconv.AppendFloat(buf, v.(float64), byte('f'), -1, 64)
-		// }
+
+		switch field.GoType {
+		case "bool":
+			if v.(bool) {
+				buf = append(buf, []byte("true")...)
+			} else {
+				buf = append(buf, []byte("false")...)
+			}
+		case "int8":
+			buf = strconv.AppendInt(buf, int64(v.(int8)), 10)
+		case "int16":
+			buf = strconv.AppendInt(buf, int64(v.(int16)), 10)
+		case "int32":
+			buf = strconv.AppendInt(buf, int64(v.(int32)), 10)
+		case "int64":
+			buf = strconv.AppendInt(buf, v.(int64), 10)
+		case "uint8":
+			buf = strconv.AppendUint(buf, uint64(v.(uint8)), 10)
+		case "uint16":
+			buf = strconv.AppendUint(buf, uint64(v.(uint16)), 10)
+		case "uint32":
+			buf = strconv.AppendUint(buf, uint64(v.(uint32)), 10)
+		case "uint64":
+			buf = strconv.AppendUint(buf, v.(uint64), 10)
+		case "float32":
+			// TODO: Need to be careful here, need to coerce these into e values sometimes
+			buf = strconv.AppendFloat(buf, float64(v.(JsonFloat32).F), byte('f'), -1, 32)
+		case "float64":
+			buf = strconv.AppendFloat(buf, v.(JsonFloat64).F, byte('f'), -1, 64)
+		case "ros.Time":
+			buf = append(buf, []byte("{\"Sec\":")...)
+			buf = strconv.AppendUint(buf, uint64(v.(Time).Sec), 10)
+			buf = append(buf, []byte(",\"NSec\":")...)
+			buf = strconv.AppendUint(buf, uint64(v.(Time).NSec), 10)
+			buf = append(buf, byte('}'))
+		case "ros.Duration":
+			buf = append(buf, []byte("{\"Sec\":")...)
+			buf = strconv.AppendUint(buf, uint64(v.(Duration).Sec), 10)
+			buf = append(buf, []byte(",\"NSec\":")...)
+			buf = strconv.AppendUint(buf, uint64(v.(Duration).NSec), 10)
+			buf = append(buf, byte('}'))
+		default:
+			encValue, err := json.Marshal(v)
+			if err != nil {
+				return nil, errors.Wrap(err, "field: "+field.Name)
+			}
+			buf = append(buf, encValue...)
+		}
 	}
 
 	buf = append(buf, byte('}'))
