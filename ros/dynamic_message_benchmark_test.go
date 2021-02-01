@@ -549,7 +549,7 @@ func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArray(b *testing.B) {
 		b.Skip("benchmark skipped, ROS environment not set up")
 		return
 	}
-	dynamicTypeBigArrayMessageType.nested["pose"] = msgType
+	dynamicTypeBigArrayMessageType.nested["geometry_msgs/Pose"] = msgType
 
 	testMessage := dynamicTypeBigArrayMessageType.NewDynamicMessage()
 
