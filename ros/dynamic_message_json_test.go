@@ -2,14 +2,311 @@ package ros
 
 import (
 	"encoding/json"
+	"math"
 	"reflect"
 	"testing"
 
 	gengo "github.com/team-rocos/rosgo/libgengo"
 )
 
-// Marshalling dynamic message is equivalent to marshalling the raw data in dynamic message.
 func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
+	testCases := []struct {
+		fields     []gengo.Field
+		data       map[string]interface{}
+		marshalled string
+	}{
+		// Singular Values.
+		// - Unsigned integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)},
+			data:       map[string]interface{}{"u8": uint8(0x12)},
+			marshalled: `{"u8":18}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", false, 0)},
+			data:       map[string]interface{}{"u16": uint16(0x8001)},
+			marshalled: `{"u16":32769}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", false, 0)},
+			data:       map[string]interface{}{"u32": uint32(0x80000001)},
+			marshalled: `{"u32":2147483649}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", false, 0)},
+			data:       map[string]interface{}{"u64": uint64(0x8000000000000001)},
+			marshalled: `{"u64":9223372036854775809}`,
+		},
+		// - Signed integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int8", "i8", false, 0)},
+			data:       map[string]interface{}{"i8": int8(-20)},
+			marshalled: `{"i8":-20}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", false, 0)},
+			data:       map[string]interface{}{"i16": int16(-20_000)},
+			marshalled: `{"i16":-20000}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", false, 0)},
+			data:       map[string]interface{}{"i32": int32(-2_000_000_000)},
+			marshalled: `{"i32":-2000000000}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", false, 0)},
+			data:       map[string]interface{}{"i64": int64(-2_000_000_000_000_000_000)},
+			marshalled: `{"i64":-2000000000000000000}`,
+		},
+		// - Booleans.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			data:       map[string]interface{}{"b": false},
+			marshalled: `{"b":false}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			data:       map[string]interface{}{"b": true},
+			marshalled: `{"b":true}`,
+		},
+		// - Floats. TODO: Move other float tests into this test
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{-1.125}},
+			marshalled: `{"f32":-1.125}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{float32(math.NaN())}},
+			marshalled: `{"f32":"nan"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{float32(math.Inf(1))}},
+			marshalled: `{"f32":"+inf"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{float32(math.Inf(-1))}},
+			marshalled: `{"f32":"-inf"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{-1.125}},
+			marshalled: `{"f64":-1.125}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{math.NaN()}},
+			marshalled: `{"f64":"nan"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{math.Inf(1)}},
+			marshalled: `{"f64":"+inf"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{math.Inf(-1)}},
+			marshalled: `{"f64":"-inf"}`,
+		},
+		// - Strings. TODO: Bring other string test cases here.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			data:       map[string]interface{}{"s": ""},
+			marshalled: `{"s":""}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			data:       map[string]interface{}{"s": "N0t  empty "},
+			marshalled: `{"s":"N0t  empty "}`,
+		},
+		// - Time and Duration.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			data:       map[string]interface{}{"t": NewTime(0xfeedf00d, 0x1337beef)},
+			marshalled: `{"t":{"Sec":4277006349,"NSec":322420463}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", false, 0)},
+			data:       map[string]interface{}{"d": NewDuration(0x40302010, 0x00706050)},
+			marshalled: `{"d":{"Sec":1076895760,"NSec":7364688}}`,
+		},
+		// Fixed and Dynamic arrays.
+		// - Unsigned integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", true, 8)},
+			data:       map[string]interface{}{"u8": []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12}},
+			marshalled: `{"u8":"8N68mnhWNBI="}`, // From https://base64.guru/converter/encode/hex
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, 5)},
+			data:       map[string]interface{}{"u16": []uint16{0xf0de, 0xbc9a, 0x7856, 0x3412, 0x0}},
+			marshalled: `{"u16":[61662,48282,30806,13330,0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, 3)},
+			data:       map[string]interface{}{"u32": []uint32{0xf0debc9a, 0x78563412, 0x0}},
+			marshalled: `{"u32":[4041129114,2018915346,0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, 3)},
+			data:       map[string]interface{}{"u64": []uint64{0x8000000000000000, 0x78563412, 0x0}},
+			marshalled: `{"u64":[9223372036854775808,2018915346,0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"u8": []uint8{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12}},
+			marshalled: `{"u8":"8N68mnhWNBI="}`, // From https://base64.guru/converter/encode/hex
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"u16": []uint16{0xf0de, 0xbc9a, 0x7856, 0x3412, 0x0}},
+			marshalled: `{"u16":[61662,48282,30806,13330,0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"u32": []uint32{0xf0debc9a, 0x78563412, 0x0}},
+			marshalled: `{"u32":[4041129114,2018915346,0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"u64": []uint64{0x8000000000000000, 0x78563412, 0x0}},
+			marshalled: `{"u64":[9223372036854775808,2018915346,0]}`,
+		},
+		// - Signed integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int8", "i8", true, 8)},
+			data:       map[string]interface{}{"i8": []int8{-128, -55, -1, 0, 1, 7, 77, 127}},
+			marshalled: `{"i8":[-128,-55,-1,0,1,7,77,127]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, 7)},
+			data:       map[string]interface{}{"i16": []int16{-32768, -129, -1, 0, 1, 128, 32767}},
+			marshalled: `{"i16":[-32768,-129,-1,0,1,128,32767]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, 9)},
+			data:       map[string]interface{}{"i32": []int32{-2147483648, -32768, -129, -1, 0, 1, 128, 32767, 2147483647}},
+			marshalled: `{"i32":[-2147483648,-32768,-129,-1,0,1,128,32767,2147483647]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, 11)},
+			data:       map[string]interface{}{"i64": []int64{-9223372036854775808, -2147483648, -32768, -129, -1, 0, 1, 128, 32767, 2147483647, 9223372036854775807}},
+			marshalled: `{"i64":[-9223372036854775808,-2147483648,-32768,-129,-1,0,1,128,32767,2147483647,9223372036854775807]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int8", "i8", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"i8": []int8{-128, -55, -1, 0, 1, 7, 77, 127}},
+			marshalled: `{"i8":[-128,-55,-1,0,1,7,77,127]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"i16": []int16{-32768, -129, -1, 0, 1, 128, 32767}},
+			marshalled: `{"i16":[-32768,-129,-1,0,1,128,32767]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"i32": []int32{-2147483648, -32768, -129, -1, 0, 1, 128, 32767, 2147483647}},
+			marshalled: `{"i32":[-2147483648,-32768,-129,-1,0,1,128,32767,2147483647]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"i64": []int64{-9223372036854775808, -2147483648, -32768, -129, -1, 0, 1, 128, 32767, 2147483647, 9223372036854775807}},
+			marshalled: `{"i64":[-9223372036854775808,-2147483648,-32768,-129,-1,0,1,128,32767,2147483647,9223372036854775807]}`,
+		},
+		// - Booleans.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 2)},
+			data:       map[string]interface{}{"b": []bool{true, false}},
+			marshalled: `{"b":[true,false]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"b": []bool{true, false}},
+			marshalled: `{"b":[true,false]}`,
+		},
+		// - Floats.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 4)},
+			data:       map[string]interface{}{"f32": []JsonFloat32{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}}},
+			marshalled: `{"f32":[-1.125,3300,7.7e+07,9.9e-09]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 4)},
+			data:       map[string]interface{}{"f64": []JsonFloat64{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}}},
+			marshalled: `{"f64":[-1.125,3300,7.7e+07,9.9e-09]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"f32": []JsonFloat32{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}}},
+			marshalled: `{"f32":[-1.125,3300,7.7e+07,9.9e-09]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"f64": []JsonFloat64{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}}},
+			marshalled: `{"f64":[-1.125,3300,7.7e+07,9.9e-09]}`,
+		},
+		// - Strings.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", true, 5)},
+			data:       map[string]interface{}{"s": []string{"", "n0t empty  ", "new\nline", "\ttabbed", "s\\ash"}},
+			marshalled: `{"s":["","n0t empty  ","new\nline","\ttabbed","s\\ash"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"s": []string{"", "n0t empty  ", "new\nline", "\ttabbed", "s\\ash"}},
+			marshalled: `{"s":["","n0t empty  ","new\nline","\ttabbed","s\\ash"]}`,
+		},
+		// - Time.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", true, 2)},
+			data:       map[string]interface{}{"t": []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x00706050)}},
+			marshalled: `{"t":[{"Sec":4277006349,"NSec":322420463},{"Sec":322420463,"NSec":7364688}]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"t": []Time{NewTime(0xfeedf00d, 0x1337beef), NewTime(0x1337beef, 0x00706050)}},
+			marshalled: `{"t":[{"Sec":4277006349,"NSec":322420463},{"Sec":322420463,"NSec":7364688}]}`,
+		},
+		// - Duration.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 2)},
+			data:       map[string]interface{}{"d": []Duration{NewDuration(0xfeedf00d, 0x1337beef), NewDuration(0x1337beef, 0x00706050)}},
+			marshalled: `{"d":[{"Sec":4277006349,"NSec":322420463},{"Sec":322420463,"NSec":7364688}]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, -1)}, // Dynamic.
+			data:       map[string]interface{}{"d": []Duration{NewDuration(0xfeedf00d, 0x1337beef), NewDuration(0x1337beef, 0x00706050)}},
+			marshalled: `{"d":[{"Sec":4277006349,"NSec":322420463},{"Sec":322420463,"NSec":7364688}]}`,
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
+
+		testMessage := &DynamicMessage{
+			dynamicType: testMessageType,
+			data:        testCase.data,
+		}
+
+		marshalled, err := json.Marshal(testMessage)
+		if err != nil {
+			t.Fatalf("failed to marshal raw data of dynamic message\n expected: %v", testCase.marshalled)
+		}
+		if string(marshalled) != testCase.marshalled {
+			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), testCase.marshalled)
+		}
+
+	}
+}
+
+func TestDynamicMessage_marshalJSON_primitiveSet(t *testing.T) {
 
 	fields := []gengo.Field{
 		// Singular primitives.

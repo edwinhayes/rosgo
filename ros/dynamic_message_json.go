@@ -5,6 +5,7 @@ package ros
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"strconv"
 
 	"github.com/buger/jsonparser"
@@ -414,9 +415,27 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 		case "uint64":
 			buf = strconv.AppendUint(buf, v.(uint64), 10)
 		case "float32":
-			buf = strconv.AppendFloat(buf, float64(v.(JsonFloat32).F), byte('g'), -1, 32)
+			f := float64(v.(JsonFloat32).F)
+			if math.IsNaN(f) {
+				buf = strconv.AppendQuote(buf, "nan")
+			} else if math.IsInf(f, 1) {
+				buf = strconv.AppendQuote(buf, "+inf")
+			} else if math.IsInf(f, -1) {
+				buf = strconv.AppendQuote(buf, "-inf")
+			} else {
+				buf = strconv.AppendFloat(buf, f, byte('g'), -1, 32)
+			}
 		case "float64":
-			buf = strconv.AppendFloat(buf, v.(JsonFloat64).F, byte('g'), -1, 64)
+			f := v.(JsonFloat64).F
+			if math.IsNaN(f) {
+				buf = strconv.AppendQuote(buf, "nan")
+			} else if math.IsInf(f, 1) {
+				buf = strconv.AppendQuote(buf, "+inf")
+			} else if math.IsInf(f, -1) {
+				buf = strconv.AppendQuote(buf, "-inf")
+			} else {
+				buf = strconv.AppendFloat(buf, f, byte('g'), -1, 64)
+			}
 		case "string":
 			buf = strconv.AppendQuote(buf, v.(string))
 		case "ros.Time":
