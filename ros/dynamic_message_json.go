@@ -324,7 +324,16 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
-					buf = strconv.AppendFloat(buf, float64(item.F), byte('g'), -1, 32)
+					f := float64(item.F)
+					if math.IsNaN(f) {
+						buf = strconv.AppendQuote(buf, "nan")
+					} else if math.IsInf(f, 1) {
+						buf = strconv.AppendQuote(buf, "+inf")
+					} else if math.IsInf(f, -1) {
+						buf = strconv.AppendQuote(buf, "-inf")
+					} else {
+						buf = strconv.AppendFloat(buf, f, byte('g'), -1, 32)
+					}
 				}
 				buf = append(buf, byte(']'))
 			case "float64":
@@ -333,7 +342,16 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
-					buf = strconv.AppendFloat(buf, item.F, byte('g'), -1, 64)
+					f := item.F
+					if math.IsNaN(f) {
+						buf = strconv.AppendQuote(buf, "nan")
+					} else if math.IsInf(f, 1) {
+						buf = strconv.AppendQuote(buf, "+inf")
+					} else if math.IsInf(f, -1) {
+						buf = strconv.AppendQuote(buf, "-inf")
+					} else {
+						buf = strconv.AppendFloat(buf, f, byte('g'), -1, 64)
+					}
 				}
 				buf = append(buf, byte(']'))
 			case "string":
@@ -500,7 +518,15 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 					m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat64), JsonFloat64{F: data.(float64)})
 				}
 			} else {
-				m.data[goField.Name] = append(m.data[goField.Name].([]string), string(key))
+				buf := make([]byte, 0, len(key)+2)
+				buf = append(buf, '"')
+				buf = append(buf, key...)
+				buf = append(buf, '"')
+				unquoted, err := strconv.Unquote(string(buf))
+				if err != nil {
+					errors.Wrap(err, "Field: "+goField.Name)
+				}
+				m.data[goField.Name] = append(m.data[goField.Name].([]string), unquoted)
 			}
 		//We have a number or int array.
 		case "number":
