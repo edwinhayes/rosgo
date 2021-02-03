@@ -9,7 +9,7 @@ import (
 	gengo "github.com/team-rocos/rosgo/libgengo"
 )
 
-func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
+func TestDynamicMessage_JSON_primitives(t *testing.T) {
 	testCases := []struct {
 		fields     []gengo.Field
 		data       map[string]interface{}
@@ -72,14 +72,24 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 		// - Floats. TODO: Move other float tests into this test
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{0.0}},
+			marshalled: `{"f32":0}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
 			data:       map[string]interface{}{"f32": JsonFloat32{-1.125}},
 			marshalled: `{"f32":-1.125}`,
 		},
-		// {
-		// 	fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
-		// 	data:       map[string]interface{}{"f32": JsonFloat32{float32(math.NaN())}},
-		// 	marshalled: `{"f32":"nan"}`,
-		// },
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{-2.3e8}},
+			marshalled: `{"f32":-2.3e+08}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:       map[string]interface{}{"f32": JsonFloat32{2.3e-8}},
+			marshalled: `{"f32":2.3e-08}`,
+		},
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
 			data:       map[string]interface{}{"f32": JsonFloat32{float32(math.Inf(1))}},
@@ -95,11 +105,16 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 			data:       map[string]interface{}{"f64": JsonFloat64{-1.125}},
 			marshalled: `{"f64":-1.125}`,
 		},
-		// {
-		// 	fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
-		// 	data:       map[string]interface{}{"f64": JsonFloat64{math.NaN()}},
-		// 	marshalled: `{"f64":"nan"}`,
-		// },
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{-2.3e8}},
+			marshalled: `{"f64":-2.3e+08}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:       map[string]interface{}{"f64": JsonFloat64{2.3e-8}},
+			marshalled: `{"f64":2.3e-08}`,
+		},
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
 			data:       map[string]interface{}{"f64": JsonFloat64{math.Inf(1)}},
@@ -110,7 +125,7 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 			data:       map[string]interface{}{"f64": JsonFloat64{math.Inf(-1)}},
 			marshalled: `{"f64":"-inf"}`,
 		},
-		// - Strings. TODO: Bring other string test cases here.
+		// - Strings.
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
 			data:       map[string]interface{}{"s": ""},
@@ -303,11 +318,6 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), testCase.marshalled)
 		}
 
-		defaultMarshalled, err := json.Marshal(testMessage)
-		if string(defaultMarshalled) != string(marshalled) || err != nil {
-			t.Fatalf("library marshalling sanity check failed\nmarshalled: %v\nexpected: %v", string(marshalled), testCase.marshalled)
-		}
-
 		unmarshalledMessage := testMessageType.NewDynamicMessage()
 
 		if err := json.Unmarshal(marshalled, unmarshalledMessage); err != nil {
@@ -317,11 +327,11 @@ func TestDynamicMessage_marshalJSON_primitives(t *testing.T) {
 		if reflect.DeepEqual(testMessage.data, unmarshalledMessage.data) == false {
 			t.Fatalf("original and unmarshalled data mismatch. \n Original: %v \n Unmarshalled: %v \n json: %v", testMessage.data, unmarshalledMessage.data, string(marshalled))
 		}
-
 	}
 }
 
-func TestDynamicMessage_marshalJSON_primitiveSet(t *testing.T) {
+// Verify a flat message of ROS built in primitives is marshalled/unmarshalled correctly.
+func TestDynamicMessage_JSON_primitiveSet(t *testing.T) {
 
 	fields := []gengo.Field{
 		// Singular primitives.
@@ -427,79 +437,174 @@ func TestDynamicMessage_marshalJSON_primitiveSet(t *testing.T) {
 		data:        data,
 	}
 
-	verifyJSONMarshalling(t, testMessage)
+	marshalled, err := json.Marshal(testMessage)
+	if err != nil {
+		t.Fatalf("failed to marshal dynamic message\nerr: %v", err)
+	}
+
+	unmarshalledMessage := testMessageType.NewDynamicMessage()
+
+	if err := json.Unmarshal(marshalled, unmarshalledMessage); err != nil {
+		t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", marshalled, err)
+	}
+
+	if reflect.DeepEqual(testMessage.data, unmarshalledMessage.data) == false {
+		t.Fatalf("original and unmarshalled data mismatch. \n Original: %v \n Unmarshalled: %v \n json: %v", testMessage.data, unmarshalledMessage.data, string(marshalled))
+	}
 }
 
 // Marshalling dynamic message strings is equivalent to the default marshaller.
 func TestDynamicMessage_marshalJSON_strings(t *testing.T) {
 
-	fields := []gengo.Field{
-		*gengo.NewField("T", "string", "newline", false, 0),
-		*gengo.NewField("T", "string", "quotes", false, 0),
-		*gengo.NewField("T", "string", "backslash", false, 0),
+	testCases := []struct {
+		fields []gengo.Field
+		data   map[string]interface{}
+	}{
+		{
+			fields: []gengo.Field{*gengo.NewField("T", "string", "s", false, 0)},
+			data:   map[string]interface{}{"s": "new\nline"},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("T", "string", "s", false, 0)},
+			data:   map[string]interface{}{"s": "more \"quotes\""},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("T", "string", "s", false, 0)},
+			data:   map[string]interface{}{"s": "escape a s\\ash"},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("T", "string", "s", false, 0)},
+			data:   map[string]interface{}{"s": "t\tab"},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("T", "string", "s", true, 4)},
+			data:   map[string]interface{}{"s": []string{"new\nline", "more \"quotes\"", "escape a s\\ash", "t\tab"}},
+		},
 	}
 
-	data := map[string]interface{}{
-		"newline":   "custom string \n with newline",
-		"quotes":    "custom string \"with quotes\"",
-		"backslash": "custom string with backs\\ash",
-	}
+	for _, testCase := range testCases {
 
-	testMessageType := &DynamicMessageType{
-		spec:         generateTestSpec(fields),
-		nested:       make(map[string]*DynamicMessageType),
-		jsonPrealloc: 0,
-	}
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
 
-	testMessage := &DynamicMessage{
-		dynamicType: testMessageType,
-		data:        data,
-	}
+		testMessage := &DynamicMessage{
+			dynamicType: testMessageType,
+			data:        testCase.data,
+		}
 
-	verifyJSONMarshalling(t, testMessage)
+		marshalled, err := json.Marshal(testMessage)
+		if err != nil {
+			t.Fatalf("failed to marshal dynamic message\n expected: %v\nerr: %v", testCase.data, err)
+		}
+
+		defaultMarshalled, err := json.Marshal(testCase.data)
+		if err != nil {
+			t.Fatalf("failed to marshal test case data\n expected: %v\nerr: %v", testCase.data, err)
+		}
+
+		if string(marshalled) != string(defaultMarshalled) {
+			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), string(defaultMarshalled))
+		}
+	}
 }
 
-// Marshalling dynamic message floats is equivalent to the default marshaller.
-func TestDynamicMessage_marshalJSON_floats(t *testing.T) {
+// Verify the NaN behavior of floats. This cannot be done using reflect deep-equal, so gets its own test case.
+func TestDynamicMessage_JSON_floatNan(t *testing.T) {
 
-	fields := []gengo.Field{
-		*gengo.NewField("T", "float32", "f32big", false, 0),
-		*gengo.NewField("T", "float32", "f32small", false, 0),
-		*gengo.NewField("T", "float32", "f32nbig", false, 0),
-		*gengo.NewField("T", "float32", "f32nsmall", false, 0),
-		*gengo.NewField("T", "float32", "f32zero", false, 0),
-		*gengo.NewField("T", "float64", "f64big", false, 0),
-		*gengo.NewField("T", "float64", "f64small", false, 0),
-		*gengo.NewField("T", "float64", "f64nbig", false, 0),
-		*gengo.NewField("T", "float64", "f64nsmall", false, 0),
-		*gengo.NewField("T", "float64", "f64zero", false, 0),
+	testCases := []struct {
+		fields     []gengo.Field
+		data       map[string]interface{}
+		marshalled string
+	}{
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float32", "f", false, 0)},
+			data:       map[string]interface{}{"f": JsonFloat32{F: float32(math.NaN())}},
+			marshalled: `{"f":"nan"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float64", "f", false, 0)},
+			data:       map[string]interface{}{"f": JsonFloat64{F: math.NaN()}},
+			marshalled: `{"f":"nan"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float32", "f", true, 2)},
+			data:       map[string]interface{}{"f": []JsonFloat32{{float32(math.NaN())}, {float32(math.NaN())}}},
+			marshalled: `{"f":["nan","nan"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float64", "f", true, 2)},
+			data:       map[string]interface{}{"f": []JsonFloat64{{math.NaN()}, {math.NaN()}}},
+			marshalled: `{"f":["nan","nan"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float32", "f", true, -1)},
+			data:       map[string]interface{}{"f": []JsonFloat32{{float32(math.NaN())}, {float32(math.NaN())}}},
+			marshalled: `{"f":["nan","nan"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "float64", "f", true, -1)},
+			data:       map[string]interface{}{"f": []JsonFloat64{{math.NaN()}, {math.NaN()}}},
+			marshalled: `{"f":["nan","nan"]}`,
+		},
 	}
 
-	data := map[string]interface{}{
-		"f32big":    JsonFloat32{F: 1.13e22},
-		"f32small":  JsonFloat32{F: 1.13e-7},
-		"f32nbig":   JsonFloat32{F: -1.13e22},
-		"f32nsmall": JsonFloat32{F: -1.13e-7},
-		"f32zero":   JsonFloat32{F: 0.0},
-		"f64big":    JsonFloat64{F: 1.13e22},
-		"f64small":  JsonFloat64{F: 1.13e-7},
-		"f64nbig":   JsonFloat64{F: -1.13e22},
-		"f64nsmall": JsonFloat64{F: -1.13e-7},
-		"f64zero":   JsonFloat64{F: 0.0},
-	}
+	for _, testCase := range testCases {
 
-	testMessageType := &DynamicMessageType{
-		spec:         generateTestSpec(fields),
-		nested:       make(map[string]*DynamicMessageType),
-		jsonPrealloc: 0,
-	}
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
 
-	testMessage := &DynamicMessage{
-		dynamicType: testMessageType,
-		data:        data,
-	}
+		testMessage := &DynamicMessage{
+			dynamicType: testMessageType,
+			data:        testCase.data,
+		}
 
-	verifyJSONMarshalling(t, testMessage)
+		marshalled, err := json.Marshal(testMessage)
+		if err != nil {
+			t.Fatalf("failed to marshal dynamic message\n expected: %v\nerr: %v", testCase.marshalled, err)
+		}
+		if string(marshalled) != testCase.marshalled {
+			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), testCase.marshalled)
+		}
+
+		unmarshalledMessage := testMessageType.NewDynamicMessage()
+
+		if err := json.Unmarshal(marshalled, unmarshalledMessage); err != nil {
+			t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", testCase.marshalled, err)
+		}
+
+		if testCase.fields[0].IsArray {
+			if testCase.fields[0].GoType == "float32" {
+				for _, val := range unmarshalledMessage.data["f"].([]JsonFloat32) {
+					if math.IsNaN(float64(val.F)) == false {
+						t.Fatalf("%v: unmarshalled value was not NaN, actual: %v", testCase.marshalled, val.F)
+					}
+				}
+			} else {
+				for _, val := range unmarshalledMessage.data["f"].([]JsonFloat64) {
+					if math.IsNaN(val.F) == false {
+						t.Fatalf("%v: unmarshalled value was not NaN, actual: %v", testCase.marshalled, val.F)
+					}
+				}
+			}
+		} else {
+			var val float64
+			if testCase.fields[0].GoType == "float32" {
+				val = float64(unmarshalledMessage.data["f"].(JsonFloat32).F)
+			} else {
+				val = unmarshalledMessage.data["f"].(JsonFloat64).F
+			}
+			if math.IsNaN(val) == false {
+				t.Fatalf("%v: unmarshalled value was not NaN, actual: %v", testCase.marshalled, val)
+			}
+		}
+
+	}
 }
 
 func TestDynamicMessage_marshalJSON_nested(t *testing.T) {
@@ -605,9 +710,4 @@ func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
 	if reflect.DeepEqual(defaultUnmarshalledMessage.data, customUnmarshalledMessage.data) == false {
 		t.Fatalf("default and custom marshal mismatch. \n Default: %v \n Custom: %v", defaultUnmarshalledMessage.data, customUnmarshalledMessage.data)
 	}
-
-	// TODO: get working
-	// if reflect.DeepEqual(msg.data, customUnmarshalledMessage.data) == false {
-	// 	t.Fatalf("original and custom marshal mismatch. \n Original: %v \n Custom: %v \n Bytes: %v", msg.data, customUnmarshalledMessage.data, string(customMarshalledBytes))
-	// }
 }
