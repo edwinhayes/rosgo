@@ -445,7 +445,7 @@ func TestDynamicMessage_JSON_primitiveSet(t *testing.T) {
 	unmarshalledMessage := testMessageType.NewDynamicMessage()
 
 	if err := json.Unmarshal(marshalled, unmarshalledMessage); err != nil {
-		t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", marshalled, err)
+		t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", string(marshalled), err)
 	}
 
 	if reflect.DeepEqual(testMessage.data, unmarshalledMessage.data) == false {

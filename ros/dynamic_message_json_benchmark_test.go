@@ -69,6 +69,26 @@ func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_custom(b *testing.B)
 	}
 }
 
+func BenchmarkDynamicMessage_JSONUnmarshal_SingularPrimitives(b *testing.B) {
+	originalMessage := singularMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
+	originalMessage.data = singularMessageData
+
+	marshalled, err := json.Marshal(originalMessage)
+	if err != nil {
+		b.Fatalf("marshal failed %s", err)
+	}
+
+	testMessage := singularMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := json.Unmarshal(marshalled, testMessage)
+		if err != nil {
+			b.Fatalf("unmarshal failed %s", err)
+		}
+	}
+}
+
 func BenchmarkDynamicMessage_JSONMarshal_FixedArrays_default(b *testing.B) {
 
 	b.ResetTimer()
@@ -93,7 +113,27 @@ func BenchmarkDynamicMessage_JSONMarshal_FixedArrays_custom(b *testing.B) {
 	}
 }
 
-func BenchmarkDynamicMessage_JSONMarshal_nested(b *testing.B) {
+func BenchmarkDynamicMessage_JSONUnmarshal_FixedArrays(b *testing.B) {
+	originalMessage := fixedArrayMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
+	originalMessage.data = fixedArrayMessageData
+
+	marshalled, err := json.Marshal(originalMessage)
+	if err != nil {
+		b.Fatalf("marshal failed %s", err)
+	}
+
+	testMessage := fixedArrayMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := json.Unmarshal(marshalled, testMessage)
+		if err != nil {
+			b.Fatalf("unmarshal failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_JSONMarshal_Nested(b *testing.B) {
 	testMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
 	if err != nil {
 		b.Skip("test skipped because ROS environment not set up")
@@ -106,6 +146,30 @@ func BenchmarkDynamicMessage_JSONMarshal_nested(b *testing.B) {
 		_, err := json.Marshal(testMessage)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
+		}
+	}
+}
+
+func BenchmarkDynamicMessage_JSONUnmarshal_Nested(b *testing.B) {
+	testMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
+	if err != nil {
+		b.Skip("test skipped because ROS environment not set up")
+		return
+	}
+	originalMessage := testMessageType.NewDynamicMessage()
+
+	marshalled, err := json.Marshal(originalMessage)
+	if err != nil {
+		b.Fatalf("marshal failed %s", err)
+	}
+
+	testMessage := testMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := json.Unmarshal(marshalled, testMessage)
+		if err != nil {
+			b.Fatalf("unmarshal failed %s", err)
 		}
 	}
 }
