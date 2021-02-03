@@ -608,16 +608,57 @@ func TestDynamicMessage_JSON_floatNan(t *testing.T) {
 }
 
 func TestDynamicMessage_marshalJSON_nested(t *testing.T) {
-	testMessageType, err := NewDynamicMessageType("geometry_msgs/Pose")
-
+	poseType, err := NewDynamicMessageType("geometry_msgs/Pose")
 	if err != nil {
 		t.Skip("test skipped because ROS environment not set up")
 		return
 	}
 
-	testMessage := testMessageType.NewDynamicMessage()
+	testCases := []struct {
+		position    map[string]interface{}
+		orientation map[string]interface{}
+		marshalled  string
+	}{
+		{
+			position:    map[string]interface{}{"x": JsonFloat64{0}, "y": JsonFloat64{0}, "z": JsonFloat64{0}},
+			orientation: map[string]interface{}{"x": JsonFloat64{0}, "y": JsonFloat64{0}, "z": JsonFloat64{0}, "w": JsonFloat64{0}},
+			marshalled:  `{"position":{"x":0,"y":0,"z":0},"orientation":{"x":0,"y":0,"z":0,"w":0}}`,
+		},
+		{
+			position:    map[string]interface{}{"x": JsonFloat64{1e9}, "y": JsonFloat64{2.4e-2}, "z": JsonFloat64{5.5e3}},
+			orientation: map[string]interface{}{"x": JsonFloat64{-0.5}, "y": JsonFloat64{0.5}, "z": JsonFloat64{0.5}, "w": JsonFloat64{0.5}},
+			marshalled:  `{"position":{"x":1e+09,"y":0.024,"z":5500},"orientation":{"x":-0.5,"y":0.5,"z":0.5,"w":0.5}}`,
+		},
+	}
 
-	verifyJSONMarshalling(t, testMessage)
+	for _, testCase := range testCases {
+
+		testMessage := poseType.NewDynamicMessage()
+		testMessage.data["position"].(*DynamicMessage).data = testCase.position
+		testMessage.data["orientation"].(*DynamicMessage).data = testCase.orientation
+
+		marshalled, err := json.Marshal(testMessage)
+		if err != nil {
+			t.Fatalf("failed to marshal dynamic message\n expected: %v\nerr: %v", testCase.marshalled, err)
+		}
+		if string(marshalled) != testCase.marshalled {
+			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), testCase.marshalled)
+		}
+
+		unmarshalledMessage := poseType.NewDynamicMessage()
+
+		if err := json.Unmarshal(marshalled, unmarshalledMessage); err != nil {
+			t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", testCase.marshalled, err)
+		}
+
+		for key := range testMessage.data {
+			original := testMessage.data[key].(*DynamicMessage).data
+			unmarshalled := unmarshalledMessage.data[key].(*DynamicMessage).data
+			if reflect.DeepEqual(original, unmarshalled) == false {
+				t.Fatalf("original and unmarshalled data mismatch. \n Original: %v \n Unmarshalled: %v \n json: %v", testMessage.data, unmarshalledMessage.data, string(marshalled))
+			}
+		}
+	}
 }
 
 func TestDynamicMessage_marshalJSON_nestedWithTypeError(t *testing.T) {
@@ -658,56 +699,36 @@ func TestDynamicMessage_marshalJSON_arrayOfNestedMessages(t *testing.T) {
 	context.RegisterMsg("test/z0Message", msgSpec)
 
 	testMessageType, err := NewDynamicMessageType("test/z0Message")
-
 	if err != nil {
 		t.Fatalf("Failed to create testMessageType, error: %v", err)
 	}
 
+	expectedMarshalled := `{"x":[{"val":0},{"val":0}]}`
+
 	testMessage := testMessageType.NewDynamicMessage()
 
-	verifyJSONMarshalling(t, testMessage)
+	marshalledBytes, err := json.Marshal(testMessage)
+	if err != nil {
+		t.Fatalf("failed to marshal dynamic message, err: %v, msg: %v", err, testMessage.data)
+	}
+	if string(marshalledBytes) != expectedMarshalled {
+		t.Fatalf("marshalled does not match expected, actual: %v, expected: %v", string(marshalledBytes), expectedMarshalled)
+	}
+
+	unmarshalledMessage := testMessage.dynamicType.NewDynamicMessage()
+	err = json.Unmarshal(marshalledBytes, unmarshalledMessage)
+	if err != nil {
+		t.Fatalf("failed to unmarshal dynamic message, %v", err)
+	}
+
+	if len(testMessage.data["x"].([]Message)) != len(unmarshalledMessage.data["x"].([]Message)) {
+		t.Fatalf("original and custom marshal mismatch \n original: %v \n custom: %v", testMessage.data, unmarshalledMessage.data)
+	}
 
 	// Extra check: ensure type error is handled.
 	testMessage.data["x"] = []float64{543.21, 98.76} // We expect this to be xMessage array.
 
 	if _, err := json.Marshal(testMessage); err == nil {
 		t.Fatalf("expected type error")
-	}
-}
-
-// Testing helpers
-
-func verifyJSONMarshalling(t *testing.T, msg *DynamicMessage) {
-	defaultMarshalledBytes, err := json.Marshal(msg.data)
-	if err != nil {
-		t.Fatalf("failed to marshal raw data of dynamic message")
-	}
-
-	customMarshalledBytes, err := json.Marshal(msg)
-	if err != nil {
-		t.Fatalf("failed to marshal dynamic message, err: %v, msg: %v", err, msg.data["x"])
-	}
-
-	defaultUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
-	err = json.Unmarshal(defaultMarshalledBytes, defaultUnmarshalledMessage)
-	if err != nil {
-		t.Fatalf("failed to unmarshal default dynamic message, %v", err)
-	}
-
-	customUnmarshalledMessage := msg.dynamicType.NewDynamicMessage()
-	err = json.Unmarshal(customMarshalledBytes, customUnmarshalledMessage)
-	if err != nil {
-		t.Fatalf("failed to unmarshal dynamic message, %v", err)
-	}
-
-	// We won't get a perfect match, because JSON promotes human-readability over numeric correctness, just check the fields match.
-	for key := range msg.data {
-		if _, ok := customUnmarshalledMessage.data[key]; ok == false {
-			t.Fatalf("unmarshalled dynamic message missing key %v", key)
-		}
-	}
-
-	if reflect.DeepEqual(defaultUnmarshalledMessage.data, customUnmarshalledMessage.data) == false {
-		t.Fatalf("default and custom marshal mismatch. \n Default: %v \n Custom: %v", defaultUnmarshalledMessage.data, customUnmarshalledMessage.data)
 	}
 }
