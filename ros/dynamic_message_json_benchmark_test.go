@@ -45,11 +45,24 @@ var fixedArrayMessageData = map[string]interface{}{
 	"d":   []Duration{NewDuration(0x40302010, 0x00706050), NewDuration(0x50607080, 0x10203040)},
 }
 
+type MockDefaultDynamicMessage struct {
+	data map[string]interface{}
+}
+
+func (m MockDefaultDynamicMessage) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.data)
+}
+
+func (m MockDefaultDynamicMessage) UnmarshalJSON(buf []byte) error {
+	return nil
+}
+
 func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_default(b *testing.B) {
+	m := MockDefaultDynamicMessage{data: singularMessageData}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(singularMessageData)
+		_, err := json.Marshal(m)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}
@@ -90,10 +103,11 @@ func BenchmarkDynamicMessage_JSONUnmarshal_SingularPrimitives(b *testing.B) {
 }
 
 func BenchmarkDynamicMessage_JSONMarshal_FixedArrays_default(b *testing.B) {
+	m := MockDefaultDynamicMessage{fixedArrayMessageData}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(fixedArrayMessageData)
+		_, err := json.Marshal(m)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}
@@ -188,10 +202,11 @@ var boolArrayMessageType DynamicMessageType = DynamicMessageType{
 
 func BenchmarkDynamicMessage_JSONMarshal_ArrayBool_default(b *testing.B) {
 	testMessage := boolArrayMessageType.NewDynamicMessage()
+	m := MockDefaultDynamicMessage{testMessage.data}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(testMessage.data)
+		_, err := json.Marshal(m)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}
@@ -234,10 +249,11 @@ func BenchmarkDynamicMessage_JSONMarshal_ArrayUint8_default(b *testing.B) {
 	for i := range testMessage.data["u8"].([]uint8) {
 		testMessage.data["u8"].([]uint8)[i] = 0x5a
 	}
+	m := MockDefaultDynamicMessage{testMessage.data}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(testMessage.data)
+		_, err := json.Marshal(m)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}
@@ -287,10 +303,11 @@ func BenchmarkDynamicMessage_JSONMarshal_ArrayUint64_default(b *testing.B) {
 	for i := range testMessage.data["u64"].([]uint64) {
 		testMessage.data["u64"].([]uint64)[i] = 0x5a
 	}
+	m := MockDefaultDynamicMessage{testMessage.data}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(testMessage.data)
+		_, err := json.Marshal(m)
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}
