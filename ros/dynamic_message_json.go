@@ -488,11 +488,17 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 	// Confirm the pointers are valid
 	if m == nil {
 		return errors.New("nil pointer to DynamicMessage")
-	} else if m.dynamicType == nil {
+	}
+	if m.dynamicType == nil {
 		return errors.New("nil pointer to dynamicType")
-	} else if m.dynamicType.spec == nil {
+	}
+	if m.dynamicType.nested == nil {
+		return errors.New("nil pointer to dynamicType nested map")
+	}
+	if m.dynamicType.spec == nil {
 		return errors.New("nil pointer to MsgSpec")
-	} else if m.dynamicType.spec.Fields == nil {
+	}
+	if m.dynamicType.spec.Fields == nil {
 		return errors.New("nil pointer to Fields")
 	}
 
@@ -600,7 +606,11 @@ func unmarshalString(value []byte, field *libgengo.Field, dest *interface{}) err
 		}
 		*dest = JsonFloat64{F: floatValue}
 	case "string":
-		*dest = string(value)
+		stringValue, err := strconv.Unquote(`"` + string(value) + `"`)
+		if err != nil {
+			return err
+		}
+		*dest = string(stringValue)
 	default:
 		return errors.New("unexpected json string")
 	}
@@ -1003,7 +1013,7 @@ func unmarshalStringArray(value []byte, array *[]string) error {
 		}
 		if dataType == jsonparser.String {
 			var stringValue string
-			stringValue, err = strconv.Unquote(`"` + string(value) + `"`) // TODO: This is required for escaping strings in arrays but not singular, why?
+			stringValue, err = strconv.Unquote(`"` + string(value) + `"`)
 			if err != nil {
 				return
 			}

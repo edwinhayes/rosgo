@@ -136,6 +136,11 @@ func TestDynamicMessage_JSON_primitives(t *testing.T) {
 			data:       map[string]interface{}{"s": "N0t  empty "},
 			marshalled: `{"s":"N0t  empty "}`,
 		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			data:       map[string]interface{}{"s": "\tha\nos g\\ove"},
+			marshalled: `{"s":"\tha\nos g\\ove"}`,
+		},
 		// - Time and Duration.
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
