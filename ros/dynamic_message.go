@@ -1561,25 +1561,25 @@ func padArray(array interface{}, field libgengo.Field, actualSize, requiredSize 
 		return v, nil
 	case "float32":
 		// Make sure we've actually got a float32.
-		v, ok := array.([]float32)
+		v, ok := array.([]JsonFloat32)
 		if !ok {
-			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []float32.")
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []JsonFloat32.")
 		}
-		padding := make([]float32, requiredSize-actualSize)
+		padding := make([]JsonFloat32, requiredSize-actualSize)
 		for i := range padding {
-			padding[i] = 0
+			padding[i] = JsonFloat32{F: 0}
 		}
 		v = append(v, padding...)
 		return v, nil
 	case "float64":
 		// Make sure we've actually got a float64.
-		v, ok := array.([]float64)
+		v, ok := array.([]JsonFloat64)
 		if !ok {
-			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []float64.")
+			return nil, errors.New("Field: " + field.Name + ": Found " + reflect.TypeOf(array).Name() + ", expected []JsonFloat64.")
 		}
-		padding := make([]float64, requiredSize-actualSize)
+		padding := make([]JsonFloat64, requiredSize-actualSize)
 		for i := range padding {
-			padding[i] = 0
+			padding[i] = JsonFloat64{F: 0}
 		}
 		v = append(v, padding...)
 		return v, nil
