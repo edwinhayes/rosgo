@@ -69,7 +69,7 @@ func TestDynamicMessage_JSON_primitives(t *testing.T) {
 			data:       map[string]interface{}{"b": true},
 			marshalled: `{"b":true}`,
 		},
-		// - Floats. TODO: Move other float tests into this test
+		// - Floats.
 		{
 			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
 			data:       map[string]interface{}{"f32": JsonFloat32{0.0}},
@@ -735,5 +735,174 @@ func TestDynamicMessage_marshalJSON_arrayOfNestedMessages(t *testing.T) {
 
 	if _, err := json.Marshal(testMessage); err == nil {
 		t.Fatalf("expected type error")
+	}
+}
+
+// Ensure that invalid marshalling results in errors and not panic
+func TestDynamicMessage_JSONMarshal_typeErrors(t *testing.T) {
+
+	testCases := []struct {
+		fields []gengo.Field
+		data   map[string]interface{}
+	}{
+		// Singular Values.
+		// - Unsigned integers.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)},
+			data:   map[string]interface{}{"u8": uint16(0x12)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", false, 0)},
+			data:   map[string]interface{}{"u16": uint8(0x80)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", false, 0)},
+			data:   map[string]interface{}{"u32": int32(0x40000001)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", false, 0)},
+			data:   map[string]interface{}{"u64": NewTime(0, 0)},
+		},
+		// - Signed integers.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int8", "i8", false, 0)},
+			data:   map[string]interface{}{"i8": float32(-20)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int16", "i16", false, 0)},
+			data:   map[string]interface{}{"i16": uint16(20_000)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int32", "i32", false, 0)},
+			data:   map[string]interface{}{"i32": int8(-2)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int64", "i64", false, 0)},
+			data:   map[string]interface{}{"i64": float64(-2_000_000_000)},
+		},
+		// - Booleans.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			data:   map[string]interface{}{"b": 0},
+		},
+		// - Floats.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			data:   map[string]interface{}{"f32": JsonFloat64{0.0}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:   map[string]interface{}{"f64": float32(-1.125)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			data:   map[string]interface{}{"f64": float64(-1.125)},
+		},
+		// - Strings.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			data:   map[string]interface{}{"s": []byte{0x64, 0x65}},
+		},
+		// - Time and Duration.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			data:   map[string]interface{}{"t": NewDuration(0xfeedf00d, 0x1337beef)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "duration", "d", false, 0)},
+			data:   map[string]interface{}{"d": uint64(0x40302010)},
+		},
+		// - Message (not builtin)
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "customType", "m", false, 0)},
+			data:   map[string]interface{}{"m": 0},
+		},
+		// Fixed and Dynamic arrays.
+		// - Unsigned integers.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", true, 8)},
+			data:   map[string]interface{}{"u8": []uint16{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, 5)},
+			data:   map[string]interface{}{"u16": []uint32{0xf0de, 0xbc9a, 0x7856, 0x3412, 0x0}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, 3)},
+			data:   map[string]interface{}{"u32": []uint64{0xf0debc9a, 0x78563412, 0x0}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, 3)},
+			data:   map[string]interface{}{"u64": []int64{0x8000000000001, 0x78563412, 0x0}},
+		},
+		// - Signed integers.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int8", "i8", true, 8)},
+			data:   map[string]interface{}{"i8": []int16{-128, -55, -1, 0, 1, 7, 77, 127}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, 7)},
+			data:   map[string]interface{}{"i16": []int32{-32768, -129, -1, 0, 1, 128, 32767}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, 9)},
+			data:   map[string]interface{}{"i32": []int64{-2147483648, -32768, -129, -1, 0, 1, 128, 32767, 2147483647}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, 1)},
+			data:   map[string]interface{}{"i64": int64(0)},
+		},
+		// - Booleans.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 2)},
+			data:   map[string]interface{}{"b": []int{0, 1}},
+		},
+		// - Floats.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 4)},
+			data:   map[string]interface{}{"f32": []JsonFloat64{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}}},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 1)},
+			data:   map[string]interface{}{"f64": JsonFloat64{-1.125}},
+		},
+		// - Strings.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "string", "s", true, 6)},
+			data:   map[string]interface{}{"s": "string"},
+		},
+		// - Time and Duration.
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "time", "t", true, 1)},
+			data:   map[string]interface{}{"t": NewTime(0xfeedf00d, 0x1337beef)},
+		},
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 1)},
+			data:   map[string]interface{}{"d": NewDuration(0xfeedf00d, 0x1337beef)},
+		},
+		// - Messages (not builtin).
+		{
+			fields: []gengo.Field{*gengo.NewField("Testing", "customType", "m", true, 1)},
+			data:   map[string]interface{}{"m": []int{0}},
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
+
+		testMessage := &DynamicMessage{
+			dynamicType: testMessageType,
+			data:        testCase.data,
+		}
+
+		marshalled, err := json.Marshal(testMessage)
+		if err == nil {
+			t.Fatalf("marshalled invalid dynamic message data\njson: %v", marshalled)
+		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"math"
+	"reflect"
 	"strconv"
 
 	"github.com/buger/jsonparser"
@@ -214,7 +215,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 						if i > 0 {
 							buf = append(buf, byte(','))
 						}
-						nestedBuf, err := nested.(*DynamicMessage).MarshalJSON()
+						nestedDynamicMessage, ok := nested.(*DynamicMessage)
+						if ok == false {
+							return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(nested).Name()+", expected DynamicMessage"), "Field: "+field.Name)
+						}
+
+						nestedBuf, err := nestedDynamicMessage.MarshalJSON()
 						if err != nil {
 							return nil, errors.Wrap(err, "field: "+field.Name)
 						}
@@ -222,14 +228,18 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 					}
 					buf = append(buf, byte(']'))
 				} else {
-					return nil, errors.Wrap(errors.New("unknown type"), "Field: "+field.Name)
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []Message"), "Field: "+field.Name)
 				}
 				continue
 			}
 			switch field.GoType {
 			case "bool":
+				slice, ok := v.([]bool)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []bool"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]bool) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -241,18 +251,25 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "int8":
+				slice, ok := v.([]int8)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []int8"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				items := v.([]int8)
-				for i := range items {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
-					buf = strconv.AppendInt(buf, int64(items[i]), 10)
+					buf = strconv.AppendInt(buf, int64(item), 10)
 				}
 				buf = append(buf, byte(']'))
 			case "int16":
+				slice, ok := v.([]int16)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []int16"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]int16) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -260,8 +277,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "int32":
+				slice, ok := v.([]int32)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []int32"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]int32) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -269,8 +290,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "int64":
+				slice, ok := v.([]int64)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []int64"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]int64) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -278,22 +303,29 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "uint8":
+				slice, ok := v.([]uint8)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []uint8"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('"'))
-				uint8Slice := v.([]uint8)
-				encodedLen := base64.StdEncoding.EncodedLen(len(uint8Slice))
+				encodedLen := base64.StdEncoding.EncodedLen(len(slice))
 				if (cap(buf) - len(buf)) > encodedLen {
 					dst := buf[len(buf) : len(buf)+encodedLen]
-					base64.StdEncoding.Encode(dst, uint8Slice)
+					base64.StdEncoding.Encode(dst, slice)
 					buf = buf[:len(buf)+encodedLen]
 				} else {
-					dst := make([]byte, encodedLen) // TODO: for biig arrays, see if we can avoid allocating this slice
-					base64.StdEncoding.Encode(dst, uint8Slice)
+					dst := make([]byte, encodedLen)
+					base64.StdEncoding.Encode(dst, slice)
 					buf = append(buf, dst...)
 				}
 				buf = append(buf, byte('"'))
 			case "uint16":
+				slice, ok := v.([]uint16)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []uint16"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]uint16) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -301,8 +333,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "uint32":
+				slice, ok := v.([]uint32)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []uint32"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]uint32) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -310,8 +346,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "uint64":
+				slice, ok := v.([]uint64)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []uint64"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]uint64) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -319,8 +359,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "float32":
+				slice, ok := v.([]JsonFloat32)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []JsonFloat32"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]JsonFloat32) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -337,8 +381,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "float64":
+				slice, ok := v.([]JsonFloat64)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []JsonFloat64"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]JsonFloat64) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -355,8 +403,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "string":
+				slice, ok := v.([]string)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []string"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]string) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -364,8 +416,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "ros.Time":
+				slice, ok := v.([]Time)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []Time"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]Time) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -377,8 +433,12 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, byte(']'))
 			case "ros.Duration":
+				slice, ok := v.([]Duration)
+				if ok == false {
+					return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected []Duration"), "field: "+field.Name)
+				}
 				buf = append(buf, byte('['))
-				for i, item := range v.([]Duration) {
+				for i, item := range slice {
 					if i > 0 {
 						buf = append(buf, byte(','))
 					}
@@ -391,7 +451,7 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				buf = append(buf, byte(']'))
 			default:
 				// Something went wrong.
-				return nil, errors.Wrap(errors.New("unknown builtin type"), "field: "+field.Name)
+				return nil, errors.Wrap(errors.New("unknown builtin type"+field.GoType), "field: "+field.Name)
 			}
 			continue
 		}
@@ -405,35 +465,75 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				}
 				buf = append(buf, nestedBuf...)
 			} else {
-				return nil, errors.Wrap(errors.New("unknown type"), "Field: "+field.Name)
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected DynamicMessage"), "field: "+field.Name)
 			}
 			continue
 		}
 		switch field.GoType {
 		case "bool":
-			if v.(bool) {
+			value, ok := v.(bool)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected int8"), "field: "+field.Name)
+			}
+			if value {
 				buf = append(buf, []byte("true")...)
 			} else {
 				buf = append(buf, []byte("false")...)
 			}
 		case "int8":
-			buf = strconv.AppendInt(buf, int64(v.(int8)), 10)
+			value, ok := v.(int8)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected int8"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "int16":
-			buf = strconv.AppendInt(buf, int64(v.(int16)), 10)
+			value, ok := v.(int16)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected int16"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "int32":
-			buf = strconv.AppendInt(buf, int64(v.(int32)), 10)
+			value, ok := v.(int32)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected int32"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "int64":
-			buf = strconv.AppendInt(buf, v.(int64), 10)
+			value, ok := v.(int64)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected int32"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, value, 10)
 		case "uint8":
-			buf = strconv.AppendUint(buf, uint64(v.(uint8)), 10)
+			value, ok := v.(uint8)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected uint8"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "uint16":
-			buf = strconv.AppendUint(buf, uint64(v.(uint16)), 10)
+			value, ok := v.(uint16)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected uint16"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "uint32":
-			buf = strconv.AppendUint(buf, uint64(v.(uint32)), 10)
+			value, ok := v.(uint32)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected uint32"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "uint64":
-			buf = strconv.AppendUint(buf, v.(uint64), 10)
+			value, ok := v.(uint64)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected uint64"), "field: "+field.Name)
+			}
+			buf = strconv.AppendInt(buf, int64(value), 10)
 		case "float32":
-			f := float64(v.(JsonFloat32).F)
+			value, ok := v.(JsonFloat32)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected JsonFloat32"), "field: "+field.Name)
+			}
+			f := float64(value.F)
 			if math.IsNaN(f) {
 				buf = strconv.AppendQuote(buf, "nan")
 			} else if math.IsInf(f, 1) {
@@ -444,7 +544,11 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				buf = strconv.AppendFloat(buf, f, byte('g'), -1, 32)
 			}
 		case "float64":
-			f := v.(JsonFloat64).F
+			value, ok := v.(JsonFloat64)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected JsonFloat64"), "field: "+field.Name)
+			}
+			f := value.F
 			if math.IsNaN(f) {
 				buf = strconv.AppendQuote(buf, "nan")
 			} else if math.IsInf(f, 1) {
@@ -455,22 +559,34 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 				buf = strconv.AppendFloat(buf, f, byte('g'), -1, 64)
 			}
 		case "string":
-			buf = strconv.AppendQuote(buf, v.(string))
+			value, ok := v.(string)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected string"), "field: "+field.Name)
+			}
+			buf = strconv.AppendQuote(buf, value)
 		case "ros.Time":
+			value, ok := v.(Time)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected Time"), "field: "+field.Name)
+			}
 			buf = append(buf, []byte("{\"Sec\":")...)
-			buf = strconv.AppendUint(buf, uint64(v.(Time).Sec), 10)
+			buf = strconv.AppendUint(buf, uint64(value.Sec), 10)
 			buf = append(buf, []byte(",\"NSec\":")...)
-			buf = strconv.AppendUint(buf, uint64(v.(Time).NSec), 10)
+			buf = strconv.AppendUint(buf, uint64(value.NSec), 10)
 			buf = append(buf, byte('}'))
 		case "ros.Duration":
+			value, ok := v.(Duration)
+			if ok == false {
+				return nil, errors.Wrap(errors.New("has type "+reflect.TypeOf(v).Name()+", expected Duration"), "field: "+field.Name)
+			}
 			buf = append(buf, []byte("{\"Sec\":")...)
-			buf = strconv.AppendUint(buf, uint64(v.(Duration).Sec), 10)
+			buf = strconv.AppendUint(buf, uint64(value.Sec), 10)
 			buf = append(buf, []byte(",\"NSec\":")...)
-			buf = strconv.AppendUint(buf, uint64(v.(Duration).NSec), 10)
+			buf = strconv.AppendUint(buf, uint64(value.NSec), 10)
 			buf = append(buf, byte('}'))
 		default:
 			// Something went wrong.
-			return nil, errors.Wrap(errors.New("unknown builtin type"), "field: "+field.Name)
+			return nil, errors.Wrap(errors.New("unknown builtin type "+field.GoType), "field: "+field.Name)
 		}
 	}
 
