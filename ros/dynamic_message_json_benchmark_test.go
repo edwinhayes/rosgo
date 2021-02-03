@@ -326,6 +326,35 @@ func BenchmarkDynamicMessage_JSONMarshal_ArrayUint64_customNoLib(b *testing.B) {
 	}
 }
 
+func BenchmarkDynamicMessage_JSONUnmarshal_bigArray(b *testing.B) {
+	var testMessageType DynamicMessageType = DynamicMessageType{
+		spec: generateTestSpec([]gengo.Field{
+			*gengo.NewField("Testing", "uint16", "u16", true, 500_000),
+		}),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
+	}
+	originalMessage := testMessageType.NewDynamicMessage()
+	for i := range originalMessage.data["u16"].([]uint16) {
+		originalMessage.data["u16"].([]uint16)[i] = 0x5a31
+	}
+
+	marshalled, err := json.Marshal(originalMessage)
+	if err != nil {
+		b.Fatalf("marshal failed %s", err)
+	}
+
+	testMessage := testMessageType.NewDynamicMessage()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := json.Unmarshal(marshalled, testMessage)
+		if err != nil {
+			b.Fatalf("unmarshal failed %s", err)
+		}
+	}
+}
+
 // Experimental stuff
 
 type typePair struct {

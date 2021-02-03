@@ -483,154 +483,23 @@ func (m *DynamicMessage) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
-//UnmarshalJSON provides a custom implementation of JSON unmarshalling. Using the dynamicMessage provided, Msgspec is used to
-//determine the individual parsing of each JSON encoded payload item into the correct Go type. It is important each type is
-//correct so that the message serializes correctly and is understood by the ROS system
-func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
-
-	//Delcaring temp variables to be used across the unmarshaller
-	var err error
-	var goField libgengo.Field
-	var oldMsgType string
-	var msg *DynamicMessage
-	var msgType *DynamicMessageType
-	var data interface{}
-
-	//Declaring jsonparser unmarshalling functions
-	var arrayHandler func([]byte, jsonparser.ValueType, int, error)
-	var objectHandler func([]byte, []byte, jsonparser.ValueType, int) error
-
-	arrayHandler = func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		switch dataType {
-		//We have a string array
-		case jsonparser.String:
-			switch goField.GoType {
-			case "float32": // We have marshalled a float32 as a string.
-				floatValue, err := strconv.ParseFloat(string(value), 32)
-				if err != nil {
-					errors.Wrap(err, "Field: "+goField.Name)
-				}
-				m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat32), JsonFloat32{F: float32(floatValue)})
-			case "float64": // We have marshalled a float64 as a string.
-				floatValue, err := strconv.ParseFloat(string(value), 64)
-				if err != nil {
-					errors.Wrap(err, "Field: "+goField.Name)
-				}
-				m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat64), JsonFloat64{F: floatValue})
-			case "string":
-				unquoted, err := strconv.Unquote(`"` + string(value) + `"`) // TODO: This is required for escaping strings in arrays but not singular, why?
-				if err != nil {
-					errors.Wrap(err, "Field: "+goField.Name)
-				}
-				m.data[goField.Name] = append(m.data[goField.Name].([]string), string(unquoted))
-			default:
-				err = errors.Wrap(errors.New("unexpected json string"), "field: "+goField.Name)
-			}
-		//We have a number or int array.
-		case jsonparser.Number:
-			//We have a float to parse
-			if goField.GoType == "float64" || goField.GoType == "float32" {
-				data, err = strconv.ParseFloat(string(value), 64)
-				if err != nil {
-					errors.Wrap(err, "Field: "+goField.Name)
-				}
-			} else {
-				data, err = strconv.ParseInt(string(value), 0, 64)
-				if err != nil {
-					errors.Wrap(err, "Field: "+goField.Name)
-				}
-			}
-			//Append field to data array
-			switch goField.GoType {
-			case "int8":
-				m.data[goField.Name] = append(m.data[goField.Name].([]int8), int8((data.(int64))))
-			case "int16":
-				m.data[goField.Name] = append(m.data[goField.Name].([]int16), int16((data.(int64))))
-			case "int32":
-				m.data[goField.Name] = append(m.data[goField.Name].([]int32), int32((data.(int64))))
-			case "int64":
-				m.data[goField.Name] = append(m.data[goField.Name].([]int64), int64((data.(int64))))
-			case "uint8":
-				m.data[goField.Name] = append(m.data[goField.Name].([]uint8), uint8((data.(int64))))
-			case "uint16":
-				m.data[goField.Name] = append(m.data[goField.Name].([]uint16), uint16((data.(int64))))
-			case "uint32":
-				m.data[goField.Name] = append(m.data[goField.Name].([]uint32), uint32((data.(int64))))
-			case "uint64":
-				m.data[goField.Name] = append(m.data[goField.Name].([]uint64), uint64((data.(int64))))
-			case "float32":
-				m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat32), JsonFloat32{F: float32((data.(float64)))})
-			case "float64":
-				m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat64), JsonFloat64{F: data.(float64)})
-			}
-		//We have an object array
-		case jsonparser.Object:
-			switch goField.GoType {
-			//We have a time object
-			case "ros.Time":
-				tmpTime := Time{}
-				sec, err := jsonparser.GetInt(value, "Sec")
-				nsec, err := jsonparser.GetInt(value, "NSec")
-				if err == nil {
-					tmpTime.Sec = uint32(sec)
-					tmpTime.NSec = uint32(nsec)
-				}
-				m.data[goField.Name] = append(m.data[goField.Name].([]Time), tmpTime)
-			//We have a duration object
-			case "ros.Duration":
-				tmpDuration := Duration{}
-				sec, err := jsonparser.GetInt(value, "Sec")
-				nsec, err := jsonparser.GetInt(value, "NSec")
-				if err == nil {
-					tmpDuration.Sec = uint32(sec)
-					tmpDuration.NSec = uint32(nsec)
-				}
-				m.data[goField.Name] = append(m.data[goField.Name].([]Duration), tmpDuration)
-			//We have a nested message
-			default:
-				newMsgType := goField.GoType
-				//Check if the message type is the same as last iteration
-				//This avoids generating a new type for each array item
-				if oldMsgType != "" && oldMsgType == newMsgType {
-					//We've already generated this type
-				} else {
-					msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil, nil)
-					_ = err
-					msgType = msgT
-				}
-				msg = msgType.NewMessage().(*DynamicMessage)
-				err = msg.UnmarshalJSON(value)
-
-				if msgArray, ok := m.data[goField.Name].([]Message); !ok {
-					errors.Wrap(errors.New("unable to convert to []Message"), "Field: "+goField.Name)
-				} else {
-					m.data[goField.Name] = append(msgArray, msg)
-				}
-
-				//Store msg type
-				oldMsgType = newMsgType
-				//No error handling in array, see next comment
-				_ = err
-
-			}
-		}
-
+// UnmarshalJSON provides a custom implementation of JSON unmarshalling. Verification provided in dynamic_message_json_test.go.
+func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
+	// Confirm the pointers are valid
+	if m == nil {
+		return errors.New("nil pointer to DynamicMessage")
+	} else if m.dynamicType == nil {
+		return errors.New("nil pointer to dynamicType")
+	} else if m.dynamicType.spec == nil {
+		return errors.New("nil pointer to MsgSpec")
+	} else if m.dynamicType.spec.Fields == nil {
+		return errors.New("nil pointer to Fields")
 	}
 
-	//JSON key handler
-	objectHandler = func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	// JSON unmarshalling. Iterates and executes the callback for each item found in buf.
+	return jsonparser.ObjectEach(buf, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		fieldExists := false
-
-		// Confirm the pointers are valid
-		if m == nil {
-			return errors.New("nil pointer to DynamicMessage")
-		} else if m.dynamicType == nil {
-			return errors.New("nil pointer to dynamicType")
-		} else if m.dynamicType.spec == nil {
-			return errors.New("nil pointer to MsgSpec")
-		} else if m.dynamicType.spec.Fields == nil {
-			return errors.New("nil pointer to Fields")
-		}
+		var goField libgengo.Field
 
 		// Find message spec field that matches JSON key
 		keyString := string(key)
@@ -640,177 +509,52 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) error {
 				fieldExists = true
 			}
 		}
-		if fieldExists {
-			switch dataType {
-
-			case jsonparser.String:
-				switch goField.GoType {
-				case "uint8": // We have a byte array encoded as JSON string.
-					data, err := base64.StdEncoding.DecodeString(string(value))
-					if err != nil {
-						return errors.Wrap(err, "Byte Array Field: "+goField.Name)
-					}
-					m.data[goField.Name] = data
-				case "float32": // We have marshalled a float32 as a string.
-					floatValue, err := strconv.ParseFloat(string(value), 32)
-					if err != nil {
-						errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = JsonFloat32{F: float32(floatValue)}
-				case "float64": // We have marshalled a float64 as a string.
-					floatValue, err := strconv.ParseFloat(string(value), 64)
-					if err != nil {
-						errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = JsonFloat64{F: floatValue}
-				case "string":
-					m.data[goField.Name] = string(value)
-				default:
-					return errors.Wrap(errors.New("unexpected json string"), "field: "+goField.Name)
-				}
-
-			case jsonparser.Number: // We have a JSON number; expect a float or integer.
-				var result interface{}
-				if err := unmarshalNumber(value, &goField, &result); err != nil {
-					return errors.Wrap(err, "field: "+goField.Name)
-				}
-				m.data[goField.Name] = result
-
-			case jsonparser.Boolean:
-				value, err := jsonparser.ParseBoolean(value)
-				if err != nil {
-					return errors.Wrap(err, "field: "+goField.Name)
-				}
-				m.data[goField.Name] = value
-
-			case jsonparser.Object:
-				switch goField.GoType {
-				case "ros.Time":
-					sec, nsec, err := unmarshalTimeObject(value)
-					if err != nil {
-						return errors.Wrap(err, "field: "+goField.Name)
-					}
-					m.data[goField.Name] = NewTime(sec, nsec)
-				case "ros.Duration":
-					sec, nsec, err := unmarshalTimeObject(value)
-					if err != nil {
-						return errors.Wrap(err, "field: "+goField.Name)
-					}
-					m.data[goField.Name] = NewDuration(sec, nsec)
-				default:
-					if goField.IsBuiltin {
-						return errors.Wrap(errors.New("unexpected object"), "field: "+goField.Name)
-					}
-					// We have a nested message.
-					msgType, err := m.dynamicType.getNestedTypeFromField(&goField)
-					if err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					msg := msgType.NewDynamicMessage()
-					if err = msg.UnmarshalJSON(value); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = msg
-				}
-			//We have a JSON array
-			case jsonparser.Array:
-				// Redeclare message array fields incase they do not exist.
-				size := goField.ArrayLen
-				if size < 0 {
-					size = 0
-				}
-				switch goField.GoType {
-				case "bool":
-					array := make([]bool, 0, size)
-					if err := unmarshalBoolArray(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "int8":
-					array := make([]int8, 0, size)
-					if err := unmarshalInt8Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "int16":
-					array := make([]int16, 0, size)
-					if err := unmarshalInt16Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "int32":
-					array := make([]int32, 0, size)
-					if err := unmarshalInt32Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "int64":
-					array := make([]int64, 0, size)
-					if err := unmarshalInt64Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "uint8":
-					m.data[goField.Name] = make([]uint8, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				case "uint16":
-					array := make([]uint16, 0, size)
-					if err := unmarshalUint16Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "uint32":
-					array := make([]uint32, 0, size)
-					if err := unmarshalUint32Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "uint64":
-					array := make([]uint64, 0, size)
-					if err := unmarshalUint64Array(value, &array); err != nil {
-						return errors.Wrap(err, "Field: "+goField.Name)
-					}
-					m.data[goField.Name] = array
-				case "float32":
-					m.data[goField.Name] = make([]JsonFloat32, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				case "float64":
-					m.data[goField.Name] = make([]JsonFloat64, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				case "string":
-					m.data[goField.Name] = make([]string, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				case "ros.Time":
-					m.data[goField.Name] = make([]Time, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				case "ros.Duration":
-					m.data[goField.Name] = make([]Duration, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				default:
-					//goType is a nested Message array
-					m.data[goField.Name] = make([]Message, 0, size)
-					jsonparser.ArrayEach(value, arrayHandler)
-
-				}
-				//Parse JSON array
-			default:
-				//We do nothing here as blank fields may return value type NotExist or Null
-				err = errors.Wrap(err, "Null field: "+string(key))
-			}
-		} else {
+		if fieldExists == false {
 			return errors.New("Field Unknown: " + string(key))
 		}
+		switch dataType {
+
+		case jsonparser.String:
+			var result interface{}
+			if err := unmarshalString(value, &goField, &result); err != nil {
+				return errors.Wrap(err, "field: "+goField.Name)
+			}
+			m.data[goField.Name] = result
+
+		case jsonparser.Number: // We have a JSON number; expect a float or integer.
+			var result interface{}
+			if err := unmarshalNumber(value, &goField, &result); err != nil {
+				return errors.Wrap(err, "field: "+goField.Name)
+			}
+			m.data[goField.Name] = result
+
+		case jsonparser.Boolean:
+			value, err := jsonparser.ParseBoolean(value)
+			if err != nil {
+				return errors.Wrap(err, "field: "+goField.Name)
+			}
+			m.data[goField.Name] = value
+
+		case jsonparser.Object:
+			var result interface{}
+			if err := unmarshalObject(m.dynamicType, value, &goField, &result); err != nil {
+				return errors.Wrap(err, "field: "+goField.Name)
+			}
+			m.data[goField.Name] = result
+
+		case jsonparser.Array:
+			var result interface{}
+			if err := unmarshalArray(m.dynamicType, value, &goField, &result); err != nil {
+				return errors.Wrap(err, "field: "+goField.Name)
+			}
+			m.data[goField.Name] = result
+		default:
+			// We do nothing here as blank fields may return value type NotExist or Null
+			return errors.Wrap(err, "Null field: "+string(key))
+		}
+
 		return err
-	}
-	//Perform JSON object handler function
-	err = jsonparser.ObjectEach(buf, objectHandler)
-	return err
+	})
 }
 
 // DEFINE PRIVATE STATIC FUNCTIONS.
@@ -833,6 +577,34 @@ func unmarshalTimeObject(marshalled []byte) (sec uint32, nsec uint32, err error)
 		return err
 	})
 	return uint32(tempSec), uint32(tempNSec), err
+}
+
+func unmarshalString(value []byte, field *libgengo.Field, dest *interface{}) error {
+	switch field.GoType {
+	case "uint8": // We have a byte array encoded as JSON string.
+		data, err := base64.StdEncoding.DecodeString(string(value))
+		if err != nil {
+			return err
+		}
+		*dest = data
+	case "float32": // We have marshalled a float32 as a string.
+		floatValue, err := strconv.ParseFloat(string(value), 32)
+		if err != nil {
+			return err
+		}
+		*dest = JsonFloat32{F: float32(floatValue)}
+	case "float64": // We have marshalled a float64 as a string.
+		floatValue, err := strconv.ParseFloat(string(value), 64)
+		if err != nil {
+			return err
+		}
+		*dest = JsonFloat64{F: floatValue}
+	case "string":
+		*dest = string(value)
+	default:
+		return errors.New("unexpected json string")
+	}
+	return nil
 }
 
 func unmarshalNumber(value []byte, field *libgengo.Field, dest *interface{}) error {
@@ -879,12 +651,131 @@ func unmarshalNumber(value []byte, field *libgengo.Field, dest *interface{}) err
 	return nil
 }
 
+func unmarshalObject(msgType *DynamicMessageType, value []byte, field *libgengo.Field, dest *interface{}) error {
+	switch field.GoType {
+	case "ros.Time":
+		sec, nsec, err := unmarshalTimeObject(value)
+		if err != nil {
+			return err
+		}
+		*dest = NewTime(sec, nsec)
+	case "ros.Duration":
+		sec, nsec, err := unmarshalTimeObject(value)
+		if err != nil {
+			return err
+		}
+		*dest = NewDuration(sec, nsec)
+	default:
+		if field.IsBuiltin {
+			errors.New("unexpected object")
+		}
+		// We have a nested message.
+		msgType, err := msgType.getNestedTypeFromField(field)
+		if err != nil {
+			return err
+		}
+		msg := msgType.NewDynamicMessage()
+		if err = msg.UnmarshalJSON(value); err != nil {
+			return err
+		}
+		*dest = msg
+	}
+	return nil
+}
+
+func unmarshalArray(msgType *DynamicMessageType, value []byte, field *libgengo.Field, dest *interface{}) error {
+	var err error
+
+	size := field.ArrayLen
+	if size < 0 {
+		size = 0
+	}
+	switch field.GoType {
+	case "bool":
+		array := make([]bool, 0, size)
+		err = unmarshalBoolArray(value, &array)
+		*dest = array
+	case "int8":
+		array := make([]int8, 0, size)
+		err = unmarshalInt8Array(value, &array)
+		*dest = array
+	case "int16":
+		array := make([]int16, 0, size)
+		err = unmarshalInt16Array(value, &array)
+		*dest = array
+	case "int32":
+		array := make([]int32, 0, size)
+		err = unmarshalInt32Array(value, &array)
+		*dest = array
+	case "int64":
+		array := make([]int64, 0, size)
+		err = unmarshalInt64Array(value, &array)
+		*dest = array
+	case "uint8":
+		// We expect this to be base64 encoded. However, handle it anyway.
+		array := make([]uint8, 0, size)
+		err = unmarshalUint8Array(value, &array)
+		*dest = array
+	case "uint16":
+		array := make([]uint16, 0, size)
+		err = unmarshalUint16Array(value, &array)
+		*dest = array
+	case "uint32":
+		array := make([]uint32, 0, size)
+		err = unmarshalUint32Array(value, &array)
+		*dest = array
+	case "uint64":
+		array := make([]uint64, 0, size)
+		err = unmarshalUint64Array(value, &array)
+		*dest = array
+	case "float32":
+		array := make([]JsonFloat32, 0, size)
+		err = unmarshalFloat32Array(value, &array)
+		*dest = array
+	case "float64":
+		array := make([]JsonFloat64, 0, size)
+		err = unmarshalFloat64Array(value, &array)
+		*dest = array
+	case "string":
+		array := make([]string, 0, size)
+		err = unmarshalStringArray(value, &array)
+		*dest = array
+	case "ros.Time":
+		array := make([]Time, 0, size)
+		err = unmarshalTimeArray(value, &array)
+		*dest = array
+	case "ros.Duration":
+		array := make([]Duration, 0, size)
+		err = unmarshalDurationArray(value, &array)
+		*dest = array
+	default:
+		if field.IsBuiltin {
+			return errors.Wrap(errors.New("unexpected object"), "field: "+field.Name)
+		}
+		// goType is a nested Message array
+		msgType, err := msgType.getNestedTypeFromField(field)
+		if err != nil {
+			return err
+		}
+		array := make([]Message, 0, size)
+		err = unmarshalMessageArray(value, &array, msgType)
+		*dest = array
+	}
+	return err
+}
+
 func unmarshalBoolArray(value []byte, array *[]bool) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Boolean {
-			data, err := jsonparser.ParseBoolean(value)
-			_ = err
+			var data bool
+			data, err = jsonparser.ParseBoolean(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, data)
 		} else {
 			errors.New("unexpected type, expecting bool")
@@ -897,9 +788,15 @@ func unmarshalBoolArray(value []byte, array *[]bool) error {
 func unmarshalInt8Array(value []byte, array *[]int8) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, int8(data))
 		} else {
 			errors.New("unexpected type, expecting int8")
@@ -912,9 +809,15 @@ func unmarshalInt8Array(value []byte, array *[]int8) error {
 func unmarshalInt16Array(value []byte, array *[]int16) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, int16(data))
 		} else {
 			errors.New("unexpected type, expecting int16")
@@ -927,9 +830,15 @@ func unmarshalInt16Array(value []byte, array *[]int16) error {
 func unmarshalInt32Array(value []byte, array *[]int32) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, int32(data))
 		} else {
 			errors.New("unexpected type, expecting int32")
@@ -942,9 +851,15 @@ func unmarshalInt32Array(value []byte, array *[]int32) error {
 func unmarshalInt64Array(value []byte, array *[]int64) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, int64(data))
 		} else {
 			errors.New("unexpected type, expecting int64")
@@ -954,12 +869,39 @@ func unmarshalInt64Array(value []byte, array *[]int64) error {
 	return err
 }
 
+func unmarshalUint8Array(value []byte, array *[]uint8) error {
+	var err error
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.Number {
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
+			*array = append(*array, uint8(data))
+		} else {
+			errors.New("unexpected type, expecting uint16")
+		}
+	}
+	jsonparser.ArrayEach(value, arrayHandler)
+	return err
+}
+
 func unmarshalUint16Array(value []byte, array *[]uint16) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, uint16(data))
 		} else {
 			errors.New("unexpected type, expecting uint16")
@@ -972,12 +914,18 @@ func unmarshalUint16Array(value []byte, array *[]uint16) error {
 func unmarshalUint32Array(value []byte, array *[]uint32) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, uint32(data))
 		} else {
-			errors.New("unexpected type, expecting uint32")
+			err = errors.New("unexpected type, expecting uint32")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -987,156 +935,142 @@ func unmarshalUint32Array(value []byte, array *[]uint32) error {
 func unmarshalUint64Array(value []byte, array *[]uint64) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
 		if dataType == jsonparser.Number {
-			data, err := jsonparser.ParseInt(value)
-			_ = err
+			var data int64
+			data, err = jsonparser.ParseInt(value)
+			if err != nil {
+				return
+			}
 			*array = append(*array, uint64(data))
 		} else {
-			errors.New("unexpected type, expecting uint64")
+			err = errors.New("unexpected type, expecting uint64")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
 	return err
 }
 
-func unmarshalFloat32Array(value []byte, array *[]float32) error {
+func unmarshalFloat32Array(value []byte, array *[]JsonFloat32) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		// if dataType == jsonparser.Boolean {
-		// 	data, err := jsonparser.ParseBoolean(value)
-		// 	_ = err
-		// 	*array = append(*array, data)
-		// } else {
-		// 	errors.New("unexpected type")
-		// }
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.String || dataType == jsonparser.Number {
+			var floatValue float64
+			floatValue, err = strconv.ParseFloat(string(value), 32)
+			if err != nil {
+				return
+			}
+			*array = append(*array, JsonFloat32{F: float32(floatValue)})
+		} else {
+			err = errors.New("unexpected type, expecting float64")
+		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
 	return err
 }
 
-func unmarshalFloat64Array(value []byte, array *[]float64) error {
+func unmarshalFloat64Array(value []byte, array *[]JsonFloat64) error {
 	var err error
 	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		// if dataType == jsonparser.Boolean {
-		// 	data, err := jsonparser.ParseBoolean(value)
-		// 	_ = err
-		// 	*array = append(*array, data)
-		// } else {
-		// 	errors.New("unexpected type")
-		// }
-		// 	switch dataType {
-		// 	//We have a string array
-		// 	case jsonparser.String:
-		// 		switch goField.GoType {
-		// 		case "float32": // We have marshalled a float32 as a string.
-		// 			floatValue, err := strconv.ParseFloat(string(value), 32)
-		// 			if err != nil {
-		// 				errors.Wrap(err, "Field: "+goField.Name)
-		// 			}
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat32), JsonFloat32{F: float32(floatValue)})
-		// 		case "float64": // We have marshalled a float64 as a string.
-		// 			floatValue, err := strconv.ParseFloat(string(value), 64)
-		// 			if err != nil {
-		// 				errors.Wrap(err, "Field: "+goField.Name)
-		// 			}
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat64), JsonFloat64{F: floatValue})
-		// 		case "string":
-		// 			unquoted, err := strconv.Unquote(`"` + string(value) + `"`) // TODO: This is required for escaping strings in arrays but not singular, why?
-		// 			if err != nil {
-		// 				errors.Wrap(err, "Field: "+goField.Name)
-		// 			}
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]string), string(unquoted))
-		// 		default:
-		// 			err = errors.Wrap(errors.New("unexpected json string"), "field: "+goField.Name)
-		// 		}
-		// 	//We have a number or int array.
-		// 	case jsonparser.Number:
-		// 		//We have a float to parse
-		// 		if goField.GoType == "float64" || goField.GoType == "float32" {
-		// 			data, err = strconv.ParseFloat(string(value), 64)
-		// 			if err != nil {
-		// 				errors.Wrap(err, "Field: "+goField.Name)
-		// 			}
-		// 		} else {
-		// 			data, err = strconv.ParseInt(string(value), 0, 64)
-		// 			if err != nil {
-		// 				errors.Wrap(err, "Field: "+goField.Name)
-		// 			}
-		// 		}
-		// 		//Append field to data array
-		// 		switch goField.GoType {
-		// 		case "int8":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]int8), int8((data.(int64))))
-		// 		case "int16":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]int16), int16((data.(int64))))
-		// 		case "int32":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]int32), int32((data.(int64))))
-		// 		case "int64":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]int64), int64((data.(int64))))
-		// 		case "uint8":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]uint8), uint8((data.(int64))))
-		// 		case "uint16":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]uint16), uint16((data.(int64))))
-		// 		case "uint32":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]uint32), uint32((data.(int64))))
-		// 		case "uint64":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]uint64), uint64((data.(int64))))
-		// 		case "float32":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat32), JsonFloat32{F: float32((data.(float64)))})
-		// 		case "float64":
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]JsonFloat64), JsonFloat64{F: data.(float64)})
-		// 		}
-		// 	//We have an object array
-		// 	case jsonparser.Object:
-		// 		switch goField.GoType {
-		// 		//We have a time object
-		// 		case "ros.Time":
-		// 			tmpTime := Time{}
-		// 			sec, err := jsonparser.GetInt(value, "Sec")
-		// 			nsec, err := jsonparser.GetInt(value, "NSec")
-		// 			if err == nil {
-		// 				tmpTime.Sec = uint32(sec)
-		// 				tmpTime.NSec = uint32(nsec)
-		// 			}
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]Time), tmpTime)
-		// 		//We have a duration object
-		// 		case "ros.Duration":
-		// 			tmpDuration := Duration{}
-		// 			sec, err := jsonparser.GetInt(value, "Sec")
-		// 			nsec, err := jsonparser.GetInt(value, "NSec")
-		// 			if err == nil {
-		// 				tmpDuration.Sec = uint32(sec)
-		// 				tmpDuration.NSec = uint32(nsec)
-		// 			}
-		// 			m.data[goField.Name] = append(m.data[goField.Name].([]Duration), tmpDuration)
-		// 		//We have a nested message
-		// 		default:
-		// 			newMsgType := goField.GoType
-		// 			//Check if the message type is the same as last iteration
-		// 			//This avoids generating a new type for each array item
-		// 			if oldMsgType != "" && oldMsgType == newMsgType {
-		// 				//We've already generated this type
-		// 			} else {
-		// 				msgT, err := newDynamicMessageTypeNested(goField.Type, goField.Package, nil, nil)
-		// 				_ = err
-		// 				msgType = msgT
-		// 			}
-		// 			msg = msgType.NewMessage().(*DynamicMessage)
-		// 			err = msg.UnmarshalJSON(value)
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.String || dataType == jsonparser.Number {
+			var floatValue float64
+			floatValue, err = strconv.ParseFloat(string(value), 64)
+			if err != nil {
+				return
+			}
+			*array = append(*array, JsonFloat64{F: floatValue})
+		} else {
+			err = errors.New("unexpected type, expecting float64")
+		}
+	}
+	jsonparser.ArrayEach(value, arrayHandler)
+	return err
+}
 
-		// 			if msgArray, ok := m.data[goField.Name].([]Message); !ok {
-		// 				errors.Wrap(errors.New("unable to convert to []Message"), "Field: "+goField.Name)
-		// 			} else {
-		// 				m.data[goField.Name] = append(msgArray, msg)
-		// 			}
+func unmarshalStringArray(value []byte, array *[]string) error {
+	var err error
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.String {
+			var stringValue string
+			stringValue, err = strconv.Unquote(`"` + string(value) + `"`) // TODO: This is required for escaping strings in arrays but not singular, why?
+			if err != nil {
+				return
+			}
+			*array = append(*array, string(stringValue))
+		} else {
+			err = errors.New("unexpected type, expecting string")
+		}
+	}
+	jsonparser.ArrayEach(value, arrayHandler)
+	return err
+}
 
-		// 			//Store msg type
-		// 			oldMsgType = newMsgType
-		// 			//No error handling in array, see next comment
-		// 			_ = err
+func unmarshalTimeArray(value []byte, array *[]Time) error {
+	var err error
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.Object {
+			sec, nsec, err := unmarshalTimeObject(value)
+			if err != nil {
+				return
+			}
+			*array = append(*array, NewTime(sec, nsec))
+		} else {
+			err = errors.New("unexpected type, expecting time object")
+		}
+	}
+	jsonparser.ArrayEach(value, arrayHandler)
+	return err
+}
 
-		// 		}
-		// 	}
+func unmarshalDurationArray(value []byte, array *[]Duration) error {
+	var err error
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.Object {
+			sec, nsec, err := unmarshalTimeObject(value)
+			if err != nil {
+				return
+			}
+			*array = append(*array, NewDuration(sec, nsec))
+		} else {
+			err = errors.New("unexpected type, expecting duration object")
+		}
+	}
+	jsonparser.ArrayEach(value, arrayHandler)
+	return err
+}
+
+func unmarshalMessageArray(value []byte, array *[]Message, msgType *DynamicMessageType) error {
+	var err error
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		if err != nil {
+			return // Stop processing if there is an error.
+		}
+		if dataType == jsonparser.Object {
+			msg := msgType.NewDynamicMessage()
+			if err = msg.UnmarshalJSON(value); err != nil {
+				return
+			}
+			*array = append(*array, msg)
+		} else {
+			err = errors.New("unexpected type, expecting message object")
+		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
 	return err
