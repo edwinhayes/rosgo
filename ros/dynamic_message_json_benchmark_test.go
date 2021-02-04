@@ -80,6 +80,19 @@ func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_custom(b *testing.B)
 	}
 }
 
+func BenchmarkDynamicMessage_JSONMarshal_SingularPrimitives_customNoLibs(b *testing.B) {
+	testMessage := singularMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
+	testMessage.data = singularMessageData
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := testMessage.MarshalJSON()
+		if err != nil {
+			b.Fatalf("marshal failed %s", err)
+		}
+	}
+}
+
 func BenchmarkDynamicMessage_JSONUnmarshal_SingularPrimitives(b *testing.B) {
 	originalMessage := singularMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
 	originalMessage.data = singularMessageData
@@ -125,6 +138,19 @@ func BenchmarkDynamicMessage_JSONMarshal_FixedArrays_custom(b *testing.B) {
 	}
 }
 
+func BenchmarkDynamicMessage_JSONMarshal_FixedArrays_customNoLib(b *testing.B) {
+	testMessage := fixedArrayMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
+	testMessage.data = fixedArrayMessageData
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := testMessage.MarshalJSON()
+		if err != nil {
+			b.Fatalf("marshal failed %s", err)
+		}
+	}
+}
+
 func BenchmarkDynamicMessage_JSONUnmarshal_FixedArrays(b *testing.B) {
 	originalMessage := fixedArrayMessageType.NewDynamicMessage() // from dynamic_message_benchmark_test.go
 	originalMessage.data = fixedArrayMessageData
@@ -156,6 +182,7 @@ func BenchmarkDynamicMessage_JSONMarshal_Nested(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := json.Marshal(testMessage)
+		// _, err := testMessage.MarshalJSON()
 		if err != nil {
 			b.Fatalf("marshal failed %s", err)
 		}

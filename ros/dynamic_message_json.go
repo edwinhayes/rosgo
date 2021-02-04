@@ -670,13 +670,13 @@ func marshalSingularValue(field *libgengo.Field, v interface{}, buf *[]byte) err
 
 // Unmarshalling Helpers.
 
-// Unmarshals time data from a JSON object representing time or duration i.e/ {"Sec":n,"NSec":n}.
-func unmarshalTimeObject(marshalled []byte) (sec uint32, nsec uint32, err error) {
+func unmarshalSecNSecObject(marshalled []byte) (sec uint32, nsec uint32, err error) {
 	var tempSec int64
 	var tempNSec int64
 	hasSec := false
 	hasNSec := false
 
+	// Expects the object to be {"Sec":n,"NSec":n} (although, order doesn't matter).
 	err = jsonparser.ObjectEach(marshalled, func(k []byte, v []byte, dataType jsonparser.ValueType, offset int) error {
 		var err error
 		switch string(k) {
@@ -785,13 +785,13 @@ func unmarshalNumber(value []byte, field *libgengo.Field, dest *interface{}) err
 func unmarshalObject(msgType *DynamicMessageType, value []byte, field *libgengo.Field, dest *interface{}) error {
 	switch field.GoType {
 	case "ros.Time":
-		sec, nsec, err := unmarshalTimeObject(value)
+		sec, nsec, err := unmarshalSecNSecObject(value)
 		if err != nil {
 			return err
 		}
 		*dest = NewTime(sec, nsec)
 	case "ros.Duration":
-		sec, nsec, err := unmarshalTimeObject(value)
+		sec, nsec, err := unmarshalSecNSecObject(value)
 		if err != nil {
 			return err
 		}
@@ -849,7 +849,7 @@ func unmarshalArray(msgType *DynamicMessageType, value []byte, field *libgengo.F
 		unmarshalledLength = len(array)
 		*dest = array
 	case "uint8":
-		// We expect this to be base64 encoded. However, handle it anyway.
+		// We expect this to be base64 encoded. Handle it anyway.
 		array := make([]uint8, 0, size)
 		err = unmarshalUint8Array(value, &array)
 		unmarshalledLength = len(array)
@@ -1173,7 +1173,7 @@ func unmarshalTimeArray(value []byte, array *[]Time) error {
 			return // Stop processing if there is an error.
 		}
 		if dataType == jsonparser.Object {
-			sec, nsec, err := unmarshalTimeObject(value)
+			sec, nsec, err := unmarshalSecNSecObject(value)
 			if err != nil {
 				return
 			}
@@ -1193,7 +1193,7 @@ func unmarshalDurationArray(value []byte, array *[]Duration) error {
 			return // Stop processing if there is an error.
 		}
 		if dataType == jsonparser.Object {
-			sec, nsec, err := unmarshalTimeObject(value)
+			sec, nsec, err := unmarshalSecNSecObject(value)
 			if err != nil {
 				return
 			}
