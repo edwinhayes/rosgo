@@ -264,6 +264,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 		switch dataType {
 
 		case jsonparser.String:
+			if goField.IsArray && goField.Type != "uint8" {
+				return errors.Wrap(errors.New("attempted to unmarshal array as singular"), "field: "+goField.Name+" value: "+string(value))
+			}
 			var result interface{}
 			if err := unmarshalString(value, &goField, &result); err != nil {
 				return errors.Wrap(err, "field: "+goField.Name)
@@ -271,6 +274,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 			m.data[goField.Name] = result
 
 		case jsonparser.Number: // We have a JSON number; expect a float or integer.
+			if goField.IsArray {
+				return errors.Wrap(errors.New("attempted to unmarshal array as singular"), "field: "+goField.Name+" value: "+string(value))
+			}
 			var result interface{}
 			if err := unmarshalNumber(value, &goField, &result); err != nil {
 				return errors.Wrap(err, "field: "+goField.Name)
@@ -278,6 +284,12 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 			m.data[goField.Name] = result
 
 		case jsonparser.Boolean:
+			if goField.IsArray {
+				return errors.Wrap(errors.New("attempted to unmarshal array as singular"), "field: "+goField.Name+" value: "+string(value))
+			}
+			if goField.Type != "bool" {
+				return errors.Wrap(errors.New("attempted to parse "+goField.Type+" as bool"), "field: "+goField.Name+" value: "+string(value))
+			}
 			value, err := jsonparser.ParseBoolean(value)
 			if err != nil {
 				return errors.Wrap(err, "field: "+goField.Name)
@@ -285,6 +297,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 			m.data[goField.Name] = value
 
 		case jsonparser.Object:
+			if goField.IsArray {
+				return errors.Wrap(errors.New("attempted to unmarshal array as singular"), "field: "+goField.Name+" value: "+string(value))
+			}
 			var result interface{}
 			if err := unmarshalObject(m.dynamicType, value, &goField, &result); err != nil {
 				return errors.Wrap(err, "field: "+goField.Name)
@@ -292,6 +307,9 @@ func (m *DynamicMessage) UnmarshalJSON(buf []byte) (err error) {
 			m.data[goField.Name] = result
 
 		case jsonparser.Array:
+			if goField.IsArray == false {
+				return errors.Wrap(errors.New("attempted to unmarshal singular as array"), "field: "+goField.Name+" value: "+string(value))
+			}
 			var result interface{}
 			if err := unmarshalArray(m.dynamicType, value, &goField, &result); err != nil {
 				return errors.Wrap(err, "field: "+goField.Name)
@@ -656,19 +674,35 @@ func marshalSingularValue(field *libgengo.Field, v interface{}, buf *[]byte) err
 func unmarshalTimeObject(marshalled []byte) (sec uint32, nsec uint32, err error) {
 	var tempSec int64
 	var tempNSec int64
+	hasSec := false
+	hasNSec := false
 
 	err = jsonparser.ObjectEach(marshalled, func(k []byte, v []byte, dataType jsonparser.ValueType, offset int) error {
 		var err error
 		switch string(k) {
 		case "Sec":
 			tempSec, err = jsonparser.ParseInt(v)
+			if err == nil {
+				hasSec = true
+			}
 		case "NSec":
 			tempNSec, err = jsonparser.ParseInt(v)
+			if err == nil {
+				hasNSec = true
+			}
 		default:
 			err = errors.New("unknown key " + string(k))
 		}
 		return err
 	})
+	if err == nil {
+		if hasSec == false {
+			return 0, 0, errors.Wrap(errors.New("object had no Sec field"), "obj: "+string(marshalled))
+		}
+		if hasNSec == false {
+			return 0, 0, errors.Wrap(errors.New("object had no NSec field"), "obj: "+string(marshalled))
+		}
+	}
 	return uint32(tempSec), uint32(tempNSec), err
 }
 
@@ -782,6 +816,7 @@ func unmarshalObject(msgType *DynamicMessageType, value []byte, field *libgengo.
 
 func unmarshalArray(msgType *DynamicMessageType, value []byte, field *libgengo.Field, dest *interface{}) error {
 	var err error
+	var unmarshalledLength int
 
 	size := field.ArrayLen
 	if size < 0 {
@@ -791,63 +826,77 @@ func unmarshalArray(msgType *DynamicMessageType, value []byte, field *libgengo.F
 	case "bool":
 		array := make([]bool, 0, size)
 		err = unmarshalBoolArray(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "int8":
 		array := make([]int8, 0, size)
 		err = unmarshalInt8Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "int16":
 		array := make([]int16, 0, size)
 		err = unmarshalInt16Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "int32":
 		array := make([]int32, 0, size)
 		err = unmarshalInt32Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "int64":
 		array := make([]int64, 0, size)
 		err = unmarshalInt64Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "uint8":
 		// We expect this to be base64 encoded. However, handle it anyway.
 		array := make([]uint8, 0, size)
 		err = unmarshalUint8Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "uint16":
 		array := make([]uint16, 0, size)
 		err = unmarshalUint16Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "uint32":
 		array := make([]uint32, 0, size)
 		err = unmarshalUint32Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "uint64":
 		array := make([]uint64, 0, size)
 		err = unmarshalUint64Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "float32":
 		array := make([]JsonFloat32, 0, size)
 		err = unmarshalFloat32Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "float64":
 		array := make([]JsonFloat64, 0, size)
 		err = unmarshalFloat64Array(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "string":
 		array := make([]string, 0, size)
 		err = unmarshalStringArray(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "ros.Time":
 		array := make([]Time, 0, size)
 		err = unmarshalTimeArray(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	case "ros.Duration":
 		array := make([]Duration, 0, size)
 		err = unmarshalDurationArray(value, &array)
+		unmarshalledLength = len(array)
 		*dest = array
 	default:
 		if field.IsBuiltin {
-			return errors.Wrap(errors.New("unexpected object"), "field: "+field.Name)
+			return errors.New("unexpected object is builtin")
 		}
 		// goType is a nested Message array
 		msgType, err := msgType.getNestedTypeFromField(field)
@@ -856,14 +905,18 @@ func unmarshalArray(msgType *DynamicMessageType, value []byte, field *libgengo.F
 		}
 		array := make([]Message, 0, size)
 		err = unmarshalMessageArray(value, &array, msgType)
+		unmarshalledLength = len(array)
 		*dest = array
+	}
+	if field.ArrayLen > 0 && unmarshalledLength != field.ArrayLen {
+		return errors.Wrap(errors.New("fixed array size does not match unmarshalled size"), "json: "+string(value)+", fixed size: "+strconv.Itoa(field.ArrayLen))
 	}
 	return err
 }
 
 func unmarshalBoolArray(value []byte, array *[]bool) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -875,7 +928,7 @@ func unmarshalBoolArray(value []byte, array *[]bool) error {
 			}
 			*array = append(*array, data)
 		} else {
-			errors.New("unexpected type, expecting bool")
+			err = errors.New("unexpected type, expecting bool")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -884,7 +937,7 @@ func unmarshalBoolArray(value []byte, array *[]bool) error {
 
 func unmarshalInt8Array(value []byte, array *[]int8) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -896,7 +949,7 @@ func unmarshalInt8Array(value []byte, array *[]int8) error {
 			}
 			*array = append(*array, int8(data))
 		} else {
-			errors.New("unexpected type, expecting int8")
+			err = errors.New("unexpected type, expecting int8")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -905,7 +958,7 @@ func unmarshalInt8Array(value []byte, array *[]int8) error {
 
 func unmarshalInt16Array(value []byte, array *[]int16) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -917,7 +970,7 @@ func unmarshalInt16Array(value []byte, array *[]int16) error {
 			}
 			*array = append(*array, int16(data))
 		} else {
-			errors.New("unexpected type, expecting int16")
+			err = errors.New("unexpected type, expecting int16")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -926,7 +979,7 @@ func unmarshalInt16Array(value []byte, array *[]int16) error {
 
 func unmarshalInt32Array(value []byte, array *[]int32) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -938,7 +991,7 @@ func unmarshalInt32Array(value []byte, array *[]int32) error {
 			}
 			*array = append(*array, int32(data))
 		} else {
-			errors.New("unexpected type, expecting int32")
+			err = errors.New("unexpected type, expecting int32")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -947,7 +1000,7 @@ func unmarshalInt32Array(value []byte, array *[]int32) error {
 
 func unmarshalInt64Array(value []byte, array *[]int64) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -959,7 +1012,7 @@ func unmarshalInt64Array(value []byte, array *[]int64) error {
 			}
 			*array = append(*array, int64(data))
 		} else {
-			errors.New("unexpected type, expecting int64")
+			err = errors.New("unexpected type, expecting int64")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -968,7 +1021,7 @@ func unmarshalInt64Array(value []byte, array *[]int64) error {
 
 func unmarshalUint8Array(value []byte, array *[]uint8) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -980,7 +1033,7 @@ func unmarshalUint8Array(value []byte, array *[]uint8) error {
 			}
 			*array = append(*array, uint8(data))
 		} else {
-			errors.New("unexpected type, expecting uint16")
+			err = errors.New("unexpected type, expecting uint8")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -989,7 +1042,7 @@ func unmarshalUint8Array(value []byte, array *[]uint8) error {
 
 func unmarshalUint16Array(value []byte, array *[]uint16) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1001,7 +1054,7 @@ func unmarshalUint16Array(value []byte, array *[]uint16) error {
 			}
 			*array = append(*array, uint16(data))
 		} else {
-			errors.New("unexpected type, expecting uint16")
+			err = errors.New("unexpected type, expecting uint16")
 		}
 	}
 	jsonparser.ArrayEach(value, arrayHandler)
@@ -1010,7 +1063,7 @@ func unmarshalUint16Array(value []byte, array *[]uint16) error {
 
 func unmarshalUint32Array(value []byte, array *[]uint32) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1031,7 +1084,7 @@ func unmarshalUint32Array(value []byte, array *[]uint32) error {
 
 func unmarshalUint64Array(value []byte, array *[]uint64) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1052,7 +1105,7 @@ func unmarshalUint64Array(value []byte, array *[]uint64) error {
 
 func unmarshalFloat32Array(value []byte, array *[]JsonFloat32) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1073,7 +1126,7 @@ func unmarshalFloat32Array(value []byte, array *[]JsonFloat32) error {
 
 func unmarshalFloat64Array(value []byte, array *[]JsonFloat64) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1094,7 +1147,7 @@ func unmarshalFloat64Array(value []byte, array *[]JsonFloat64) error {
 
 func unmarshalStringArray(value []byte, array *[]string) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1115,7 +1168,7 @@ func unmarshalStringArray(value []byte, array *[]string) error {
 
 func unmarshalTimeArray(value []byte, array *[]Time) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1135,7 +1188,7 @@ func unmarshalTimeArray(value []byte, array *[]Time) error {
 
 func unmarshalDurationArray(value []byte, array *[]Duration) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}
@@ -1155,7 +1208,7 @@ func unmarshalDurationArray(value []byte, array *[]Duration) error {
 
 func unmarshalMessageArray(value []byte, array *[]Message, msgType *DynamicMessageType) error {
 	var err error
-	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	arrayHandler := func(value []byte, dataType jsonparser.ValueType, offset int, _ error) {
 		if err != nil {
 			return // Stop processing if there is an error.
 		}

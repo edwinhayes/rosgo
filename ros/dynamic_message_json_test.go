@@ -248,12 +248,12 @@ func TestDynamicMessage_JSON_primitives(t *testing.T) {
 		},
 		// - Floats.
 		{
-			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 4)},
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 6)},
 			data:       map[string]interface{}{"f32": []JsonFloat32{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}, {float32(math.Inf(1))}, {float32(math.Inf(-1))}}},
 			marshalled: `{"f32":[-1.125,3300,7.7e+07,9.9e-09,"+inf","-inf"]}`,
 		},
 		{
-			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 7)},
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 6)},
 			data:       map[string]interface{}{"f64": []JsonFloat64{{-1.125}, {3.3e3}, {7.7e7}, {9.9e-9}, {math.Inf(1)}, {math.Inf(-1)}}},
 			marshalled: `{"f64":[-1.125,3300,7.7e+07,9.9e-09,"+inf","-inf"]}`,
 		},
@@ -512,6 +512,44 @@ func TestDynamicMessage_marshalJSON_strings(t *testing.T) {
 
 		if string(marshalled) != string(defaultMarshalled) {
 			t.Fatalf("marshalled data does not equal expected\nmarshalled: %v\nexpected: %v", string(marshalled), string(defaultMarshalled))
+		}
+	}
+}
+
+// Ensure that we will still unmarshal a u8 array of numbers (even though the default representation is base64).
+func TestDynamicMessage_marshalJSON_u8Array(t *testing.T) {
+
+	testCases := []struct {
+		fields     []gengo.Field
+		marshalled string
+		data       []uint8
+	}{
+		{
+			fields:     []gengo.Field{*gengo.NewField("T", "uint8", "u8", true, -1)},
+			marshalled: `{"u8":[0,1,2,3,4,5]}`,
+			data:       []uint8{0, 1, 2, 3, 4, 5},
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
+
+		testMessage := &DynamicMessage{
+			dynamicType: testMessageType,
+			data:        make(map[string]interface{}),
+		}
+
+		if err := json.Unmarshal([]byte(testCase.marshalled), testMessage); err != nil {
+			t.Fatalf("failed to unmarshal dynamic message\n json: %v\nerr: %v", testCase.marshalled, err)
+		}
+
+		if reflect.DeepEqual(testCase.data, testMessage.data["u8"].([]uint8)) == false {
+			t.Fatalf("unmarshalled data did not match expected\n unmarshalled: %v\n expected: %v", testCase.data, testMessage.data["u8"].([]uint8))
 		}
 	}
 }
@@ -903,6 +941,357 @@ func TestDynamicMessage_JSONMarshal_typeErrors(t *testing.T) {
 		marshalled, err := json.Marshal(testMessage)
 		if err == nil {
 			t.Fatalf("marshalled invalid dynamic message data\njson: %v", marshalled)
+		}
+	}
+}
+
+func TestDynamicMessage_JSONUnmarshal_errors(t *testing.T) {
+	testCases := []struct {
+		fields     []gengo.Field
+		marshalled string
+	}{
+		// Singular Values.
+		// - Unsigned integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)},
+			marshalled: `{"u8":"18"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", false, 0)},
+			marshalled: `{"u16":10.5}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", false, 0)},
+			marshalled: `{"u32":false}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", false, 0)},
+			marshalled: `{"u64":{"Sec":0,"NSec":1}}`,
+		},
+		// - Signed integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int8", "i8", false, 0)},
+			marshalled: `{"i8":[0,1,2,3,4]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", false, 0)},
+			marshalled: `{"i16":{}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", false, 0)},
+			marshalled: `{"i32":""}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", false, 0)},
+			marshalled: `{"i64":12.34}`,
+		},
+		// - Booleans.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			marshalled: `{"b":0}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			marshalled: `{"b":1.2}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			marshalled: `{"b":{}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", false, 0)},
+			marshalled: `{"b":[true]}`,
+		},
+		// - Floats.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":"nAAn"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":1e}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":-2.3e^08}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":[1.2]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":"+infff"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", false, 0)},
+			marshalled: `{"f32":{}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":"nAAn"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":1e}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":-2.3e^08}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":[1.2]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":"+infff"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", false, 0)},
+			marshalled: `{"f64":{}}`,
+		},
+		// - Strings.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			marshalled: `{"s":no quotes}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			marshalled: `{"s":\"escaped quotes\"}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			marshalled: `{"s":0}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			marshalled: `{"s":["arr"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", false, 0)},
+			marshalled: `{"s":{"obj":"val"}}`,
+		},
+		// - Time and Duration.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			marshalled: `{"t":{}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			marshalled: `{"t":{"NSec":1}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			marshalled: `{"t":{"Sec":1}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", false, 0)},
+			marshalled: `{"t":1.5}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", false, 0)},
+			marshalled: `{"d":{"Sec":true,"NSec":true}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", false, 0)},
+			marshalled: `{"d":[{"Sec":"","NSec":""}]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", false, 0)},
+			marshalled: `{"d":false}`,
+		},
+		// Arrays.
+		// - Unsigned integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", true, 1)},
+			marshalled: `{"u8":"001"}`, // Invalid base64.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint8", "u8", true, 1)},
+			marshalled: `{"u8":["AAAAA"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, 5)},
+			marshalled: `{"u16":[61662,48282,30806,"13330",0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, 5)},
+			marshalled: `{"u16":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint16", "u16", true, 1)},
+			marshalled: `{"u16":30806}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, 5)},
+			marshalled: `{"u32":[61662,48282,30806,{"v":"13330"},0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, 5)},
+			marshalled: `{"u32":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint32", "u32", true, 1)},
+			marshalled: `{"u32":30806}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, 5)},
+			marshalled: `{"u64":[61662,48282,30806,[13330],0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, 5)},
+			marshalled: `{"u64":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "uint64", "u64", true, 1)},
+			marshalled: `{"u64":30806}`,
+		},
+		// - Signed integers.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int8", "i8", true, 5)},
+			marshalled: `{"i8":[61,48,30,"13",0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i8", true, 5)},
+			marshalled: `{"i8":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i8", true, 1)},
+			marshalled: `{"i8":6}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, 5)},
+			marshalled: `{"i16":[61662,48282,30806,"13330",0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, 5)},
+			marshalled: `{"i16":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int16", "i16", true, 1)},
+			marshalled: `{"i16":30806}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, 5)},
+			marshalled: `{"i32":[61662,48282,30806,{"v":13330},0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, 5)},
+			marshalled: `{"i32":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int32", "i32", true, 1)},
+			marshalled: `{"i32":30806}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, 5)},
+			marshalled: `{"i64":[61662,48282,30806,[13330],0]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, 5)},
+			marshalled: `{"i64":[0]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "int64", "i64", true, 1)},
+			marshalled: `{"i64":30806}`,
+		},
+		// - Booleans.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 1)},
+			marshalled: `{"b":true}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 1)},
+			marshalled: `{"b":[true,false]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 2)},
+			marshalled: `{"b":[1,2]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "bool", "b", true, 1)},
+			marshalled: `{"b":["true"]}`,
+		},
+		// - Floats.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 4)},
+			marshalled: `{"f32":[-1.125,3300,7.7e+07,9.9e-09,"+inf","-inf"]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float32", "f32", true, 1)},
+			marshalled: `{"f32":["zero"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 1)},
+			marshalled: `{"f64":-1.125}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "float64", "f64", true, 1)},
+			marshalled: `{"f64":[{1.2}]}`,
+		},
+		// - Strings.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", true, 5)},
+			marshalled: `{"s":[""]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", true, 2)},
+			marshalled: `{"s":[0,"1"]}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "string", "s", true, -1)},
+			marshalled: `{"s":"string"}`,
+		},
+		// - Time.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", true, 2)},
+			marshalled: `{"t":[{"Sec":322420463,"NSec":7364688}]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", true, 1)},
+			marshalled: `{"t":{"Sec":322420463,"NSec":7364688}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "time", "t", true, 1)},
+			marshalled: `{"t":[{"Sec":"zero","NSec":7364688}]}`,
+		},
+		// - Duration.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 2)},
+			marshalled: `{"d":[{"Sec":322420463,"NSec":7364688}]}`, // Wrong length.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 2)},
+			marshalled: `{"d":{"Sec":322420463,"NSec":7364688}}`,
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 2)},
+			marshalled: `{"d":[{"Sec":"zero","NSec":7364688}]}`,
+		},
+		// Other errors.
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 1)},
+			marshalled: `{"t":[{"Sec":0,"NSec":7364688}]}`, // Key not found.
+		},
+		{
+			fields:     []gengo.Field{*gengo.NewField("Testing", "duration", "d", true, 1)},
+			marshalled: `{"d":[{"Sec":0,"NSec":7364688}],"t":[{"Sec":0,"NSec":7364688}]}`, // Unknown key.
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		testMessageType := &DynamicMessageType{
+			spec:         generateTestSpec(testCase.fields),
+			nested:       make(map[string]*DynamicMessageType),
+			jsonPrealloc: 0,
+		}
+
+		testMessage := testMessageType.NewDynamicMessage()
+
+		if err := json.Unmarshal([]byte(testCase.marshalled), testMessage); err == nil {
+			t.Fatalf("unmarshalled invalid dynamic message json\njson: %v", testCase.marshalled)
 		}
 	}
 }
