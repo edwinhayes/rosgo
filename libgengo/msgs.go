@@ -17,6 +17,28 @@ const (
 	DurationMsg    = "uint32 secs\nuint32 nsecs"
 )
 
+// BuiltInType enumeration represents a standard ros type. See http://wiki.ros.org/msg for specification.
+type BuiltInType int
+
+// Enumeration of all ros builtin types. Invalid represents a non-built in type.
+const (
+	Invalid BuiltInType = iota
+	Bool
+	Int8
+	Int16
+	Int32
+	Int64
+	Uint8
+	Uint16
+	Uint32
+	Uint64
+	Float32
+	Float64
+	String
+	Time
+	Duration
+)
+
 var PrimitiveTypes = []string{
 	"int8",
 	"uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float32", "float64",
@@ -213,6 +235,43 @@ func ToGoType(pkg string, typeName string) string {
 	return goType
 }
 
+func ToBuiltInType(typeName string) BuiltInType {
+	var builtInType BuiltInType
+	switch typeName {
+	case "int8":
+		builtInType = Int8
+	case "uint8", "char", "byte":
+		builtInType = Uint8
+	case "int16":
+		builtInType = Int16
+	case "uint16":
+		builtInType = Uint16
+	case "int32":
+		builtInType = Int32
+	case "uint32":
+		builtInType = Uint32
+	case "int64":
+		builtInType = Int64
+	case "uint64":
+		builtInType = Uint64
+	case "float32":
+		builtInType = Float32
+	case "float64":
+		builtInType = Float64
+	case "string":
+		builtInType = String
+	case "bool":
+		builtInType = Bool
+	case "time":
+		builtInType = Time
+	case "duration":
+		builtInType = Duration
+	default:
+		builtInType = Invalid
+	}
+	return builtInType
+}
+
 func ToGoName(name string, constant bool) string {
 	if constant {
 		return strings.ToUpper(name)
@@ -284,23 +343,25 @@ func (c *Constant) String() string {
 }
 
 type Field struct {
-	Package   string
-	Type      string
-	Name      string
-	IsBuiltin bool
-	IsArray   bool
-	ArrayLen  int
-	GoName    string
-	GoType    string
-	ZeroValue string
+	Package     string
+	Type        string
+	Name        string
+	IsBuiltin   bool
+	BuiltInType BuiltInType
+	IsArray     bool
+	ArrayLen    int
+	GoName      string
+	GoType      string
+	ZeroValue   string
 }
 
 func NewField(pkg string, fieldType string, name string, isArray bool, arrayLen int) *Field {
+	builtInType := ToBuiltInType(fieldType)
 	goType := ToGoType(pkg, fieldType)
 	goName := ToGoName(name, false)
 	zeroValue := GetZeroValue(pkg, fieldType)
-	isBuiltin := isBuiltinType(fieldType)
-	return &Field{pkg, fieldType, name, isBuiltin, isArray, arrayLen, goName, goType, zeroValue}
+	isBuiltin := builtInType != Invalid
+	return &Field{pkg, fieldType, name, isBuiltin, builtInType, isArray, arrayLen, goName, goType, zeroValue}
 }
 
 func (f *Field) String() string {
