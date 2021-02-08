@@ -96,8 +96,9 @@ func TestSubscriber_Shutdown(t *testing.T) {
 		*gengo.NewField("Testing", "uint8", "u8", true, 8),
 	}
 	msgType := &DynamicMessageType{
-		generateTestSpec(fields), // From dynamic_message_tests.go.
-		make(map[string]*DynamicMessageType),
+		spec:         generateTestSpec(fields), // From dynamic_message_tests.go.
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 	sub := newDefaultSubscriber("testTopic", msgType, func() {})
 

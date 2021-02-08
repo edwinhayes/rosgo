@@ -11,7 +11,7 @@ import (
 
 // Singular value type used for testing across all ROS primitives.
 var singularMessageType DynamicMessageType = DynamicMessageType{
-	generateTestSpec([]gengo.Field{
+	spec: generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint8", "u8", false, 0),
 		*gengo.NewField("Testing", "uint16", "u16", false, 0),
 		*gengo.NewField("Testing", "uint32", "u32", false, 0),
@@ -27,7 +27,8 @@ var singularMessageType DynamicMessageType = DynamicMessageType{
 		*gengo.NewField("Testing", "time", "t", false, 0),
 		*gengo.NewField("Testing", "duration", "d", false, 0),
 	}),
-	make(map[string]*DynamicMessageType),
+	nested:       make(map[string]*DynamicMessageType),
+	jsonPrealloc: 0,
 }
 
 var singularSerialized []byte = []byte{
@@ -63,7 +64,7 @@ func BenchmarkDynamicMessage_Deserialize_SingularPrimitives(b *testing.B) {
 
 // Fixed array type used for testing across all ROS primitives.
 var fixedArrayMessageType DynamicMessageType = DynamicMessageType{
-	generateTestSpec([]gengo.Field{
+	spec: generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint8", "u8", true, 8),
 		*gengo.NewField("Testing", "uint16", "u16", true, 4),
 		*gengo.NewField("Testing", "uint32", "u32", true, 2),
@@ -79,7 +80,8 @@ var fixedArrayMessageType DynamicMessageType = DynamicMessageType{
 		*gengo.NewField("Testing", "time", "t", true, 2),
 		*gengo.NewField("Testing", "duration", "d", true, 2),
 	}),
-	make(map[string]*DynamicMessageType),
+	nested:       make(map[string]*DynamicMessageType),
+	jsonPrealloc: 0,
 }
 
 var fixedArraySerialized []byte = []byte{
@@ -119,7 +121,7 @@ func BenchmarkDynamicMessage_Deserialize_FixedArrayPrimitives(b *testing.B) {
 
 // Dynamic array type used for testing across all ROS primitives. Note: negative array sizes => dynamic arrays.
 var dynamicArrayMessageType DynamicMessageType = DynamicMessageType{
-	generateTestSpec([]gengo.Field{
+	spec: generateTestSpec([]gengo.Field{
 		*gengo.NewField("Testing", "uint8", "u8", true, -1),
 		*gengo.NewField("Testing", "uint16", "u16", true, -1),
 		*gengo.NewField("Testing", "uint32", "u32", true, -1),
@@ -135,7 +137,8 @@ var dynamicArrayMessageType DynamicMessageType = DynamicMessageType{
 		*gengo.NewField("Testing", "time", "t", true, -1),
 		*gengo.NewField("Testing", "duration", "d", true, -1),
 	}),
-	make(map[string]*DynamicMessageType),
+	nested:       make(map[string]*DynamicMessageType),
+	jsonPrealloc: 0,
 }
 
 var dynamicArraySerialized []byte = []byte{
@@ -196,10 +199,11 @@ var bigArraySerialized []byte = make([]byte, 1_000_000)
 func BenchmarkDynamicMessage_Deserialize_boolBigArray(b *testing.B) {
 
 	var boolBigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "bool", "b", true, 1_000_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := boolBigArrayMessageType.NewDynamicMessage()
@@ -217,10 +221,11 @@ func BenchmarkDynamicMessage_Deserialize_boolBigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_int8BigArray(b *testing.B) {
 
 	var int8BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "int8", "i8", true, 1_000_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := int8BigArrayMessageType.NewDynamicMessage()
@@ -238,10 +243,11 @@ func BenchmarkDynamicMessage_Deserialize_int8BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_int16BigArray(b *testing.B) {
 
 	var int16BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "int16", "i16", true, 500_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := int16BigArrayMessageType.NewDynamicMessage()
@@ -258,10 +264,11 @@ func BenchmarkDynamicMessage_Deserialize_int16BigArray(b *testing.B) {
 // Benchmark deserializing a one megabyte array of int32.
 func BenchmarkDynamicMessage_Deserialize_int32BigArray(b *testing.B) {
 	var int32BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "int32", "i32", true, 250_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := int32BigArrayMessageType.NewDynamicMessage()
@@ -279,10 +286,11 @@ func BenchmarkDynamicMessage_Deserialize_int32BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_int64BigArray(b *testing.B) {
 
 	var int64BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "int64", "i64", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := int64BigArrayMessageType.NewDynamicMessage()
@@ -300,10 +308,11 @@ func BenchmarkDynamicMessage_Deserialize_int64BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_uint8BigArray(b *testing.B) {
 
 	var uint8BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "uint8", "u8", true, 1_000_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := uint8BigArrayMessageType.NewDynamicMessage()
@@ -321,10 +330,11 @@ func BenchmarkDynamicMessage_Deserialize_uint8BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_uint16BigArray(b *testing.B) {
 
 	var uint16BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "uint16", "u16", true, 500_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := uint16BigArrayMessageType.NewDynamicMessage()
@@ -342,10 +352,11 @@ func BenchmarkDynamicMessage_Deserialize_uint16BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_uint32BigArray(b *testing.B) {
 
 	var uint32BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "uint32", "u32", true, 250_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := uint32BigArrayMessageType.NewDynamicMessage()
@@ -363,10 +374,11 @@ func BenchmarkDynamicMessage_Deserialize_uint32BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_uint64BigArray(b *testing.B) {
 
 	var uint64BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "uint64", "u64", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := uint64BigArrayMessageType.NewDynamicMessage()
@@ -384,10 +396,11 @@ func BenchmarkDynamicMessage_Deserialize_uint64BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_float32BigArray(b *testing.B) {
 
 	var float32BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "float32", "f32", true, 250_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := float32BigArrayMessageType.NewDynamicMessage()
@@ -405,10 +418,11 @@ func BenchmarkDynamicMessage_Deserialize_float32BigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_float64BigArray(b *testing.B) {
 
 	var float64BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "float64", "f64", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := float64BigArrayMessageType.NewDynamicMessage()
@@ -428,10 +442,11 @@ func BenchmarkDynamicMessage_Deserialize_stringBigArray(b *testing.B) {
 	var stringBigArraySerialized []byte = bytes.Repeat([]byte{0x04, 0x00, 0x00, 0x00, 'J', 'o', 'J', 'o'}, 125_000)
 
 	var stringBigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "string", "s", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := stringBigArrayMessageType.NewDynamicMessage()
@@ -449,10 +464,11 @@ func BenchmarkDynamicMessage_Deserialize_stringBigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_timeBigArray(b *testing.B) {
 
 	var timeBigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "time", "t", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := timeBigArrayMessageType.NewDynamicMessage()
@@ -470,10 +486,11 @@ func BenchmarkDynamicMessage_Deserialize_timeBigArray(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_durationBigArray(b *testing.B) {
 
 	var durationBigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "duration", "d", true, 125_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	testMessage := durationBigArrayMessageType.NewDynamicMessage()
@@ -520,10 +537,11 @@ func BenchmarkDynamicMessage_Deserialize_dynamicType(b *testing.B) {
 func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArray(b *testing.B) {
 	// Extract 1_000_000 bytes / 56 (bytes/packet) ~= 17857 packet.
 	var dynamicTypeBigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("geometry_msgs", "Pose", "pose", true, 17857),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	msgType, err := newDynamicMessageTypeNested("Pose", "geometry_msgs", nil, nil)
@@ -531,7 +549,7 @@ func BenchmarkDynamicMessage_Deserialize_dynamicTypeBigArray(b *testing.B) {
 		b.Skip("benchmark skipped, ROS environment not set up")
 		return
 	}
-	dynamicTypeBigArrayMessageType.nested["pose"] = msgType
+	dynamicTypeBigArrayMessageType.nested["geometry_msgs/Pose"] = msgType
 
 	testMessage := dynamicTypeBigArrayMessageType.NewDynamicMessage()
 
@@ -586,10 +604,11 @@ func BenchmarkDynamicMessage_NewMessage_dynamicType(b *testing.B) {
 
 func BenchmarkDynamicMessage_NewMessage_BigArray(b *testing.B) {
 	var uint16BigArrayMessageType DynamicMessageType = DynamicMessageType{
-		generateTestSpec([]gengo.Field{
+		spec: generateTestSpec([]gengo.Field{
 			*gengo.NewField("Testing", "uint16", "u16", true, 500_000),
 		}),
-		make(map[string]*DynamicMessageType),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
 	}
 
 	b.ResetTimer()
