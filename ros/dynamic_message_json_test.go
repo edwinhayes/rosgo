@@ -1295,3 +1295,76 @@ func TestDynamicMessage_JSONUnmarshal_errors(t *testing.T) {
 		}
 	}
 }
+
+func TestDynamicMessage_marshalJSON_invalidPointers(t *testing.T) {
+
+	marshalled := []byte(`{"u8":0}`)
+	testMessageType := &DynamicMessageType{
+		spec:         generateTestSpec([]gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)}),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
+	}
+	testMessage := testMessageType.NewDynamicMessage()
+
+	// Nil pointer to dynamic message type
+	testMessage.dynamicType = nil
+	if _, err := testMessage.MarshalJSON(); err == nil {
+		t.Fatal("expected error when marshalling nil type")
+	}
+	if err := testMessage.UnmarshalJSON(marshalled); err == nil {
+		t.Fatal("expected error when unmarshalling nil type")
+	}
+
+	// Nil pointer to dynamic message data
+	testMessage = testMessageType.NewDynamicMessage()
+	testMessage.data = nil
+	if _, err := testMessage.MarshalJSON(); err == nil {
+		t.Fatal("expected error when marshalling nil data")
+	}
+	if err := testMessage.UnmarshalJSON(marshalled); err == nil {
+		t.Fatal("expected error when unmarshalling nil data")
+	}
+
+	// Nil pointer to dynamic message nested types
+	testMessage = testMessageType.NewDynamicMessage()
+	testMessage.dynamicType.nested = nil
+	if _, err := testMessage.MarshalJSON(); err == nil {
+		t.Fatal("expected error when marshalling nil nested")
+	}
+	if err := testMessage.UnmarshalJSON(marshalled); err == nil {
+		t.Fatal("expected error when unmarshalling nil nested")
+	}
+
+	testMessageType = &DynamicMessageType{
+		spec:         generateTestSpec([]gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)}),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
+	}
+
+	// Nil pointer to dynamic message spec
+	testMessage = testMessageType.NewDynamicMessage()
+	testMessage.dynamicType.spec = nil
+	if _, err := testMessage.MarshalJSON(); err == nil {
+		t.Fatal("expected error when marshalling nil spec")
+	}
+	if err := testMessage.UnmarshalJSON(marshalled); err == nil {
+		t.Fatal("expected error when unmarshalling nil spec")
+	}
+
+	testMessageType = &DynamicMessageType{
+		spec:         generateTestSpec([]gengo.Field{*gengo.NewField("Testing", "uint8", "u8", false, 0)}),
+		nested:       make(map[string]*DynamicMessageType),
+		jsonPrealloc: 0,
+	}
+
+	// Nil pointer to dynamic message spec fields
+	testMessage = testMessageType.NewDynamicMessage()
+	testMessage.dynamicType.spec.Fields = nil
+	if _, err := testMessage.MarshalJSON(); err == nil {
+		t.Fatal("expected error when marshalling nil spec fields")
+	}
+	if err := testMessage.UnmarshalJSON(marshalled); err == nil {
+		t.Fatal("expected error when unmarshalling nil spec fields")
+	}
+
+}
