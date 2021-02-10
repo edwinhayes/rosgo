@@ -33,7 +33,6 @@ func newDefaultServiceClient(log *modular.ModuleLogger, nodeID string, masterURI
 }
 
 func (c *defaultServiceClient) Call(srv Service) error {
-	logger := *c.logger
 
 	result, err := callRosAPI(c.masterURI, "lookupService", c.nodeID, c.service)
 	if err != nil {
@@ -50,8 +49,15 @@ func (c *defaultServiceClient) Call(srv Service) error {
 		return err
 	}
 
+	return c.doServiceRequest(srv, serviceURL.Host)
+}
+
+func (c *defaultServiceClient) doServiceRequest(srv Service, serviceURI string) error {
+	logger := *c.logger
+
 	var conn net.Conn
-	conn, err = net.Dial("tcp", serviceURL.Host)
+	var err error
+	conn, err = net.Dial("tcp", serviceURI)
 	if err != nil {
 		return err
 	}
