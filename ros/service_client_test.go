@@ -228,13 +228,118 @@ func TestServiceClient_NotOkError(t *testing.T) {
 		t.Fatal("took too long to shutdown test client")
 	case err := <-result:
 		if err == nil {
-			t.Fatal("expected error from early hang up, got no error")
+			t.Fatal("expected error from not ok, got no error")
+		}
+	}
+}
+
+func TestServiceClient_SuccessfulServiceExchange_HeaderDelay(t *testing.T) {
+	l, conn, client, result := setupServiceServerAndClient(t)
+	defer l.Close()
+	defer conn.Close()
+
+	doReadConnectionHeader(t, conn)
+	<-time.After(500 * time.Millisecond)
+	select {
+	case err := <-result:
+		t.Fatalf("premature exit due to header response delay, got error %s", err)
+	default:
+	}
+	doWriteConnectionHeader(t, conn, client)
+	doReceiveRequest(t, conn)
+	doSendOk(t, conn, true)
+	doSendResponse(t, conn)
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("took too long for client to stop")
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("expected successful request/response, got error %s", err)
+		}
+	}
+}
+
+func TestServiceClient_SuccessfulServiceExchange_OkDelay(t *testing.T) {
+	l, conn, client, result := setupServiceServerAndClient(t)
+	defer l.Close()
+	defer conn.Close()
+
+	doServiceServerHeaderExchange(t, conn, client)
+	doReceiveRequest(t, conn)
+	<-time.After(500 * time.Millisecond)
+	select {
+	case err := <-result:
+		t.Fatalf("premature exit due to ok reply delay, got error %s", err)
+	default:
+	}
+	doSendOk(t, conn, true)
+	doSendResponse(t, conn)
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("took too long for client to stop")
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("expected successful request/response, got error %s", err)
+		}
+	}
+}
+
+func TestServiceClient_SuccessfulServiceExchange_ResponseDelay(t *testing.T) {
+	l, conn, client, result := setupServiceServerAndClient(t)
+	defer l.Close()
+	defer conn.Close()
+
+	doServiceServerHeaderExchange(t, conn, client)
+	doReceiveRequest(t, conn)
+	doSendOk(t, conn, true)
+	<-time.After(500 * time.Millisecond)
+	select {
+	case err := <-result:
+		t.Fatalf("premature exit due to response delay, got error %s", err)
+	default:
+	}
+	doSendResponse(t, conn)
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("took too long for client to stop")
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("expected successful request/response, got error %s", err)
 		}
 	}
 }
 
 // Test helper functions.
 
+func doReadConnectionHeader(t *testing.T, conn net.Conn) {
+	if _, err := readConnectionHeader(conn); err != nil {
+		t.Fatal("Failed to read header:", err)
+	}
+}
+
+func doWriteConnectionHeader(t *testing.T, conn net.Conn, client *defaultServiceClient) {
+	replyHeader := []header{
+		{"service", client.service},
+		{"md5sum", client.srvType.MD5Sum()},
+		{"type", client.srvType.Name()},
+		{"callerid", "testServer"},
+	}
+
+	if err := writeConnectionHeader(replyHeader, conn); err != nil {
+		t.Fatalf("Failed to write header: %s", replyHeader)
+	}
+}
+
+// doHeaderExchange emulates the header exchange as a service server. Puts the client in a state where it is ready to send a request.
+func doServiceServerHeaderExchange(t *testing.T, conn net.Conn, client *defaultServiceClient) {
+	doReadConnectionHeader(t, conn)
+	doWriteConnectionHeader(t, conn, client)
+}
+
+// Receives a request message. Because we are using test messages, we know this should be `Receive` serialized.
 func doReceiveRequest(t *testing.T, conn net.Conn) {
 	// Receive a request.
 	var size uint32
@@ -259,6 +364,8 @@ func doReceiveRequest(t *testing.T, conn net.Conn) {
 		t.Fatalf("request serialized to unexpected bytes, expected `Request` got %s", string(buffer[4:]))
 	}
 }
+
+// Sends an OK byte
 func doSendOk(t *testing.T, conn net.Conn, isOk bool) {
 	var ok uint8
 	if isOk {
@@ -273,9 +380,10 @@ func doSendOk(t *testing.T, conn net.Conn, isOk bool) {
 	}
 }
 
+// Sends a response message which is just `Response` serialized.
 func doSendResponse(t *testing.T, conn net.Conn) {
 	size := uint32(8)
-	buffer := []byte("response")
+	buffer := []byte("Response")
 
 	// Send a response.
 	if err := binary.Write(conn, binary.LittleEndian, &size); err != nil {
@@ -324,25 +432,4 @@ func setupServiceServerAndClient(t *testing.T) (net.Listener, net.Conn, *default
 	}
 
 	return l, conn, client, result
-}
-
-// doHeaderExchange emulates the header exchange as a service server. Puts the client in a state where it is ready to send a request.
-func doServiceServerHeaderExchange(t *testing.T, conn net.Conn, client *defaultServiceClient) {
-	_, err := readConnectionHeader(conn)
-
-	if err != nil {
-		t.Fatal("Failed to read header:", err)
-	}
-
-	replyHeader := []header{
-		{"service", client.service},
-		{"md5sum", client.srvType.MD5Sum()},
-		{"type", client.srvType.Name()},
-		{"callerid", "testServer"},
-	}
-
-	err = writeConnectionHeader(replyHeader, conn)
-	if err != nil {
-		t.Fatalf("Failed to write header: %s", replyHeader)
-	}
 }
